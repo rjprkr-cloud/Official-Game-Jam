@@ -28,14 +28,20 @@ body {
     var(--bg);
 }
 
-#game {
+#game-container {
   max-width: 95vw;
   max-height: 85vh;
-  background: #120826;
+  line-height: 0;
   border: 2px solid var(--accent);
   border-radius: 10px;
   box-shadow: 0 0 80px rgba(198, 75, 255, 0.55);
-  image-rendering: pixelated;
+  overflow: hidden;
+}
+
+#game-container canvas {
+  display: block;
+  max-width: 95vw;
+  max-height: 85vh;
 }
 
 #hud {
