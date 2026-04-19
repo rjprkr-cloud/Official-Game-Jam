@@ -20,8 +20,14 @@ scene.fog    = new THREE.Fog(0xf0a060, 60, 155);
 const camera = new THREE.PerspectiveCamera(72, W / H, 0.1, 220);
 
 // ── Portal Protocol ────────────────────────────────────────────────────────────
-const incoming   = Portal.readPortalParams();
-const nextTarget = await Portal.pickPortalTarget();
+const incoming = Portal.readPortalParams();
+let nextTarget = null;
+try {
+  nextTarget = await Promise.race([
+    Portal.pickPortalTarget(),
+    new Promise(r => setTimeout(() => r(null), 800))
+  ]);
+} catch (e) { nextTarget = null; }
 
 // ── Lighting ───────────────────────────────────────────────────────────────────
 const ambLight = new THREE.AmbientLight(0xffd8a0, 2.2);
