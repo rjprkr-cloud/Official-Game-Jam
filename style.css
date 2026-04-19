@@ -448,3 +448,29 @@ body {
   accent-color: var(--accent);
   width: 130px;
 }
+
+/* ── Lane pip indicator ──────────────────────────────────────────────────── */
+#hud-lanes {
+  position: absolute;
+  bottom: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.lane-pip {
+  width: 28px;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18);
+  transition: background 0.1s, box-shadow 0.1s, border-color 0.1s;
+}
+
+.lane-pip.active {
+  background: var(--accent3);
+  border-color: var(--accent3);
+  box-shadow: 0 0 10px var(--accent3), 0 0 22px rgba(79,240,255,0.45);
+}
