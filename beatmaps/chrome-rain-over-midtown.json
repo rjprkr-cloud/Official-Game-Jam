@@ -353,7 +353,22 @@
     { "beat": 413, "time": 185.0848, "lane": 4 }
   ],
 
-  "hazards": [],
+  "hazards": [
+    { "time":  25.0, "lane": 4, "type": "spike_strip"       },
+    { "time":  38.0, "lane": 1, "type": "oil_slick"         },
+    { "time":  50.5, "lane": 3, "type": "concrete_barrier"  },
+    { "time":  60.0, "lane": 2, "type": "spike_strip"       },
+    { "time":  74.0, "lane": 4, "type": "oil_slick"         },
+    { "time":  84.5, "lane": 1, "type": "concrete_barrier"  },
+    { "time":  97.0, "lane": 3, "type": "spike_strip"       },
+    { "time": 108.0, "lane": 2, "type": "oil_slick"         },
+    { "time": 121.0, "lane": 4, "type": "concrete_barrier"  },
+    { "time": 133.5, "lane": 1, "type": "spike_strip"       },
+    { "time": 146.0, "lane": 3, "type": "oil_slick"         },
+    { "time": 159.0, "lane": 2, "type": "concrete_barrier"  },
+    { "time": 171.5, "lane": 4, "type": "spike_strip"       },
+    { "time": 180.0, "lane": 1, "type": "oil_slick"         }
+  ],
 
   "_noteDesignNotes": {
     "intro":    "beats 0-28,  every 4 beats — sparse, lane 2/3 only, easing player in",

@@ -1,4 +1,4 @@
-// Pulse//Drive — Phase 7: Note Orbs
+// Pulse//Drive — Phase 8: Hazards & HP Damage
 // Portal Protocol preserved.
 
 import * as THREE from 'https://esm.sh/three@0.169';
@@ -35,9 +35,7 @@ sun.shadow.camera.left = sun.shadow.camera.bottom = -90;
 sun.shadow.camera.right = sun.shadow.camera.top   =  90;
 scene.add(sun);
 
-// Beat accent light — pulses with the music
 const beatLight = new THREE.PointLight(0x4ff0ff, 0, 22);
-beatLight.position.set(0, 4, 0);
 scene.add(beatLight);
 
 // ── Sky gradient dome ──────────────────────────────────────────────────────────
@@ -64,13 +62,16 @@ const ROAD_START   = 25;
 const ROAD_END     = -(ROAD_LEN - 25);
 const CRUISE_SPD   = 28;
 const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75];
+// NOTE: beat-map lanes are 1-indexed (1-4). Convert with: lane - 1
 
-// ── Hit-judgment constants ─────────────────────────────────────────────────────
-const PERFECT_WINDOW = 0.08;   // ±80ms → PERFECT
-const HIT_WINDOW     = 0.16;   // ±160ms → GOOD
-const MISS_TIMEOUT   = 0.22;   // past this → MISS (auto-despawn)
-const ORB_SPAWN_AHEAD = 3.2;   // spawn notes this many seconds before hit time
-const ORB_POOL_SIZE  = 20;
+// ── Timing constants ──────────────────────────────────────────────────────────
+const PERFECT_WINDOW     = 0.08;   // ±80ms  → PERFECT
+const HIT_WINDOW         = 0.16;   // ±160ms → GOOD
+const MISS_TIMEOUT       = 0.22;   // note past this → MISS
+const ORB_SPAWN_AHEAD    = 3.2;    // seconds before hit to spawn orb
+const ORB_POOL_SIZE      = 20;
+const HAZARD_HIT_WINDOW  = 0.20;   // ±200ms → hazard collision window
+const HAZARD_SPAWN_AHEAD = 4.0;    // seconds before hit to show hazard
 
 // ── Ribbon mesh builder ────────────────────────────────────────────────────────
 function buildRibbon(halfWL, halfWR, yOff, tex, tileLen) {
@@ -144,13 +145,10 @@ buildRibbon(ROAD_W/2, ROAD_W/2+CURB_W, 0.010, makeCurbTex(), 6);
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(50, 500);
-  const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(600, ROAD_LEN+50),
-    new THREE.MeshLambertMaterial({ map:tex })
-  );
-  m.rotation.x = -Math.PI/2;
-  m.position.set(0, 0, ROAD_START - ROAD_LEN/2);
-  m.receiveShadow = true; scene.add(m);
+  scene.add(Object.assign(
+    new THREE.Mesh(new THREE.PlaneGeometry(600, ROAD_LEN+50), new THREE.MeshLambertMaterial({ map:tex })),
+    { rotation: new THREE.Euler(-Math.PI/2,0,0), position: new THREE.Vector3(0,0,ROAD_START-ROAD_LEN/2), receiveShadow:true }
+  ));
 }
 
 // ── Trees ──────────────────────────────────────────────────────────────────────
@@ -243,47 +241,37 @@ function buildCarIntoGroup(group, carCfg) {
       box(m.dark,  1.78,0.48,2.15, 0,0.98,+0.18); box(m.glass, 1.72,0.38,0.07, 0,0.94,-1.02);
       box(m.glass, 1.72,0.34,0.07, 0,0.94,+1.28); box(m.stripe,0.34,0.59,1.90, 0,0.52,-0.82);
       box(m.dark,  2.14,0.25,0.18, 0,0.28,-2.22); box(m.dark,  2.14,0.25,0.18, 0,0.28,+2.22);
-      for(const x of[-0.7,0.7]) box(m.hl,0.38,0.18,0.08, x,0.52,-2.22);
-      for(const x of[-0.7,0.7]) box(m.tl,0.44,0.20,0.08, x,0.52,+2.22);
-      addWheel(-1.19,0.35,-1.36); addWheel(1.19,0.35,-1.36);
-      addWheel(-1.19,0.35,+1.36); addWheel(1.19,0.35,+1.36); break;
+      for(const x of[-0.7,0.7]) { box(m.hl,0.38,0.18,0.08, x,0.52,-2.22); box(m.tl,0.44,0.20,0.08, x,0.52,+2.22); }
+      addWheel(-1.19,0.35,-1.36); addWheel(1.19,0.35,-1.36); addWheel(-1.19,0.35,+1.36); addWheel(1.19,0.35,+1.36); break;
     case 'truck':
       box(m.body,  2.60,0.90,4.00, 0,0.65, 0.00); box(m.dark,  2.76,0.28,4.20, 0,0.22, 0.00);
       box(m.dark,  2.20,0.82,2.00, 0,1.36,+0.30); box(m.glass, 2.10,0.52,0.07, 0,1.40,-0.72);
       box(m.glass, 2.10,0.46,0.07, 0,1.38,+1.30); box(m.dark,  2.52,0.28,0.20, 0,0.26,-2.02);
       box(m.dark,  2.52,0.28,0.20, 0,0.26,+2.02);
-      for(const x of[-0.8,0.8]) box(m.hl,0.44,0.22,0.08, x,0.70,-2.02);
-      for(const x of[-0.8,0.8]) box(m.tl,0.50,0.24,0.08, x,0.70,+2.02);
-      addWheel(-1.25,0.46,-1.30,1.12); addWheel(1.25,0.46,-1.30,1.12);
-      addWheel(-1.25,0.46,+1.30,1.12); addWheel(1.25,0.46,+1.30,1.12); break;
+      for(const x of[-0.8,0.8]) { box(m.hl,0.44,0.22,0.08, x,0.70,-2.02); box(m.tl,0.50,0.24,0.08, x,0.70,+2.02); }
+      addWheel(-1.25,0.46,-1.30,1.12); addWheel(1.25,0.46,-1.30,1.12); addWheel(-1.25,0.46,+1.30,1.12); addWheel(1.25,0.46,+1.30,1.12); break;
     case 'luxury':
       box(m.body,  2.08,0.48,5.20, 0,0.48, 0.00); box(m.dark,  2.22,0.22,5.40, 0,0.22, 0.00);
       box(m.dark,  1.68,0.44,2.60, 0,0.88,+0.30); box(m.glass, 1.60,0.36,0.07, 0,0.90,-0.98);
       box(m.glass, 1.60,0.32,0.07, 0,0.88,+1.60); box(m.stripe,0.26,0.49,2.10, 0,0.48,-0.70);
       box(m.dark,  2.00,0.22,0.18, 0,0.26,-2.62); box(m.dark,  2.00,0.22,0.18, 0,0.26,+2.62);
-      for(const x of[-0.62,0.62]) box(m.hl,0.36,0.14,0.08, x,0.48,-2.62);
-      for(const x of[-0.62,0.62]) box(m.tl,0.44,0.16,0.08, x,0.48,+2.62);
-      addWheel(-1.00,0.30,-1.80,0.90); addWheel(1.00,0.30,-1.80,0.90);
-      addWheel(-1.00,0.30,+1.80,0.90); addWheel(1.00,0.30,+1.80,0.90); break;
+      for(const x of[-0.62,0.62]) { box(m.hl,0.36,0.14,0.08, x,0.48,-2.62); box(m.tl,0.44,0.16,0.08, x,0.48,+2.62); }
+      addWheel(-1.00,0.30,-1.80,0.90); addWheel(1.00,0.30,-1.80,0.90); addWheel(-1.00,0.30,+1.80,0.90); addWheel(1.00,0.30,+1.80,0.90); break;
     case 'muscle':
       box(m.body,  2.78,0.58,4.20, 0,0.52, 0.00); box(m.dark,  2.94,0.24,4.40, 0,0.22, 0.00);
       box(m.dark,  2.00,0.50,1.92, 0,0.98,+0.50); box(m.glass, 1.90,0.40,0.07, 0,0.94,-0.64);
       box(m.glass, 1.90,0.36,0.07, 0,0.94,+1.44); box(m.stripe,0.52,0.59,2.40, 0,0.52,-0.50);
       box(m.dark,  0.52,0.14,1.80, 0,0.80,-0.50); box(m.dark,  2.70,0.26,0.20, 0,0.28,-2.12);
       box(m.dark,  2.70,0.26,0.20, 0,0.28,+2.12);
-      for(const x of[-0.80,0.80]) box(m.hl,0.42,0.20,0.08, x,0.52,-2.12);
-      for(const x of[-0.80,0.80]) box(m.tl,0.50,0.22,0.08, x,0.52,+2.12);
-      addWheel(-1.32,0.36,-1.30,1.06); addWheel(1.32,0.36,-1.30,1.06);
-      addWheel(-1.32,0.36,+1.30,1.06); addWheel(1.32,0.36,+1.30,1.06); break;
+      for(const x of[-0.80,0.80]) { box(m.hl,0.42,0.20,0.08, x,0.52,-2.12); box(m.tl,0.50,0.22,0.08, x,0.52,+2.12); }
+      addWheel(-1.32,0.36,-1.30,1.06); addWheel(1.32,0.36,-1.30,1.06); addWheel(-1.32,0.36,+1.30,1.06); addWheel(1.32,0.36,+1.30,1.06); break;
     case 'compact':
       box(m.body,  1.82,0.62,3.20, 0,0.50, 0.00); box(m.dark,  1.96,0.22,3.38, 0,0.22, 0.00);
       box(m.dark,  1.52,0.58,1.90, 0,0.98,+0.10); box(m.glass, 1.44,0.44,0.07, 0,0.98,-0.84);
       box(m.glass, 1.44,0.38,0.07, 0,0.96,+1.06); box(m.dark,  1.74,0.24,0.16, 0,0.26,-1.62);
       box(m.dark,  1.74,0.24,0.16, 0,0.26,+1.62);
-      for(const x of[-0.52,0.52]) box(m.hl,0.34,0.16,0.08, x,0.50,-1.62);
-      for(const x of[-0.52,0.52]) box(m.tl,0.40,0.18,0.08, x,0.50,+1.62);
-      addWheel(-0.90,0.30,-0.95,0.90); addWheel(0.90,0.30,-0.95,0.90);
-      addWheel(-0.90,0.30,+0.95,0.90); addWheel(0.90,0.30,+0.95,0.90); break;
+      for(const x of[-0.52,0.52]) { box(m.hl,0.34,0.16,0.08, x,0.50,-1.62); box(m.tl,0.40,0.18,0.08, x,0.50,+1.62); }
+      addWheel(-0.90,0.30,-0.95,0.90); addWheel(0.90,0.30,-0.95,0.90); addWheel(-0.90,0.30,+0.95,0.90); addWheel(0.90,0.30,+0.95,0.90); break;
   }
   return wheels;
 }
@@ -302,15 +290,12 @@ prevRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 prevRenderer.setClearColor(0x000000, 0);
 const prevScene  = new THREE.Scene();
 const prevCamera = new THREE.PerspectiveCamera(32, PREV_W/PREV_H, 0.1, 50);
-prevCamera.position.set(5.5, 3.2, 7.5);
-prevCamera.lookAt(0, 0.8, 0);
+prevCamera.position.set(5.5, 3.2, 7.5); prevCamera.lookAt(0, 0.8, 0);
 prevScene.add(new THREE.AmbientLight(0xffeedd, 3.0));
 const prevSun = new THREE.DirectionalLight(0xffffff, 4.5);
 prevSun.position.set(5,10,8); prevScene.add(prevSun);
-const prevRim = new THREE.PointLight(0x4ff0ff, 5, 18);
-prevRim.position.set(-4,2,-3); prevScene.add(prevRim);
-const prevRim2 = new THREE.PointLight(0xc64bff, 3, 14);
-prevRim2.position.set(3,-1,3); prevScene.add(prevRim2);
+prevScene.add(Object.assign(new THREE.PointLight(0x4ff0ff, 5, 18), { position: new THREE.Vector3(-4,2,-3) }));
+prevScene.add(Object.assign(new THREE.PointLight(0xc64bff, 3, 14), { position: new THREE.Vector3(3,-1,3) }));
 const prevCarGroup = new THREE.Group();
 prevCarGroup.rotation.order = 'YXZ';
 prevScene.add(prevCarGroup);
@@ -341,8 +326,7 @@ function drawSpeedLines(intensity) {
   for (const sl of SPEED_LINES) {
     const f=(t*(1.0+intensity*2.5)+sl.phase)%1, r0=(0.22+f*0.48)*R, r1=r0+sl.len*R*intensity;
     slCtx.strokeStyle=`rgba(255,255,255,${(0.15+intensity*0.45)*(1-f*0.55)})`;
-    slCtx.lineWidth=sl.width*intensity;
-    slCtx.beginPath();
+    slCtx.lineWidth=sl.width*intensity; slCtx.beginPath();
     slCtx.moveTo(cx+Math.cos(sl.angle)*r0, cy+Math.sin(sl.angle)*r0);
     slCtx.lineTo(cx+Math.cos(sl.angle)*r1, cy+Math.sin(sl.angle)*r1);
     slCtx.stroke();
@@ -357,189 +341,119 @@ function drawSpeedLines(intensity) {
 }
 
 // ── Web Audio ──────────────────────────────────────────────────────────────────
-let audioCtx    = null;
-let audioBuffer = null;
-let audioSource = null;
-let masterGain  = null;
-let musicGain   = null;
-let beatMap     = null;
-let audioReady  = false;
+let audioCtx    = null, audioBuffer = null, audioSource = null;
+let masterGain  = null, musicGain   = null;
+let beatMap     = null, audioReady  = false;
+let songStartTime = 0,  songTime    = 0;
+let nextBeatIdx = 0,    beatPulse   = 0;
+let volMaster = 0.8,    volMusic    = 0.9;
 
-let songStartTime = 0;
-let songTime      = 0;
-let nextBeatIdx   = 0;
-let beatPulse     = 0;
-
-let volMaster = 0.8;
-let volMusic  = 0.9;
-
-// Sky lerp targets
-const skyLerpTop = new THREE.Color(0xf5a060);
-const skyLerpBot = new THREE.Color(0x5c8de0);
-const skyLerpFog = new THREE.Color(0xf0a060);
-const skyLerpAmb = new THREE.Color(0xffd8a0);
-let   skyLerpAmbInt = 2.2;
+const skyLerpTop = new THREE.Color(0xf5a060), skyLerpBot = new THREE.Color(0x5c8de0);
+const skyLerpFog = new THREE.Color(0xf0a060), skyLerpAmb = new THREE.Color(0xffd8a0);
+let skyLerpAmbInt = 2.2;
 
 async function initAudio() {
   try {
-    const mapRes = await fetch('beatmaps/chrome-rain-over-midtown.json');
-    if (!mapRes.ok) throw new Error('Beat map 404');
-    beatMap = await mapRes.json();
-  } catch(e) { console.warn('Beat map load failed:', e); return; }
+    const r = await fetch('beatmaps/chrome-rain-over-midtown.json');
+    if (!r.ok) throw new Error('map 404');
+    beatMap = await r.json();
+  } catch(e) { console.warn('Beat map:', e); return; }
   try {
-    const tmpCtx = new AudioContext();
-    const audioRes = await fetch(beatMap.file);
-    if (!audioRes.ok) throw new Error('Audio 404');
-    audioBuffer = await tmpCtx.decodeAudioData(await audioRes.arrayBuffer());
-    await tmpCtx.close();
+    const tmp = new AudioContext();
+    const ar  = await fetch(beatMap.file);
+    if (!ar.ok) throw new Error('audio 404');
+    audioBuffer = await tmp.decodeAudioData(await ar.arrayBuffer());
+    await tmp.close();
     audioReady = true;
-  } catch(e) { console.warn('Audio decode failed:', e); }
+  } catch(e) { console.warn('Audio:', e); }
 }
 initAudio();
 
 function ensureAudioCtx() {
   if (audioCtx) return;
   audioCtx   = new AudioContext();
-  masterGain = audioCtx.createGain();
-  musicGain  = audioCtx.createGain();
-  musicGain.connect(masterGain);
-  masterGain.connect(audioCtx.destination);
-  masterGain.gain.value = volMaster;
-  musicGain.gain.value  = volMusic;
+  masterGain = audioCtx.createGain(); musicGain = audioCtx.createGain();
+  musicGain.connect(masterGain); masterGain.connect(audioCtx.destination);
+  masterGain.gain.value = volMaster; musicGain.gain.value = volMusic;
 }
-
 function startSong() {
-  if (!audioReady || !audioBuffer) { console.warn('Audio not ready'); return; }
+  if (!audioReady) return;
   ensureAudioCtx();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   stopSong();
-  audioSource         = audioCtx.createBufferSource();
-  audioSource.buffer  = audioBuffer;
-  audioSource.connect(musicGain);
-  songStartTime       = audioCtx.currentTime;
-  songTime            = 0;
-  nextBeatIdx         = 0;
-  beatPulse           = 0;
+  audioSource = audioCtx.createBufferSource();
+  audioSource.buffer = audioBuffer; audioSource.connect(musicGain);
+  songStartTime = audioCtx.currentTime; songTime = 0;
+  nextBeatIdx = 0; beatPulse = 0;
   audioSource.onended = () => { audioSource = null; };
   audioSource.start(0);
 }
-
 function stopSong() {
-  if (audioSource) {
-    try { audioSource.stop(); } catch(_) {}
-    audioSource.onended = null;
-    audioSource = null;
-  }
+  if (!audioSource) return;
+  try { audioSource.stop(); } catch(_) {}
+  audioSource.onended = null; audioSource = null;
 }
-
-function onBeat(idx) {
-  beatPulse = idx % 4 === 0 ? 1.0 : 0.72;
-}
+function onBeat(idx) { beatPulse = idx % 4 === 0 ? 1.0 : 0.72; }
 
 // ── Note orb system ────────────────────────────────────────────────────────────
-
-// Pre-computed world Z for each note (filled in prepareNotes)
 let noteWorldZ = [];
 
 function prepareNotes() {
   noteWorldZ = beatMap ? beatMap.notes.map(n => -CRUISE_SPD * n.time) : [];
 }
 
-// Orb mesh factory
 const _orbSphereGeo = new THREE.SphereGeometry(0.52, 9, 6);
 const _orbOuterGeo  = new THREE.SphereGeometry(0.82, 9, 6);
 const _orbRingGeo   = new THREE.RingGeometry(0.55, 1.15, 22);
 
 function makeOrb() {
   const group    = new THREE.Group();
-
   const innerMat = new THREE.MeshBasicMaterial({ color:0xff44ff, transparent:true });
   const outerMat = new THREE.MeshBasicMaterial({ color:0xcc00ff, transparent:true, opacity:0.36, depthWrite:false });
   const ringMat  = new THREE.MeshBasicMaterial({ color:0xff44ff, transparent:true, opacity:0.50, side:THREE.DoubleSide, depthWrite:false });
-
-  const inner = new THREE.Mesh(_orbSphereGeo, innerMat);
-  inner.position.y = 1.25;
-
-  const outer = new THREE.Mesh(_orbOuterGeo, outerMat);
-  outer.position.y = 1.25;
-
-  const ring = new THREE.Mesh(_orbRingGeo, ringMat);
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.015;
-
-  group.add(inner, outer, ring);
-  group.visible = false;
-  scene.add(group);
-
-  return {
-    group, inner, outer, ring,
-    innerMat, outerMat, ringMat,
-    noteIdx:   -1,
-    judged:    false,
-    state:     'done',   // 'active' | 'hit' | 'miss' | 'done'
-    stateTimer: 0,
-    phase:     Math.random() * Math.PI * 2,
-  };
+  const inner = new THREE.Mesh(_orbSphereGeo, innerMat); inner.position.y = 1.25;
+  const outer = new THREE.Mesh(_orbOuterGeo,  outerMat); outer.position.y = 1.25;
+  const ring  = new THREE.Mesh(_orbRingGeo,   ringMat);  ring.rotation.x = -Math.PI/2; ring.position.y = 0.015;
+  group.add(inner, outer, ring); group.visible = false; scene.add(group);
+  return { group, inner, outer, ring, innerMat, outerMat, ringMat,
+           noteIdx:-1, judged:false, state:'done', stateTimer:0, phase:Math.random()*Math.PI*2 };
 }
 
 const orbPool  = Array.from({ length: ORB_POOL_SIZE }, makeOrb);
 const liveOrbs = new Set();
-let   spawnIdx = 0;   // next beatMap.notes index to attempt spawning
+let   spawnIdx = 0;
 
-function getFreeOrb() {
-  for (const o of orbPool) if (o.state === 'done') return o;
-  return null;
-}
+function getFreeOrb() { for (const o of orbPool) if (o.state === 'done') return o; return null; }
 
 function spawnOrb(noteIdx) {
-  const orb = getFreeOrb();
-  if (!orb) return;
-
-  const note  = beatMap.notes[noteIdx];
-  const nz    = noteWorldZ[noteIdx];
-  const nx    = curveX(nz) + LANE_OFFSETS[note.lane];
-  const theme = beatMap.theme;
-
-  orb.innerMat.color.set(theme.noteColor);
-  orb.outerMat.color.set(theme.noteGlow);
-  orb.ringMat.color.set(theme.noteColor);
-  orb.innerMat.opacity = 1;
-  orb.outerMat.opacity = 0.36;
-  orb.ringMat.opacity  = 0.50;
-
-  orb.group.position.set(nx, 0, nz);
-  orb.group.scale.setScalar(1);
-  orb.group.visible = true;
-
-  orb.noteIdx    = noteIdx;
-  orb.judged     = false;
-  orb.state      = 'active';
-  orb.stateTimer = 0;
-
+  const orb  = getFreeOrb(); if (!orb) return;
+  const note = beatMap.notes[noteIdx];
+  const nz   = noteWorldZ[noteIdx];
+  const nx   = curveX(nz) + LANE_OFFSETS[note.lane - 1];   // ← 1-indexed fix
+  const th   = beatMap.theme;
+  orb.innerMat.color.set(th.noteColor); orb.outerMat.color.set(th.noteGlow); orb.ringMat.color.set(th.noteColor);
+  orb.innerMat.opacity = 1; orb.outerMat.opacity = 0.36; orb.ringMat.opacity = 0.50;
+  orb.group.position.set(nx, 0, nz); orb.group.scale.setScalar(1); orb.group.visible = true;
+  orb.noteIdx = noteIdx; orb.judged = false; orb.state = 'active'; orb.stateTimer = 0;
   liveOrbs.add(orb);
 }
 
 function despawnOrb(orb) {
-  orb.group.visible = false;
-  orb.state   = 'done';
-  orb.noteIdx = -1;
-  liveOrbs.delete(orb);
+  orb.group.visible = false; orb.state = 'done'; orb.noteIdx = -1; liveOrbs.delete(orb);
 }
 
 function judgeNote(orb, result) {
   if (orb.judged) return;
-  orb.judged     = true;
-  orb.stateTimer = 0;
-
+  orb.judged = true; orb.stateTimer = 0;
   if (result === 'perfect' || result === 'good') {
     const mult = Math.min(8, 1 + Math.floor(combo / 4));
     score += (result === 'perfect' ? 300 : 100) * mult;
-    combo++;
-    maxCombo = Math.max(maxCombo, combo);
+    combo++; maxCombo = Math.max(maxCombo, combo);
+    notesHit++;
     showHitFeedback(result, result === 'perfect' ? 'PERFECT' : 'GOOD');
     orb.state = 'hit';
   } else {
-    combo = 0;
+    combo = 0; notesMissed++;
     showHitFeedback('miss', 'MISS');
     orb.state = 'miss';
   }
@@ -552,100 +466,228 @@ function clearAllOrbs() {
 }
 
 function updateOrbs(dt) {
-  if (!beatMap || !beatMap.notes.length) return;
+  if (!beatMap?.notes?.length) return;
   const t = performance.now() / 1000;
-
-  // ── Spawn notes coming up ──────────────────────────────────────────────────
   while (spawnIdx < beatMap.notes.length) {
     const note = beatMap.notes[spawnIdx];
-    const ahead = note.time - songTime;
-    if (ahead > ORB_SPAWN_AHEAD) break;             // too far ahead, wait
-    if (ahead > -MISS_TIMEOUT) spawnOrb(spawnIdx);  // still valid to spawn
+    if (note.time - songTime > ORB_SPAWN_AHEAD) break;
+    if (note.time - songTime > -MISS_TIMEOUT) spawnOrb(spawnIdx);
     spawnIdx++;
   }
-
-  // ── Update live orbs ───────────────────────────────────────────────────────
   const toRemove = [];
   for (const orb of liveOrbs) {
     const note      = beatMap.notes[orb.noteIdx];
-    const timeDelta = songTime - note.time;   // + = note in past, - = note in future
-
+    const timeDelta = songTime - note.time;
     if (orb.state === 'active') {
-      // Floating bob
       const bob = Math.sin(t * 3.2 + orb.phase) * 0.18;
-      orb.inner.position.y = 1.25 + bob;
-      orb.outer.position.y = 1.25 + bob;
-
-      // Approach ring — shrinks as note time nears
-      const ahead = -timeDelta;  // positive = still in future
-      if (ahead > 0) {
-        const frac = Math.min(1, ahead / ORB_SPAWN_AHEAD);
-        orb.ring.scale.setScalar(0.75 + frac * 2.25);           // 3.0 → 0.75
-        orb.ringMat.opacity = 0.18 + (1 - frac) * 0.42;        // fades in as approaching
-      } else {
-        orb.ring.scale.setScalar(0.75);
-      }
-
-      // Glow pulse synced to song beat
-      const glow = 0.28 + beatPulse * 0.22;
-      orb.outerMat.opacity = glow;
-
-      // ── Hit detection ──────────────────────────────────────────────────────
+      orb.inner.position.y = 1.25 + bob; orb.outer.position.y = 1.25 + bob;
+      const ahead = -timeDelta;
+      orb.ring.scale.setScalar(ahead > 0 ? 0.75 + Math.min(1, ahead/ORB_SPAWN_AHEAD)*2.25 : 0.75);
+      orb.ringMat.opacity  = ahead > 0 ? 0.18 + (1-Math.min(1,ahead/ORB_SPAWN_AHEAD))*0.42 : 0.60;
+      orb.outerMat.opacity = 0.28 + beatPulse * 0.22;
       if (!orb.judged) {
-        if (Math.abs(timeDelta) <= HIT_WINDOW && car.lane === note.lane) {
+        if      (Math.abs(timeDelta) <= HIT_WINDOW && car.lane === note.lane - 1)
           judgeNote(orb, Math.abs(timeDelta) <= PERFECT_WINDOW ? 'perfect' : 'good');
-        } else if (timeDelta > MISS_TIMEOUT) {
+        else if (timeDelta > MISS_TIMEOUT)
           judgeNote(orb, 'miss');
-        }
       }
-
     } else if (orb.state === 'hit') {
-      // Scale up + fade out
       orb.stateTimer += dt;
       const frac = Math.min(1, orb.stateTimer / 0.28);
       orb.group.scale.setScalar(1 + frac * 0.9);
-      orb.innerMat.opacity = 1 - frac;
-      orb.outerMat.opacity = (1 - frac) * 0.36;
-      orb.ringMat.opacity  = (1 - frac) * 0.55;
+      orb.innerMat.opacity = 1 - frac; orb.outerMat.opacity = (1-frac)*0.36; orb.ringMat.opacity = (1-frac)*0.55;
       if (frac >= 1) toRemove.push(orb);
-
     } else if (orb.state === 'miss') {
-      // Flash red then shrink out
       orb.stateTimer += dt;
       const frac = Math.min(1, orb.stateTimer / 0.30);
       orb.innerMat.color.set(frac < 0.45 ? '#ff3333' : beatMap.theme.noteColor);
-      orb.innerMat.opacity = 1 - frac;
-      orb.outerMat.opacity = (1 - frac) * 0.36;
-      orb.ringMat.opacity  = (1 - frac) * 0.55;
-      orb.group.scale.setScalar(1 - frac * 0.55);
+      orb.innerMat.opacity = 1-frac; orb.outerMat.opacity = (1-frac)*0.36;
+      orb.ringMat.opacity  = (1-frac)*0.55; orb.group.scale.setScalar(1-frac*0.55);
       if (frac >= 1) toRemove.push(orb);
     }
   }
-
   for (const orb of toRemove) despawnOrb(orb);
 }
 
-// ── Car physics state ──────────────────────────────────────────────────────────
-const car = {
-  x: 0, z: 0,
-  heading: 0,
-  lane: 1,
-  laneX: LANE_OFFSETS[1],
-  lean: 0, wheelRot: 0,
-  suspY: 0, suspVel: 0, pitch: 0,
-};
+// ── Hazard system ──────────────────────────────────────────────────────────────
 
-function resetCar() {
-  car.z       = 0;
-  car.lane    = 1;
-  car.laneX   = LANE_OFFSETS[1];
-  car.x       = curveX(0) + car.laneX;
-  car.heading = Math.atan2(-curveDX(0), 1);
-  car.lean    = 0; car.wheelRot = 0;
-  car.suspY   = 0; car.suspVel  = 0; car.pitch = 0;
+// Build a Three.js mesh group for a given hazard type
+function buildHazardMesh(type) {
+  const g = new THREE.Group();
+
+  if (type === 'spike_strip') {
+    // Flat metal base
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(4.2, 0.13, 0.90),
+      new THREE.MeshLambertMaterial({ color: 0x888899 })
+    );
+    base.position.y = 0.065; base.castShadow = true; g.add(base);
+    // Yellow warning stripes
+    const stripeMat = new THREE.MeshLambertMaterial({ color: 0xffcc00, emissive: 0x886600, emissiveIntensity: 0.4 });
+    for (const xi of [-1.4, -0.4, 0.4, 1.4]) {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.15, 0.92), stripeMat);
+      s.position.set(xi, 0.075, 0); g.add(s);
+    }
+    // Warning cones on either side
+    const coneMat = new THREE.MeshLambertMaterial({ color: 0xff6600, emissive: 0x882200, emissiveIntensity: 0.3 });
+    for (const xi of [-2.4, 2.4]) {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.65, 6), coneMat);
+      cone.position.set(xi, 0.325, 0); g.add(cone);
+    }
+    g.add(Object.assign(new THREE.PointLight(0xff8800, 3.5, 9), { position: new THREE.Vector3(0, 1.8, 0) }));
+
+  } else if (type === 'oil_slick') {
+    // Dark iridescent puddle
+    const poolMat = new THREE.MeshLambertMaterial({
+      color: 0x110011, emissive: 0x550055, emissiveIntensity: 0.7,
+      transparent: true, opacity: 0.92, depthWrite: false,
+    });
+    const pool = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.055, 16), poolMat);
+    pool.position.y = 0.028; g.add(pool);
+    // Inner shimmer ring
+    const shimMat = new THREE.MeshBasicMaterial({ color: 0xcc44ff, transparent: true, opacity: 0.50, depthWrite: false });
+    const shim = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.04, 14), shimMat);
+    shim.position.y = 0.04; g.add(shim);
+    g.add(Object.assign(new THREE.PointLight(0x9900cc, 3, 7), { position: new THREE.Vector3(0, 1.2, 0) }));
+
+  } else if (type === 'concrete_barrier') {
+    // Main block
+    const blockMat = new THREE.MeshLambertMaterial({ color: 0xb8b8b8 });
+    const block = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.65, 0.95), blockMat);
+    block.position.y = 0.825; block.castShadow = true; g.add(block);
+    // Red danger stripe
+    const stripeMat = new THREE.MeshLambertMaterial({ color: 0xdd1111, emissive: 0x880000, emissiveIntensity: 0.35 });
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(3.85, 0.30, 0.98), stripeMat);
+    stripe.position.y = 0.72; g.add(stripe);
+    // Reflective top
+    const topMat = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+    const top = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.12, 0.95), topMat);
+    top.position.y = 1.71; g.add(top);
+    g.add(Object.assign(new THREE.PointLight(0xff3300, 4, 10), { position: new THREE.Vector3(0, 2.6, 0) }));
+  }
+
+  return g;
 }
 
-// ── Lane switch ────────────────────────────────────────────────────────────────
+// Pre-built hazard objects (rebuilt each song via prepareHazards)
+const hazardObjects = [];   // { group, hazardIdx, active, judged, stateTimer }
+let hazardSpawnIdx  = 0;
+
+function prepareHazards() {
+  for (const h of hazardObjects) scene.remove(h.group);
+  hazardObjects.length = 0;
+  hazardSpawnIdx = 0;
+  if (!beatMap?.hazards?.length) return;
+  for (let i = 0; i < beatMap.hazards.length; i++) {
+    const h  = beatMap.hazards[i];
+    const nz = -CRUISE_SPD * h.time;
+    const nx = curveX(nz) + LANE_OFFSETS[h.lane - 1];   // ← 1-indexed fix
+    const mesh = buildHazardMesh(h.type);
+    mesh.position.set(nx, 0, nz);
+    mesh.rotation.y = Math.atan2(-curveDX(nz), 1);  // align to road tangent
+    mesh.visible = false;
+    scene.add(mesh);
+    hazardObjects.push({ group: mesh, hazardIdx: i, active: false, judged: false, stateTimer: 0 });
+  }
+}
+
+function clearAllHazards() {
+  for (const h of hazardObjects) { h.group.visible = false; h.active = false; h.judged = false; h.stateTimer = 0; }
+  hazardSpawnIdx = 0;
+}
+
+function updateHazards(dt) {
+  if (!beatMap?.hazards?.length) return;
+  const hazards = beatMap.hazards;
+
+  // Show upcoming hazards
+  while (hazardSpawnIdx < hazards.length) {
+    const h = hazards[hazardSpawnIdx];
+    if (h.time - songTime > HAZARD_SPAWN_AHEAD) break;
+    if (h.time - songTime > -HAZARD_HIT_WINDOW) {
+      hazardObjects[hazardSpawnIdx].active  = true;
+      hazardObjects[hazardSpawnIdx].group.visible = true;
+    }
+    hazardSpawnIdx++;
+  }
+
+  for (const hobj of hazardObjects) {
+    if (!hobj.active) continue;
+    const h         = hazards[hobj.hazardIdx];
+    const timeDelta = songTime - h.time;
+
+    // Collision: car in same lane within time window
+    if (!hobj.judged && Math.abs(timeDelta) <= HAZARD_HIT_WINDOW && car.lane === h.lane - 1) {
+      hobj.judged     = true;
+      hobj.stateTimer = 0;
+      takeDamage();
+    }
+
+    // Past safe window — hide
+    if (timeDelta > HAZARD_HIT_WINDOW + 0.25) {
+      hobj.judged = true;  // safely dodged
+      hobj.stateTimer += dt;
+      if (hobj.stateTimer > 0.4) {
+        hobj.active        = false;
+        hobj.group.visible = false;
+      }
+    }
+
+    // Oil slick shimmer animation
+    if (h.type === 'oil_slick' && hobj.group.children[1]) {
+      const t = performance.now() / 1000;
+      hobj.group.children[1].scale.setScalar(0.85 + Math.sin(t * 2.8 + hobj.hazardIdx) * 0.18);
+    }
+  }
+}
+
+// ── Damage & camera shake ──────────────────────────────────────────────────────
+let gameOverPending = false;
+const camShake = { timer: 0, intensity: 0 };
+
+// Damage flash overlay
+const damageFlash = document.createElement('div');
+Object.assign(damageFlash.style, {
+  position:'fixed', inset:'0', background:'rgba(220,20,20,0)',
+  pointerEvents:'none', zIndex:'90', transition:'background 0.06s',
+});
+document.body.appendChild(damageFlash);
+let damageFlashTimer = 0;
+
+function takeDamage() {
+  if (gameOverPending) return;
+  hp = Math.max(0, hp - 0.5);
+  updateHearts();
+
+  // Screen flash
+  damageFlash.style.background = 'rgba(220,20,20,0.50)';
+  damageFlashTimer = 0.40;
+
+  // Camera shake
+  camShake.timer     = 0.55;
+  camShake.intensity = 0.40;
+
+  // Heart pulse
+  document.querySelectorAll('.heart').forEach(el => {
+    el.classList.add('pulse');
+    setTimeout(() => el.classList.remove('pulse'), 220);
+  });
+
+  if (hp <= 0) {
+    gameOverPending = true;
+    setTimeout(() => { setState(STATE.GAME_OVER); gameOverPending = false; }, 900);
+  }
+}
+
+// ── Car physics state ──────────────────────────────────────────────────────────
+const car = { x:0, z:0, heading:0, lane:1, laneX:LANE_OFFSETS[1], lean:0, wheelRot:0, suspY:0, suspVel:0, pitch:0 };
+
+function resetCar() {
+  car.z = 0; car.lane = 1; car.laneX = LANE_OFFSETS[1];
+  car.x = curveX(0) + car.laneX; car.heading = Math.atan2(-curveDX(0), 1);
+  car.lean = 0; car.wheelRot = 0; car.suspY = 0; car.suspVel = 0; car.pitch = 0;
+}
+
 function switchLane(dir) {
   if (gameState !== STATE.PLAYING) return;
   car.lane = Math.max(0, Math.min(3, car.lane + dir));
@@ -683,10 +725,8 @@ function makeGate(colorHex, zPos, label, target) {
   if (label) {
     const cv = Object.assign(document.createElement('canvas'), { width:320, height:64 });
     const lx = cv.getContext('2d');
-    lx.fillStyle = colorHex;
-    lx.font = 'bold 26px ui-sans-serif,system-ui,sans-serif';
-    lx.textAlign = 'center'; lx.textBaseline = 'middle';
-    lx.fillText(label, 160, 32);
+    lx.fillStyle = colorHex; lx.font = 'bold 26px ui-sans-serif,system-ui,sans-serif';
+    lx.textAlign = 'center'; lx.textBaseline = 'middle'; lx.fillText(label, 160, 32);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(cv), transparent:true }));
     sp.scale.set(5.5,1.1,1); sp.position.set(0,12.5,0); grp.add(sp);
   }
@@ -703,6 +743,7 @@ const STATE = { MENU:'menu', CAR_SELECT:'car-select', PLAYING:'playing', GAME_OV
 let gameState   = STATE.MENU;
 let selectedCar = 0;
 let hp = 3.0, score = 0, combo = 0, maxCombo = 0;
+let notesHit = 0, notesMissed = 0;
 let menuTime = 0, redirecting = false;
 
 // ── DOM: HUD ───────────────────────────────────────────────────────────────────
@@ -730,13 +771,9 @@ hud.innerHTML = `
 `;
 document.body.appendChild(hud);
 
-// Beat bar
 const beatBar = document.createElement('div');
 beatBar.id = 'beat-bar';
-Object.assign(beatBar.style, {
-  position:'fixed', top:'0', left:'0', width:'100%', height:'3px',
-  background:'transparent', zIndex:'100', pointerEvents:'none', transition:'opacity 0.05s',
-});
+Object.assign(beatBar.style, { position:'fixed', top:'0', left:'0', width:'100%', height:'3px', background:'transparent', zIndex:'100', pointerEvents:'none', transition:'opacity 0.05s' });
 document.body.appendChild(beatBar);
 
 const hitFlash = document.createElement('div');
@@ -786,8 +823,10 @@ screenGameOver.id = 'screen-game-over'; screenGameOver.className = 'screen hidde
 screenGameOver.innerHTML = `
   <div class="go-title">Game Over</div>
   <ul class="go-stats">
-    <li>Score     <span id="go-score">0</span></li>
-    <li>Max Combo <span id="go-combo">×0</span></li>
+    <li>Score       <span id="go-score">0</span></li>
+    <li>Max Combo   <span id="go-combo">×0</span></li>
+    <li>Notes Hit   <span id="go-hits">0</span></li>
+    <li>Notes Missed <span id="go-miss">0</span></li>
   </ul>
   <button class="menu-btn" id="go-menu">Back to Menu</button>
 `;
@@ -819,9 +858,7 @@ function updateScore() {
   document.getElementById('hud-combo').textContent = combo > 1 ? `× ${combo} COMBO` : '';
 }
 function showHitFeedback(type, text) {
-  hitFlash.textContent = text;
-  hitFlash.className = `show ${type}`;
-  hitFlashTimer = 0.62;
+  hitFlash.textContent = text; hitFlash.className = `show ${type}`; hitFlashTimer = 0.62;
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────────
@@ -830,70 +867,56 @@ function openSettings() {
     <div class="setting-row"><span>Master Volume</span>
       <input type="range" id="sl-master" min="0" max="100" value="${(volMaster*100)|0}"></div>
     <div class="setting-row"><span>Music Volume</span>
-      <input type="range" id="sl-music"  min="0" max="100" value="${(volMusic*100)|0}"></div>
+      <input type="range" id="sl-music" min="0" max="100" value="${(volMusic*100)|0}"></div>
     <p style="margin-top:1rem;color:var(--muted);font-size:.76rem;letter-spacing:.1em">← → SWITCH LANES</p>
   `, overlay => {
-    overlay.querySelector('#sl-master').addEventListener('input', e => {
-      volMaster = e.target.value / 100;
-      if (masterGain) masterGain.gain.value = volMaster;
-    });
-    overlay.querySelector('#sl-music').addEventListener('input', e => {
-      volMusic = e.target.value / 100;
-      if (musicGain) musicGain.gain.value = volMusic;
-    });
+    overlay.querySelector('#sl-master').addEventListener('input', e => { volMaster = e.target.value/100; if (masterGain) masterGain.gain.value = volMaster; });
+    overlay.querySelector('#sl-music' ).addEventListener('input', e => { volMusic  = e.target.value/100; if (musicGain)  musicGain.gain.value  = volMusic;  });
   });
 }
 
 // ── State machine ──────────────────────────────────────────────────────────────
 function setState(s) {
-  const prev = gameState;
-  gameState  = s;
+  const prev = gameState; gameState = s;
   screenMenu.classList.toggle('hidden',      s !== STATE.MENU);
   screenCarSelect.classList.toggle('hidden', s !== STATE.CAR_SELECT);
   screenGameOver.classList.toggle('hidden',  s !== STATE.GAME_OVER);
   hud.classList.toggle('hidden',             s !== STATE.PLAYING);
 
   if (prev === STATE.PLAYING && s !== STATE.PLAYING) {
-    stopSong();
-    clearAllOrbs();
+    stopSong(); clearAllOrbs(); clearAllHazards();
+    damageFlash.style.background = 'rgba(220,20,20,0)';
     skyLerpTop.set(0xf5a060); skyLerpBot.set(0x5c8de0);
-    skyLerpFog.set(0xf0a060); skyLerpAmb.set(0xffd8a0);
-    skyLerpAmbInt = 2.2;
+    skyLerpFog.set(0xf0a060); skyLerpAmb.set(0xffd8a0); skyLerpAmbInt = 2.2;
   }
 
   if (s === STATE.PLAYING) {
-    hp=3.0; score=0; combo=0; maxCombo=0;
+    hp=3.0; score=0; combo=0; maxCombo=0; notesHit=0; notesMissed=0;
     updateHearts(); updateScore(); updateLanePips();
-    resetCar();
-    redirecting = false;
-
+    resetCar(); redirecting = false;
     if (beatMap?.theme) {
       const t = beatMap.theme;
       skyLerpTop.set(t.skyTop); skyLerpBot.set(t.skyBot);
-      skyLerpFog.set(t.fog);   skyLerpAmb.set(t.accent);
-      skyLerpAmbInt = 1.8;
+      skyLerpFog.set(t.fog);   skyLerpAmb.set(t.accent); skyLerpAmbInt = 1.8;
     }
-
-    prepareNotes();
-    clearAllOrbs();
+    prepareNotes(); clearAllOrbs();
+    prepareHazards();
     startSong();
   }
 
   if (s === STATE.GAME_OVER) {
     document.getElementById('go-score').textContent = score.toLocaleString();
     document.getElementById('go-combo').textContent = `×${maxCombo}`;
+    document.getElementById('go-hits' ).textContent = notesHit;
+    document.getElementById('go-miss' ).textContent = notesMissed;
   }
 }
 
 // ── Button wiring ──────────────────────────────────────────────────────────────
 document.getElementById('btn-new-game').addEventListener('click', () => setState(STATE.CAR_SELECT));
-document.getElementById('btn-load-game').addEventListener('click', () =>
-  showModal('Load Game', '<p style="color:var(--muted);font-size:.88rem;letter-spacing:.06em">No saved game found.</p>')
-);
+document.getElementById('btn-load-game').addEventListener('click', () => showModal('Load Game','<p style="color:var(--muted);font-size:.88rem;letter-spacing:.06em">No saved game found.</p>'));
 document.getElementById('btn-settings').addEventListener('click', openSettings);
-document.getElementById('btn-exit').addEventListener('click', () =>
-  showModal('Exit', '<p style="color:var(--muted);font-size:.88rem;letter-spacing:.06em">Close this tab to exit.</p>')
-);
+document.getElementById('btn-exit').addEventListener('click', () => showModal('Exit','<p style="color:var(--muted);font-size:.88rem;letter-spacing:.06em">Close this tab to exit.</p>'));
 document.getElementById('cs-prev').addEventListener('click', () => setPreviewCar(previewCarIdx-1));
 document.getElementById('cs-next').addEventListener('click', () => setPreviewCar(previewCarIdx+1));
 document.getElementById('cs-select').addEventListener('click', () => {
@@ -922,7 +945,7 @@ function updateMenuCamera(dt) {
   menuTime += dt;
   const t = menuTime * 0.055;
   camera.fov = 70; camera.updateProjectionMatrix();
-  camera.position.set(curveX(-20) + Math.sin(t)*5, 7+Math.sin(t*0.7)*1.2, 16+Math.cos(t*0.4)*3);
+  camera.position.set(curveX(-20)+Math.sin(t)*5, 7+Math.sin(t*0.7)*1.2, 16+Math.cos(t*0.4)*3);
   camera.lookAt(curveX(-40), 1.2, -40);
 }
 
@@ -938,91 +961,100 @@ function lerpSky(dt) {
 
 // ── Gameplay update ────────────────────────────────────────────────────────────
 function updatePlaying(dt) {
-  // ── Song time ─────────────────────────────────────────────────────────────
+  if (gameOverPending) return;   // freeze gameplay while waiting for game-over screen
+
+  // Song time
   if (audioCtx && audioSource) songTime = audioCtx.currentTime - songStartTime;
 
-  // ── Beat ticks ────────────────────────────────────────────────────────────
+  // Beat ticks
   if (beatMap) {
     const beats = beatMap.beats;
-    while (nextBeatIdx < beats.length && beats[nextBeatIdx] <= songTime) {
-      onBeat(nextBeatIdx++);
-    }
+    while (nextBeatIdx < beats.length && beats[nextBeatIdx] <= songTime) onBeat(nextBeatIdx++);
   }
 
-  // ── Beat pulse decay (~100ms half-life) ───────────────────────────────────
   beatPulse *= Math.pow(0.001, dt);
 
-  // ── Beat bar flash ────────────────────────────────────────────────────────
+  // Beat bar
   if (beatPulse > 0.05) {
-    const accent = beatMap?.theme?.accent ?? '#4ff0ff';
-    beatBar.style.background = `linear-gradient(90deg,transparent,${accent},transparent)`;
-    beatBar.style.opacity    = beatPulse;
-    beatBar.style.boxShadow  = `0 0 ${(beatPulse*14)|0}px ${accent}`;
+    const ac = beatMap?.theme?.accent ?? '#4ff0ff';
+    beatBar.style.background = `linear-gradient(90deg,transparent,${ac},transparent)`;
+    beatBar.style.opacity = beatPulse;
+    beatBar.style.boxShadow = `0 0 ${(beatPulse*14)|0}px ${ac}`;
   } else { beatBar.style.opacity = '0'; }
 
-  // ── Ambient + beat accent light ────────────────────────────────────────────
+  // Ambient + beat light
   ambLight.intensity = skyLerpAmbInt + beatPulse * 2.2;
   beatLight.position.set(car.x, 4, car.z - 8);
   beatLight.intensity = beatPulse * 5.5;
   if (beatMap?.theme?.accent) beatLight.color.set(beatMap.theme.accent);
 
-  // ── Note orbs ─────────────────────────────────────────────────────────────
+  // Note orbs + hazards
   updateOrbs(dt);
+  updateHazards(dt);
 
-  // ── Auto-forward ──────────────────────────────────────────────────────────
+  // Damage flash decay
+  if (damageFlashTimer > 0) {
+    damageFlashTimer -= dt;
+    if (damageFlashTimer <= 0) damageFlash.style.background = 'rgba(220,20,20,0)';
+  }
+
+  // Auto-forward
   car.z -= CRUISE_SPD * dt;
 
-  // ── Lane interpolation ────────────────────────────────────────────────────
+  // Lane interpolation
   const targetLaneX = LANE_OFFSETS[car.lane];
   const prevLaneX   = car.laneX;
   car.laneX += (targetLaneX - car.laneX) * Math.min(1, dt * 12);
   car.x = curveX(car.z) + car.laneX;
 
-  // ── Heading tracks road tangent ───────────────────────────────────────────
+  // Heading
   const tH = Math.atan2(-curveDX(car.z), 1);
   let dH = tH - car.heading;
   while (dH >  Math.PI) dH -= Math.PI*2;
   while (dH < -Math.PI) dH += Math.PI*2;
   car.heading += dH * Math.min(1, dt * 10);
 
-  // ── Lean ──────────────────────────────────────────────────────────────────
+  // Lean
   const lateralVel = (car.laneX - prevLaneX) / Math.max(dt, 0.001);
-  const targetLean = -lateralVel * 0.011;
-  car.lean += (targetLean - car.lean) * Math.min(1, dt * 8);
+  car.lean += (-lateralVel*0.011 - car.lean) * Math.min(1, dt*8);
   car.lean  = Math.max(-0.08, Math.min(0.08, car.lean));
 
-  // ── Suspension ────────────────────────────────────────────────────────────
+  // Suspension
   car.suspVel += (-100*car.suspY - 18*car.suspVel + (Math.random()-0.5)*9) * dt;
   car.suspY   += car.suspVel * dt;
   car.suspY    = Math.max(-0.12, Math.min(0.10, car.suspY));
-  car.pitch   += (-car.suspY * 0.055 - car.pitch) * Math.min(1, dt*4);
+  car.pitch   += (-car.suspY*0.055 - car.pitch) * Math.min(1, dt*4);
   car.pitch    = Math.max(-0.04, Math.min(0.04, car.pitch));
 
-  // ── Wheel animation ───────────────────────────────────────────────────────
+  // Wheels
   car.wheelRot += CRUISE_SPD * dt * 2.2;
   const steerVis = Math.max(-0.38, Math.min(0.38, lateralVel * 0.038));
   for (const [i, w] of carWheels.entries()) {
-    w.rotation.order = 'YXZ';
-    w.rotation.y = i < 2 ? steerVis : 0;
-    w.rotation.x = car.wheelRot;
+    w.rotation.order = 'YXZ'; w.rotation.y = i<2 ? steerVis : 0; w.rotation.x = car.wheelRot;
   }
 
-  // ── Car transform ─────────────────────────────────────────────────────────
+  // Car transform
   carGroup.position.set(car.x, car.suspY, car.z);
-  carGroup.rotation.y = car.heading;
-  carGroup.rotation.x = car.pitch;
-  carGroup.rotation.z = car.lean;
+  carGroup.rotation.y = car.heading; carGroup.rotation.x = car.pitch; carGroup.rotation.z = car.lean;
 
-  // ── Camera ────────────────────────────────────────────────────────────────
+  // Camera + shake
   camera.fov = 72; camera.updateProjectionMatrix();
   const pb = 9.2;
-  camera.position.set(car.x - Math.sin(car.heading)*pb, 3.4, car.z + Math.cos(car.heading)*pb);
+  let cx = car.x - Math.sin(car.heading)*pb;
+  let cy = 3.4;
+  if (camShake.timer > 0) {
+    camShake.timer -= dt;
+    const s = camShake.intensity * (camShake.timer / 0.55);
+    cx += (Math.random()-0.5) * s;
+    cy += (Math.random()-0.5) * s * 0.4;
+  }
+  camera.position.set(cx, cy, car.z + Math.cos(car.heading)*pb);
   camera.lookAt(car.x + Math.sin(car.heading)*8, 1.4, car.z - Math.cos(car.heading)*8);
 
-  // ── Speed lines ───────────────────────────────────────────────────────────
+  // Speed lines
   drawSpeedLines(0.28 + beatPulse * 0.50);
 
-  // ── Hit flash decay ───────────────────────────────────────────────────────
+  // Hit flash decay
   if (hitFlashTimer > 0) { hitFlashTimer -= dt; if (hitFlashTimer <= 0) hitFlash.className = ''; }
 
   checkPortals();
@@ -1033,20 +1065,15 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-
   if (gameState !== STATE.PLAYING) updateMenuCamera(dt);
   else updatePlaying(dt);
-
   lerpSky(dt);
   renderer.render(scene, camera);
-
   if (gameState === STATE.CAR_SELECT) {
     previewAngle += dt * 0.7;
     prevCarGroup.rotation.y = previewAngle;
     prevRenderer.render(prevScene, prevCamera);
   }
-
   requestAnimationFrame(loop);
 }
-
 requestAnimationFrame(loop);
