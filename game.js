@@ -1,4 +1,4 @@
-// Pulse//Drive — Phase 6: Web Audio + Beat Clock
+// Pulse//Drive — Phase 7: Note Orbs
 // Portal Protocol preserved.
 
 import * as THREE from 'https://esm.sh/three@0.169';
@@ -52,29 +52,25 @@ const skyMat = new THREE.ShaderMaterial({
 });
 scene.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(190,16,8), skyMat), { renderOrder:-1 }));
 
-// Sky palette presets
-const SKY = {
-  menu: {
-    top: new THREE.Color(0xf5a060),
-    bot: new THREE.Color(0x5c8de0),
-    fog: new THREE.Color(0xf0a060),
-    amb: new THREE.Color(0xffd8a0),
-    ambInt: 2.2,
-  },
-};
-
 // ── Road curve ─────────────────────────────────────────────────────────────────
 function curveX(z)  { return 14*Math.sin(z*0.013) + 5*Math.sin(z*0.034+1.5); }
 function curveDX(z) { return 14*0.013*Math.cos(z*0.013) + 5*0.034*Math.cos(z*0.034+1.5); }
 
 // ── World & lane constants ─────────────────────────────────────────────────────
-const ROAD_LEN    = 6000;
-const ROAD_W      = 18;
-const CURB_W      = 1.6;
-const ROAD_START  = 25;
-const ROAD_END    = -(ROAD_LEN - 25);
-const CRUISE_SPD  = 28;   // m/s
+const ROAD_LEN     = 6000;
+const ROAD_W       = 18;
+const CURB_W       = 1.6;
+const ROAD_START   = 25;
+const ROAD_END     = -(ROAD_LEN - 25);
+const CRUISE_SPD   = 28;
 const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75];
+
+// ── Hit-judgment constants ─────────────────────────────────────────────────────
+const PERFECT_WINDOW = 0.08;   // ±80ms → PERFECT
+const HIT_WINDOW     = 0.16;   // ±160ms → GOOD
+const MISS_TIMEOUT   = 0.22;   // past this → MISS (auto-despawn)
+const ORB_SPAWN_AHEAD = 3.2;   // spawn notes this many seconds before hit time
+const ORB_POOL_SIZE  = 20;
 
 // ── Ribbon mesh builder ────────────────────────────────────────────────────────
 function buildRibbon(halfWL, halfWR, yOff, tex, tileLen) {
@@ -99,7 +95,6 @@ function buildRibbon(halfWL, halfWR, yOff, tex, tileLen) {
   m.position.y = yOff; m.receiveShadow = true; scene.add(m);
 }
 
-// ── Road texture — 4 lanes ─────────────────────────────────────────────────────
 function makeRoadTex() {
   const cw=256, ch=512;
   const cv = Object.assign(document.createElement('canvas'), { width:cw, height:ch });
@@ -111,8 +106,7 @@ function makeRoadTex() {
     cx.fillRect(Math.random()*cw, Math.random()*ch, 1, 1);
   }
   cx.fillStyle = '#d8d8d6';
-  cx.fillRect(8, 0, 7, ch);
-  cx.fillRect(cw-15, 0, 7, ch);
+  cx.fillRect(8, 0, 7, ch); cx.fillRect(cw-15, 0, 7, ch);
   cx.fillStyle = '#bbbbba';
   for (const tx of [64, 128, 192]) {
     cx.fillRect(tx-3, 0,   5, 160);
@@ -245,74 +239,51 @@ function buildCarIntoGroup(group, carCfg) {
   }
   switch (carCfg.id) {
     case 'street':
-      box(m.body,  2.22,0.58,4.30, 0,0.52, 0.00);
-      box(m.dark,  2.38,0.24,4.50, 0,0.22, 0.00);
-      box(m.dark,  1.78,0.48,2.15, 0,0.98,+0.18);
-      box(m.glass, 1.72,0.38,0.07, 0,0.94,-1.02);
-      box(m.glass, 1.72,0.34,0.07, 0,0.94,+1.28);
-      box(m.stripe,0.34,0.59,1.90, 0,0.52,-0.82);
-      box(m.dark,  2.14,0.25,0.18, 0,0.28,-2.22);
-      box(m.dark,  2.14,0.25,0.18, 0,0.28,+2.22);
+      box(m.body,  2.22,0.58,4.30, 0,0.52, 0.00); box(m.dark,  2.38,0.24,4.50, 0,0.22, 0.00);
+      box(m.dark,  1.78,0.48,2.15, 0,0.98,+0.18); box(m.glass, 1.72,0.38,0.07, 0,0.94,-1.02);
+      box(m.glass, 1.72,0.34,0.07, 0,0.94,+1.28); box(m.stripe,0.34,0.59,1.90, 0,0.52,-0.82);
+      box(m.dark,  2.14,0.25,0.18, 0,0.28,-2.22); box(m.dark,  2.14,0.25,0.18, 0,0.28,+2.22);
       for(const x of[-0.7,0.7]) box(m.hl,0.38,0.18,0.08, x,0.52,-2.22);
       for(const x of[-0.7,0.7]) box(m.tl,0.44,0.20,0.08, x,0.52,+2.22);
       addWheel(-1.19,0.35,-1.36); addWheel(1.19,0.35,-1.36);
-      addWheel(-1.19,0.35,+1.36); addWheel(1.19,0.35,+1.36);
-      break;
+      addWheel(-1.19,0.35,+1.36); addWheel(1.19,0.35,+1.36); break;
     case 'truck':
-      box(m.body,  2.60,0.90,4.00, 0,0.65, 0.00);
-      box(m.dark,  2.76,0.28,4.20, 0,0.22, 0.00);
-      box(m.dark,  2.20,0.82,2.00, 0,1.36,+0.30);
-      box(m.glass, 2.10,0.52,0.07, 0,1.40,-0.72);
-      box(m.glass, 2.10,0.46,0.07, 0,1.38,+1.30);
-      box(m.dark,  2.52,0.28,0.20, 0,0.26,-2.02);
+      box(m.body,  2.60,0.90,4.00, 0,0.65, 0.00); box(m.dark,  2.76,0.28,4.20, 0,0.22, 0.00);
+      box(m.dark,  2.20,0.82,2.00, 0,1.36,+0.30); box(m.glass, 2.10,0.52,0.07, 0,1.40,-0.72);
+      box(m.glass, 2.10,0.46,0.07, 0,1.38,+1.30); box(m.dark,  2.52,0.28,0.20, 0,0.26,-2.02);
       box(m.dark,  2.52,0.28,0.20, 0,0.26,+2.02);
       for(const x of[-0.8,0.8]) box(m.hl,0.44,0.22,0.08, x,0.70,-2.02);
       for(const x of[-0.8,0.8]) box(m.tl,0.50,0.24,0.08, x,0.70,+2.02);
       addWheel(-1.25,0.46,-1.30,1.12); addWheel(1.25,0.46,-1.30,1.12);
-      addWheel(-1.25,0.46,+1.30,1.12); addWheel(1.25,0.46,+1.30,1.12);
-      break;
+      addWheel(-1.25,0.46,+1.30,1.12); addWheel(1.25,0.46,+1.30,1.12); break;
     case 'luxury':
-      box(m.body,  2.08,0.48,5.20, 0,0.48, 0.00);
-      box(m.dark,  2.22,0.22,5.40, 0,0.22, 0.00);
-      box(m.dark,  1.68,0.44,2.60, 0,0.88,+0.30);
-      box(m.glass, 1.60,0.36,0.07, 0,0.90,-0.98);
-      box(m.glass, 1.60,0.32,0.07, 0,0.88,+1.60);
-      box(m.stripe,0.26,0.49,2.10, 0,0.48,-0.70);
-      box(m.dark,  2.00,0.22,0.18, 0,0.26,-2.62);
-      box(m.dark,  2.00,0.22,0.18, 0,0.26,+2.62);
+      box(m.body,  2.08,0.48,5.20, 0,0.48, 0.00); box(m.dark,  2.22,0.22,5.40, 0,0.22, 0.00);
+      box(m.dark,  1.68,0.44,2.60, 0,0.88,+0.30); box(m.glass, 1.60,0.36,0.07, 0,0.90,-0.98);
+      box(m.glass, 1.60,0.32,0.07, 0,0.88,+1.60); box(m.stripe,0.26,0.49,2.10, 0,0.48,-0.70);
+      box(m.dark,  2.00,0.22,0.18, 0,0.26,-2.62); box(m.dark,  2.00,0.22,0.18, 0,0.26,+2.62);
       for(const x of[-0.62,0.62]) box(m.hl,0.36,0.14,0.08, x,0.48,-2.62);
       for(const x of[-0.62,0.62]) box(m.tl,0.44,0.16,0.08, x,0.48,+2.62);
       addWheel(-1.00,0.30,-1.80,0.90); addWheel(1.00,0.30,-1.80,0.90);
-      addWheel(-1.00,0.30,+1.80,0.90); addWheel(1.00,0.30,+1.80,0.90);
-      break;
+      addWheel(-1.00,0.30,+1.80,0.90); addWheel(1.00,0.30,+1.80,0.90); break;
     case 'muscle':
-      box(m.body,  2.78,0.58,4.20, 0,0.52, 0.00);
-      box(m.dark,  2.94,0.24,4.40, 0,0.22, 0.00);
-      box(m.dark,  2.00,0.50,1.92, 0,0.98,+0.50);
-      box(m.glass, 1.90,0.40,0.07, 0,0.94,-0.64);
-      box(m.glass, 1.90,0.36,0.07, 0,0.94,+1.44);
-      box(m.stripe,0.52,0.59,2.40, 0,0.52,-0.50);
-      box(m.dark,  0.52,0.14,1.80, 0,0.80,-0.50);
-      box(m.dark,  2.70,0.26,0.20, 0,0.28,-2.12);
+      box(m.body,  2.78,0.58,4.20, 0,0.52, 0.00); box(m.dark,  2.94,0.24,4.40, 0,0.22, 0.00);
+      box(m.dark,  2.00,0.50,1.92, 0,0.98,+0.50); box(m.glass, 1.90,0.40,0.07, 0,0.94,-0.64);
+      box(m.glass, 1.90,0.36,0.07, 0,0.94,+1.44); box(m.stripe,0.52,0.59,2.40, 0,0.52,-0.50);
+      box(m.dark,  0.52,0.14,1.80, 0,0.80,-0.50); box(m.dark,  2.70,0.26,0.20, 0,0.28,-2.12);
       box(m.dark,  2.70,0.26,0.20, 0,0.28,+2.12);
       for(const x of[-0.80,0.80]) box(m.hl,0.42,0.20,0.08, x,0.52,-2.12);
       for(const x of[-0.80,0.80]) box(m.tl,0.50,0.22,0.08, x,0.52,+2.12);
       addWheel(-1.32,0.36,-1.30,1.06); addWheel(1.32,0.36,-1.30,1.06);
-      addWheel(-1.32,0.36,+1.30,1.06); addWheel(1.32,0.36,+1.30,1.06);
-      break;
+      addWheel(-1.32,0.36,+1.30,1.06); addWheel(1.32,0.36,+1.30,1.06); break;
     case 'compact':
-      box(m.body,  1.82,0.62,3.20, 0,0.50, 0.00);
-      box(m.dark,  1.96,0.22,3.38, 0,0.22, 0.00);
-      box(m.dark,  1.52,0.58,1.90, 0,0.98,+0.10);
-      box(m.glass, 1.44,0.44,0.07, 0,0.98,-0.84);
-      box(m.glass, 1.44,0.38,0.07, 0,0.96,+1.06);
-      box(m.dark,  1.74,0.24,0.16, 0,0.26,-1.62);
+      box(m.body,  1.82,0.62,3.20, 0,0.50, 0.00); box(m.dark,  1.96,0.22,3.38, 0,0.22, 0.00);
+      box(m.dark,  1.52,0.58,1.90, 0,0.98,+0.10); box(m.glass, 1.44,0.44,0.07, 0,0.98,-0.84);
+      box(m.glass, 1.44,0.38,0.07, 0,0.96,+1.06); box(m.dark,  1.74,0.24,0.16, 0,0.26,-1.62);
       box(m.dark,  1.74,0.24,0.16, 0,0.26,+1.62);
       for(const x of[-0.52,0.52]) box(m.hl,0.34,0.16,0.08, x,0.50,-1.62);
       for(const x of[-0.52,0.52]) box(m.tl,0.40,0.18,0.08, x,0.50,+1.62);
       addWheel(-0.90,0.30,-0.95,0.90); addWheel(0.90,0.30,-0.95,0.90);
-      addWheel(-0.90,0.30,+0.95,0.90); addWheel(0.90,0.30,+0.95,0.90);
-      break;
+      addWheel(-0.90,0.30,+0.95,0.90); addWheel(0.90,0.30,+0.95,0.90); break;
   }
   return wheels;
 }
@@ -386,57 +357,45 @@ function drawSpeedLines(intensity) {
 }
 
 // ── Web Audio ──────────────────────────────────────────────────────────────────
-let audioCtx     = null;
-let audioBuffer  = null;
-let audioSource  = null;
-let masterGain   = null;   // master volume node
-let musicGain    = null;   // music volume node
-let beatMap      = null;   // loaded JSON beat map
-let audioReady   = false;  // true once buffer is decoded
+let audioCtx    = null;
+let audioBuffer = null;
+let audioSource = null;
+let masterGain  = null;
+let musicGain   = null;
+let beatMap     = null;
+let audioReady  = false;
 
-// Beat clock state
-let songStartTime = 0;     // audioCtx.currentTime when song began
-let songTime      = 0;     // seconds into current song (Phase 7+ reads this)
-let nextBeatIdx   = 0;     // index into beatMap.beats[]
-let nextNoteIdx   = 0;     // index into beatMap.notes[] — Phase 7 reads this
-let beatPulse    = 0;      // 0-1, peaks on every beat, decays fast
+let songStartTime = 0;
+let songTime      = 0;
+let nextBeatIdx   = 0;
+let beatPulse     = 0;
 
-// Volume levels (0-1) — updated by settings sliders
 let volMaster = 0.8;
 let volMusic  = 0.9;
 
-// Sky lerp targets — updated when entering gameplay
+// Sky lerp targets
 const skyLerpTop = new THREE.Color(0xf5a060);
 const skyLerpBot = new THREE.Color(0x5c8de0);
 const skyLerpFog = new THREE.Color(0xf0a060);
 const skyLerpAmb = new THREE.Color(0xffd8a0);
 let   skyLerpAmbInt = 2.2;
 
-// Preload beat map and audio immediately (non-blocking)
 async function initAudio() {
   try {
     const mapRes = await fetch('beatmaps/chrome-rain-over-midtown.json');
-    if (!mapRes.ok) throw new Error('Beat map fetch failed');
+    if (!mapRes.ok) throw new Error('Beat map 404');
     beatMap = await mapRes.json();
-  } catch(e) {
-    console.warn('Beat map load failed:', e);
-    return;
-  }
+  } catch(e) { console.warn('Beat map load failed:', e); return; }
   try {
-    // AudioContext must be created or resumed after a user gesture,
-    // so we just decode here and create the context on first play.
     const tmpCtx = new AudioContext();
     const audioRes = await fetch(beatMap.file);
-    if (!audioRes.ok) throw new Error('Audio fetch failed');
-    const arrayBuf = await audioRes.arrayBuffer();
-    audioBuffer = await tmpCtx.decodeAudioData(arrayBuf);
+    if (!audioRes.ok) throw new Error('Audio 404');
+    audioBuffer = await tmpCtx.decodeAudioData(await audioRes.arrayBuffer());
     await tmpCtx.close();
     audioReady = true;
-  } catch(e) {
-    console.warn('Audio decode failed:', e);
-  }
+  } catch(e) { console.warn('Audio decode failed:', e); }
 }
-initAudio(); // fire and forget
+initAudio();
 
 function ensureAudioCtx() {
   if (audioCtx) return;
@@ -454,15 +413,14 @@ function startSong() {
   ensureAudioCtx();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   stopSong();
-  audioSource          = audioCtx.createBufferSource();
-  audioSource.buffer   = audioBuffer;
+  audioSource         = audioCtx.createBufferSource();
+  audioSource.buffer  = audioBuffer;
   audioSource.connect(musicGain);
-  songStartTime        = audioCtx.currentTime;
-  songTime             = 0;
-  nextBeatIdx          = 0;
-  nextNoteIdx          = 0;
-  beatPulse            = 0;
-  audioSource.onended  = () => { audioSource = null; };
+  songStartTime       = audioCtx.currentTime;
+  songTime            = 0;
+  nextBeatIdx         = 0;
+  beatPulse           = 0;
+  audioSource.onended = () => { audioSource = null; };
   audioSource.start(0);
 }
 
@@ -475,8 +433,196 @@ function stopSong() {
 }
 
 function onBeat(idx) {
-  // Strong pulse every 4th beat (downbeat), regular pulse otherwise
   beatPulse = idx % 4 === 0 ? 1.0 : 0.72;
+}
+
+// ── Note orb system ────────────────────────────────────────────────────────────
+
+// Pre-computed world Z for each note (filled in prepareNotes)
+let noteWorldZ = [];
+
+function prepareNotes() {
+  noteWorldZ = beatMap ? beatMap.notes.map(n => -CRUISE_SPD * n.time) : [];
+}
+
+// Orb mesh factory
+const _orbSphereGeo = new THREE.SphereGeometry(0.52, 9, 6);
+const _orbOuterGeo  = new THREE.SphereGeometry(0.82, 9, 6);
+const _orbRingGeo   = new THREE.RingGeometry(0.55, 1.15, 22);
+
+function makeOrb() {
+  const group    = new THREE.Group();
+
+  const innerMat = new THREE.MeshBasicMaterial({ color:0xff44ff, transparent:true });
+  const outerMat = new THREE.MeshBasicMaterial({ color:0xcc00ff, transparent:true, opacity:0.36, depthWrite:false });
+  const ringMat  = new THREE.MeshBasicMaterial({ color:0xff44ff, transparent:true, opacity:0.50, side:THREE.DoubleSide, depthWrite:false });
+
+  const inner = new THREE.Mesh(_orbSphereGeo, innerMat);
+  inner.position.y = 1.25;
+
+  const outer = new THREE.Mesh(_orbOuterGeo, outerMat);
+  outer.position.y = 1.25;
+
+  const ring = new THREE.Mesh(_orbRingGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.015;
+
+  group.add(inner, outer, ring);
+  group.visible = false;
+  scene.add(group);
+
+  return {
+    group, inner, outer, ring,
+    innerMat, outerMat, ringMat,
+    noteIdx:   -1,
+    judged:    false,
+    state:     'done',   // 'active' | 'hit' | 'miss' | 'done'
+    stateTimer: 0,
+    phase:     Math.random() * Math.PI * 2,
+  };
+}
+
+const orbPool  = Array.from({ length: ORB_POOL_SIZE }, makeOrb);
+const liveOrbs = new Set();
+let   spawnIdx = 0;   // next beatMap.notes index to attempt spawning
+
+function getFreeOrb() {
+  for (const o of orbPool) if (o.state === 'done') return o;
+  return null;
+}
+
+function spawnOrb(noteIdx) {
+  const orb = getFreeOrb();
+  if (!orb) return;
+
+  const note  = beatMap.notes[noteIdx];
+  const nz    = noteWorldZ[noteIdx];
+  const nx    = curveX(nz) + LANE_OFFSETS[note.lane];
+  const theme = beatMap.theme;
+
+  orb.innerMat.color.set(theme.noteColor);
+  orb.outerMat.color.set(theme.noteGlow);
+  orb.ringMat.color.set(theme.noteColor);
+  orb.innerMat.opacity = 1;
+  orb.outerMat.opacity = 0.36;
+  orb.ringMat.opacity  = 0.50;
+
+  orb.group.position.set(nx, 0, nz);
+  orb.group.scale.setScalar(1);
+  orb.group.visible = true;
+
+  orb.noteIdx    = noteIdx;
+  orb.judged     = false;
+  orb.state      = 'active';
+  orb.stateTimer = 0;
+
+  liveOrbs.add(orb);
+}
+
+function despawnOrb(orb) {
+  orb.group.visible = false;
+  orb.state   = 'done';
+  orb.noteIdx = -1;
+  liveOrbs.delete(orb);
+}
+
+function judgeNote(orb, result) {
+  if (orb.judged) return;
+  orb.judged     = true;
+  orb.stateTimer = 0;
+
+  if (result === 'perfect' || result === 'good') {
+    const mult = Math.min(8, 1 + Math.floor(combo / 4));
+    score += (result === 'perfect' ? 300 : 100) * mult;
+    combo++;
+    maxCombo = Math.max(maxCombo, combo);
+    showHitFeedback(result, result === 'perfect' ? 'PERFECT' : 'GOOD');
+    orb.state = 'hit';
+  } else {
+    combo = 0;
+    showHitFeedback('miss', 'MISS');
+    orb.state = 'miss';
+  }
+  updateScore();
+}
+
+function clearAllOrbs() {
+  for (const orb of [...liveOrbs]) despawnOrb(orb);
+  spawnIdx = 0;
+}
+
+function updateOrbs(dt) {
+  if (!beatMap || !beatMap.notes.length) return;
+  const t = performance.now() / 1000;
+
+  // ── Spawn notes coming up ──────────────────────────────────────────────────
+  while (spawnIdx < beatMap.notes.length) {
+    const note = beatMap.notes[spawnIdx];
+    const ahead = note.time - songTime;
+    if (ahead > ORB_SPAWN_AHEAD) break;             // too far ahead, wait
+    if (ahead > -MISS_TIMEOUT) spawnOrb(spawnIdx);  // still valid to spawn
+    spawnIdx++;
+  }
+
+  // ── Update live orbs ───────────────────────────────────────────────────────
+  const toRemove = [];
+  for (const orb of liveOrbs) {
+    const note      = beatMap.notes[orb.noteIdx];
+    const timeDelta = songTime - note.time;   // + = note in past, - = note in future
+
+    if (orb.state === 'active') {
+      // Floating bob
+      const bob = Math.sin(t * 3.2 + orb.phase) * 0.18;
+      orb.inner.position.y = 1.25 + bob;
+      orb.outer.position.y = 1.25 + bob;
+
+      // Approach ring — shrinks as note time nears
+      const ahead = -timeDelta;  // positive = still in future
+      if (ahead > 0) {
+        const frac = Math.min(1, ahead / ORB_SPAWN_AHEAD);
+        orb.ring.scale.setScalar(0.75 + frac * 2.25);           // 3.0 → 0.75
+        orb.ringMat.opacity = 0.18 + (1 - frac) * 0.42;        // fades in as approaching
+      } else {
+        orb.ring.scale.setScalar(0.75);
+      }
+
+      // Glow pulse synced to song beat
+      const glow = 0.28 + beatPulse * 0.22;
+      orb.outerMat.opacity = glow;
+
+      // ── Hit detection ──────────────────────────────────────────────────────
+      if (!orb.judged) {
+        if (Math.abs(timeDelta) <= HIT_WINDOW && car.lane === note.lane) {
+          judgeNote(orb, Math.abs(timeDelta) <= PERFECT_WINDOW ? 'perfect' : 'good');
+        } else if (timeDelta > MISS_TIMEOUT) {
+          judgeNote(orb, 'miss');
+        }
+      }
+
+    } else if (orb.state === 'hit') {
+      // Scale up + fade out
+      orb.stateTimer += dt;
+      const frac = Math.min(1, orb.stateTimer / 0.28);
+      orb.group.scale.setScalar(1 + frac * 0.9);
+      orb.innerMat.opacity = 1 - frac;
+      orb.outerMat.opacity = (1 - frac) * 0.36;
+      orb.ringMat.opacity  = (1 - frac) * 0.55;
+      if (frac >= 1) toRemove.push(orb);
+
+    } else if (orb.state === 'miss') {
+      // Flash red then shrink out
+      orb.stateTimer += dt;
+      const frac = Math.min(1, orb.stateTimer / 0.30);
+      orb.innerMat.color.set(frac < 0.45 ? '#ff3333' : beatMap.theme.noteColor);
+      orb.innerMat.opacity = 1 - frac;
+      orb.outerMat.opacity = (1 - frac) * 0.36;
+      orb.ringMat.opacity  = (1 - frac) * 0.55;
+      orb.group.scale.setScalar(1 - frac * 0.55);
+      if (frac >= 1) toRemove.push(orb);
+    }
+  }
+
+  for (const orb of toRemove) despawnOrb(orb);
 }
 
 // ── Car physics state ──────────────────────────────────────────────────────────
@@ -490,14 +636,13 @@ const car = {
 };
 
 function resetCar() {
-  const startZ = incoming.fromPortal ? -5 : 0;
-  car.z        = startZ;
-  car.lane     = 1;
-  car.laneX    = LANE_OFFSETS[1];
-  car.x        = curveX(startZ) + car.laneX;
-  car.heading  = Math.atan2(-curveDX(startZ), 1);
-  car.lean     = 0; car.wheelRot = 0;
-  car.suspY    = 0; car.suspVel  = 0; car.pitch = 0;
+  car.z       = 0;
+  car.lane    = 1;
+  car.laneX   = LANE_OFFSETS[1];
+  car.x       = curveX(0) + car.laneX;
+  car.heading = Math.atan2(-curveDX(0), 1);
+  car.lean    = 0; car.wheelRot = 0;
+  car.suspY   = 0; car.suspVel  = 0; car.pitch = 0;
 }
 
 // ── Lane switch ────────────────────────────────────────────────────────────────
@@ -585,13 +730,12 @@ hud.innerHTML = `
 `;
 document.body.appendChild(hud);
 
-// Beat-sync bar — thin line at top of screen that flashes on beat
+// Beat bar
 const beatBar = document.createElement('div');
 beatBar.id = 'beat-bar';
 Object.assign(beatBar.style, {
-  position: 'fixed', top: '0', left: '0', width: '100%', height: '3px',
-  background: 'transparent', zIndex: '100', pointerEvents: 'none',
-  transition: 'opacity 0.05s',
+  position:'fixed', top:'0', left:'0', width:'100%', height:'3px',
+  background:'transparent', zIndex:'100', pointerEvents:'none', transition:'opacity 0.05s',
 });
 document.body.appendChild(beatBar);
 
@@ -602,8 +746,7 @@ let hitFlashTimer = 0;
 
 // ── DOM: Main Menu ─────────────────────────────────────────────────────────────
 const screenMenu = document.createElement('div');
-screenMenu.id = 'screen-menu';
-screenMenu.className = 'screen';
+screenMenu.id = 'screen-menu'; screenMenu.className = 'screen';
 screenMenu.innerHTML = `
   <div class="menu-title">PULSE//DRIVE</div>
   <div class="menu-subtitle">Ordinary Game Jam #1</div>
@@ -618,8 +761,7 @@ document.body.appendChild(screenMenu);
 
 // ── DOM: Car Select ────────────────────────────────────────────────────────────
 const screenCarSelect = document.createElement('div');
-screenCarSelect.id = 'screen-car-select';
-screenCarSelect.className = 'screen hidden';
+screenCarSelect.id = 'screen-car-select'; screenCarSelect.className = 'screen hidden';
 screenCarSelect.innerHTML = `
   <div class="cs-title">Select Your Car</div>
   <div class="cs-row">
@@ -631,9 +773,7 @@ screenCarSelect.innerHTML = `
     <div class="cs-name" id="cs-name">${CARS[0].name}</div>
     <div class="cs-desc" id="cs-desc">${CARS[0].desc}</div>
   </div>
-  <div class="cs-dots">
-    ${CARS.map((_,i)=>`<div class="cs-dot${i===0?' active':''}"></div>`).join('')}
-  </div>
+  <div class="cs-dots">${CARS.map((_,i)=>`<div class="cs-dot${i===0?' active':''}"></div>`).join('')}</div>
   <button class="cs-select-btn" id="cs-select">Select &amp; Race</button>
   <button class="cs-back" id="cs-back">← Back to Menu</button>
 `;
@@ -642,8 +782,7 @@ document.getElementById('cs-preview-wrap').appendChild(prevRenderer.domElement);
 
 // ── DOM: Game Over ─────────────────────────────────────────────────────────────
 const screenGameOver = document.createElement('div');
-screenGameOver.id = 'screen-game-over';
-screenGameOver.className = 'screen hidden';
+screenGameOver.id = 'screen-game-over'; screenGameOver.className = 'screen hidden';
 screenGameOver.innerHTML = `
   <div class="go-title">Game Over</div>
   <ul class="go-stats">
@@ -658,9 +797,7 @@ document.body.appendChild(screenGameOver);
 function showModal(title, bodyHTML, onOpen) {
   document.getElementById('modal-overlay')?.remove();
   const overlay = document.createElement('div');
-  overlay.id = 'modal-overlay';
-  overlay.className = 'screen';
-  overlay.style.zIndex = '200';
+  overlay.id = 'modal-overlay'; overlay.className = 'screen'; overlay.style.zIndex = '200';
   overlay.innerHTML = `<div class="modal-box"><h2>${title}</h2>${bodyHTML}<button class="modal-close" id="modal-close">Close</button></div>`;
   document.body.appendChild(overlay);
   document.getElementById('modal-close').addEventListener('click', () => overlay.remove());
@@ -684,20 +821,16 @@ function updateScore() {
 function showHitFeedback(type, text) {
   hitFlash.textContent = text;
   hitFlash.className = `show ${type}`;
-  hitFlashTimer = 0.65;
+  hitFlashTimer = 0.62;
 }
 
-// ── Settings modal — wired to gain nodes ───────────────────────────────────────
+// ── Settings ───────────────────────────────────────────────────────────────────
 function openSettings() {
   showModal('Settings', `
-    <div class="setting-row">
-      <span>Master Volume</span>
-      <input type="range" id="sl-master" min="0" max="100" value="${(volMaster*100)|0}">
-    </div>
-    <div class="setting-row">
-      <span>Music Volume</span>
-      <input type="range" id="sl-music"  min="0" max="100" value="${(volMusic*100)|0}">
-    </div>
+    <div class="setting-row"><span>Master Volume</span>
+      <input type="range" id="sl-master" min="0" max="100" value="${(volMaster*100)|0}"></div>
+    <div class="setting-row"><span>Music Volume</span>
+      <input type="range" id="sl-music"  min="0" max="100" value="${(volMusic*100)|0}"></div>
     <p style="margin-top:1rem;color:var(--muted);font-size:.76rem;letter-spacing:.1em">← → SWITCH LANES</p>
   `, overlay => {
     overlay.querySelector('#sl-master').addEventListener('input', e => {
@@ -714,20 +847,17 @@ function openSettings() {
 // ── State machine ──────────────────────────────────────────────────────────────
 function setState(s) {
   const prev = gameState;
-  gameState = s;
+  gameState  = s;
   screenMenu.classList.toggle('hidden',      s !== STATE.MENU);
   screenCarSelect.classList.toggle('hidden', s !== STATE.CAR_SELECT);
   screenGameOver.classList.toggle('hidden',  s !== STATE.GAME_OVER);
   hud.classList.toggle('hidden',             s !== STATE.PLAYING);
 
-  // Stop music when leaving PLAYING
   if (prev === STATE.PLAYING && s !== STATE.PLAYING) {
     stopSong();
-    // Fade sky back to menu palette
-    skyLerpTop.set(0xf5a060);
-    skyLerpBot.set(0x5c8de0);
-    skyLerpFog.set(0xf0a060);
-    skyLerpAmb.set(0xffd8a0);
+    clearAllOrbs();
+    skyLerpTop.set(0xf5a060); skyLerpBot.set(0x5c8de0);
+    skyLerpFog.set(0xf0a060); skyLerpAmb.set(0xffd8a0);
     skyLerpAmbInt = 2.2;
   }
 
@@ -737,17 +867,15 @@ function setState(s) {
     resetCar();
     redirecting = false;
 
-    // Set sky to song theme
     if (beatMap?.theme) {
       const t = beatMap.theme;
-      skyLerpTop.set(t.skyTop);
-      skyLerpBot.set(t.skyBot);
-      skyLerpFog.set(t.fog);
-      skyLerpAmb.set(t.accent);
+      skyLerpTop.set(t.skyTop); skyLerpBot.set(t.skyBot);
+      skyLerpFog.set(t.fog);   skyLerpAmb.set(t.accent);
       skyLerpAmbInt = 1.8;
     }
 
-    // Start music (user gesture already happened via button click)
+    prepareNotes();
+    clearAllOrbs();
     startSong();
   }
 
@@ -786,8 +914,7 @@ function checkPortals() {
       Portal.sendPlayerThroughPortal(gate.target, { username:incoming.username, color:incoming.color, speed:incoming.speed });
     }
   };
-  check(exitGate);
-  check(returnGate);
+  check(exitGate); check(returnGate);
 }
 
 // ── Menu camera ────────────────────────────────────────────────────────────────
@@ -795,44 +922,30 @@ function updateMenuCamera(dt) {
   menuTime += dt;
   const t = menuTime * 0.055;
   camera.fov = 70; camera.updateProjectionMatrix();
-  camera.position.set(
-    curveX(-20) + Math.sin(t) * 5,
-    7 + Math.sin(t*0.7) * 1.2,
-    16 + Math.cos(t*0.4) * 3
-  );
+  camera.position.set(curveX(-20) + Math.sin(t)*5, 7+Math.sin(t*0.7)*1.2, 16+Math.cos(t*0.4)*3);
   camera.lookAt(curveX(-40), 1.2, -40);
 }
 
-// ── Sky lerp helper ────────────────────────────────────────────────────────────
+// ── Sky lerp ──────────────────────────────────────────────────────────────────
 function lerpSky(dt) {
-  const rate = dt * 1.4;
-  skyMat.uniforms.uTop.value.lerp(skyLerpTop, rate);
-  skyMat.uniforms.uBot.value.lerp(skyLerpBot, rate);
-  scene.fog.color.lerp(skyLerpFog, rate);
-  ambLight.color.lerp(skyLerpAmb, rate);
-  ambLight.intensity += (skyLerpAmbInt - ambLight.intensity) * rate;
+  const r = dt * 1.4;
+  skyMat.uniforms.uTop.value.lerp(skyLerpTop, r);
+  skyMat.uniforms.uBot.value.lerp(skyLerpBot, r);
+  scene.fog.color.lerp(skyLerpFog, r);
+  ambLight.color.lerp(skyLerpAmb, r);
+  ambLight.intensity += (skyLerpAmbInt - ambLight.intensity) * r;
 }
 
 // ── Gameplay update ────────────────────────────────────────────────────────────
 function updatePlaying(dt) {
-  // ── Song time ────────────────────────────────────────────────────────────
-  if (audioCtx && audioSource) {
-    songTime = audioCtx.currentTime - songStartTime;
-  }
+  // ── Song time ─────────────────────────────────────────────────────────────
+  if (audioCtx && audioSource) songTime = audioCtx.currentTime - songStartTime;
 
-  // ── Beat ticks ───────────────────────────────────────────────────────────
+  // ── Beat ticks ────────────────────────────────────────────────────────────
   if (beatMap) {
     const beats = beatMap.beats;
     while (nextBeatIdx < beats.length && beats[nextBeatIdx] <= songTime) {
-      onBeat(nextBeatIdx);
-      nextBeatIdx++;
-    }
-    // Advance note pointer so Phase 7 can pick up from the right index
-    const notes = beatMap.notes;
-    // (Phase 7 will consume notes starting at nextNoteIdx)
-    // Keep nextNoteIdx in sync — advance past notes already in the past
-    while (nextNoteIdx < notes.length && notes[nextNoteIdx].time < songTime - 0.5) {
-      nextNoteIdx++;
+      onBeat(nextBeatIdx++);
     }
   }
 
@@ -842,18 +955,19 @@ function updatePlaying(dt) {
   // ── Beat bar flash ────────────────────────────────────────────────────────
   if (beatPulse > 0.05) {
     const accent = beatMap?.theme?.accent ?? '#4ff0ff';
-    beatBar.style.background = `linear-gradient(90deg, transparent, ${accent}, transparent)`;
-    beatBar.style.opacity = beatPulse;
-    beatBar.style.boxShadow = `0 0 ${(beatPulse*14)|0}px ${accent}`;
-  } else {
-    beatBar.style.opacity = '0';
-  }
+    beatBar.style.background = `linear-gradient(90deg,transparent,${accent},transparent)`;
+    beatBar.style.opacity    = beatPulse;
+    beatBar.style.boxShadow  = `0 0 ${(beatPulse*14)|0}px ${accent}`;
+  } else { beatBar.style.opacity = '0'; }
 
   // ── Ambient + beat accent light ────────────────────────────────────────────
   ambLight.intensity = skyLerpAmbInt + beatPulse * 2.2;
   beatLight.position.set(car.x, 4, car.z - 8);
   beatLight.intensity = beatPulse * 5.5;
   if (beatMap?.theme?.accent) beatLight.color.set(beatMap.theme.accent);
+
+  // ── Note orbs ─────────────────────────────────────────────────────────────
+  updateOrbs(dt);
 
   // ── Auto-forward ──────────────────────────────────────────────────────────
   car.z -= CRUISE_SPD * dt;
@@ -871,21 +985,18 @@ function updatePlaying(dt) {
   while (dH < -Math.PI) dH += Math.PI*2;
   car.heading += dH * Math.min(1, dt * 10);
 
-  // ── Lean into lane change ─────────────────────────────────────────────────
+  // ── Lean ──────────────────────────────────────────────────────────────────
   const lateralVel = (car.laneX - prevLaneX) / Math.max(dt, 0.001);
   const targetLean = -lateralVel * 0.011;
   car.lean += (targetLean - car.lean) * Math.min(1, dt * 8);
   car.lean  = Math.max(-0.08, Math.min(0.08, car.lean));
 
   // ── Suspension ────────────────────────────────────────────────────────────
-  const vibe = (Math.random()-0.5) * 9;
-  car.suspVel += (-100*car.suspY - 18*car.suspVel + vibe) * dt;
+  car.suspVel += (-100*car.suspY - 18*car.suspVel + (Math.random()-0.5)*9) * dt;
   car.suspY   += car.suspVel * dt;
   car.suspY    = Math.max(-0.12, Math.min(0.10, car.suspY));
-
-  // ── Pitch from suspension ─────────────────────────────────────────────────
-  car.pitch += (-car.suspY * 0.055 - car.pitch) * Math.min(1, dt*4);
-  car.pitch  = Math.max(-0.04, Math.min(0.04, car.pitch));
+  car.pitch   += (-car.suspY * 0.055 - car.pitch) * Math.min(1, dt*4);
+  car.pitch    = Math.max(-0.04, Math.min(0.04, car.pitch));
 
   // ── Wheel animation ───────────────────────────────────────────────────────
   car.wheelRot += CRUISE_SPD * dt * 2.2;
@@ -896,35 +1007,23 @@ function updatePlaying(dt) {
     w.rotation.x = car.wheelRot;
   }
 
-  // ── Car group transform ───────────────────────────────────────────────────
+  // ── Car transform ─────────────────────────────────────────────────────────
   carGroup.position.set(car.x, car.suspY, car.z);
   carGroup.rotation.y = car.heading;
   carGroup.rotation.x = car.pitch;
   carGroup.rotation.z = car.lean;
 
-  // ── Camera ───────────────────────────────────────────────────────────────
+  // ── Camera ────────────────────────────────────────────────────────────────
   camera.fov = 72; camera.updateProjectionMatrix();
-  const pullBack = 9.2;
-  camera.position.set(
-    car.x - Math.sin(car.heading) * pullBack,
-    3.4,
-    car.z + Math.cos(car.heading) * pullBack
-  );
-  camera.lookAt(
-    car.x + Math.sin(car.heading) * 8,
-    1.4,
-    car.z - Math.cos(car.heading) * 8
-  );
+  const pb = 9.2;
+  camera.position.set(car.x - Math.sin(car.heading)*pb, 3.4, car.z + Math.cos(car.heading)*pb);
+  camera.lookAt(car.x + Math.sin(car.heading)*8, 1.4, car.z - Math.cos(car.heading)*8);
 
-  // ── Speed lines — pulse with beat ─────────────────────────────────────────
-  const lineIntensity = 0.28 + beatPulse * 0.50;
-  drawSpeedLines(lineIntensity);
+  // ── Speed lines ───────────────────────────────────────────────────────────
+  drawSpeedLines(0.28 + beatPulse * 0.50);
 
   // ── Hit flash decay ───────────────────────────────────────────────────────
-  if (hitFlashTimer > 0) {
-    hitFlashTimer -= dt;
-    if (hitFlashTimer <= 0) hitFlash.className = '';
-  }
+  if (hitFlashTimer > 0) { hitFlashTimer -= dt; if (hitFlashTimer <= 0) hitFlash.className = ''; }
 
   checkPortals();
 }
@@ -935,15 +1034,10 @@ function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
-  if (gameState === STATE.MENU || gameState === STATE.CAR_SELECT || gameState === STATE.GAME_OVER) {
-    updateMenuCamera(dt);
-  } else if (gameState === STATE.PLAYING) {
-    updatePlaying(dt);
-  }
+  if (gameState !== STATE.PLAYING) updateMenuCamera(dt);
+  else updatePlaying(dt);
 
-  // Sky always lerps smoothly
   lerpSky(dt);
-
   renderer.render(scene, camera);
 
   if (gameState === STATE.CAR_SELECT) {
