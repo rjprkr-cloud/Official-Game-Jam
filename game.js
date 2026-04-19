@@ -1,4 +1,4 @@
-// Pulse//Drive — Phase 5: Lane System
+// Pulse//Drive — Phase 6: Web Audio + Beat Clock
 // Portal Protocol preserved.
 
 import * as THREE from 'https://esm.sh/three@0.169';
@@ -24,7 +24,8 @@ const incoming   = Portal.readPortalParams();
 const nextTarget = await Portal.pickPortalTarget();
 
 // ── Lighting ───────────────────────────────────────────────────────────────────
-scene.add(new THREE.AmbientLight(0xffd8a0, 2.2));
+const ambLight = new THREE.AmbientLight(0xffd8a0, 2.2);
+scene.add(ambLight);
 const sun = new THREE.DirectionalLight(0xffe8b0, 2.8);
 sun.position.set(18, 35, 25);
 sun.castShadow = true;
@@ -33,6 +34,11 @@ sun.shadow.camera.near = 1; sun.shadow.camera.far = 250;
 sun.shadow.camera.left = sun.shadow.camera.bottom = -90;
 sun.shadow.camera.right = sun.shadow.camera.top   =  90;
 scene.add(sun);
+
+// Beat accent light — pulses with the music
+const beatLight = new THREE.PointLight(0x4ff0ff, 0, 22);
+beatLight.position.set(0, 4, 0);
+scene.add(beatLight);
 
 // ── Sky gradient dome ──────────────────────────────────────────────────────────
 const skyMat = new THREE.ShaderMaterial({
@@ -46,6 +52,17 @@ const skyMat = new THREE.ShaderMaterial({
 });
 scene.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(190,16,8), skyMat), { renderOrder:-1 }));
 
+// Sky palette presets
+const SKY = {
+  menu: {
+    top: new THREE.Color(0xf5a060),
+    bot: new THREE.Color(0x5c8de0),
+    fog: new THREE.Color(0xf0a060),
+    amb: new THREE.Color(0xffd8a0),
+    ambInt: 2.2,
+  },
+};
+
 // ── Road curve ─────────────────────────────────────────────────────────────────
 function curveX(z)  { return 14*Math.sin(z*0.013) + 5*Math.sin(z*0.034+1.5); }
 function curveDX(z) { return 14*0.013*Math.cos(z*0.013) + 5*0.034*Math.cos(z*0.034+1.5); }
@@ -56,8 +73,8 @@ const ROAD_W      = 18;
 const CURB_W      = 1.6;
 const ROAD_START  = 25;
 const ROAD_END    = -(ROAD_LEN - 25);
-const CRUISE_SPD  = 28;   // m/s — constant auto-forward speed
-const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75]; // X from road centre, lane 0-3
+const CRUISE_SPD  = 28;   // m/s
+const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75];
 
 // ── Ribbon mesh builder ────────────────────────────────────────────────────────
 function buildRibbon(halfWL, halfWR, yOff, tex, tileLen) {
@@ -87,23 +104,19 @@ function makeRoadTex() {
   const cw=256, ch=512;
   const cv = Object.assign(document.createElement('canvas'), { width:cw, height:ch });
   const cx = cv.getContext('2d');
-  // Base asphalt
   cx.fillStyle = '#3b3d42'; cx.fillRect(0, 0, cw, ch);
-  // Noise
   for (let i=0; i<2500; i++) {
     const v = 55+(Math.random()*22|0);
     cx.fillStyle = `rgba(${v},${v},${v},0.22)`;
     cx.fillRect(Math.random()*cw, Math.random()*ch, 1, 1);
   }
-  // Solid white edge lines
   cx.fillStyle = '#d8d8d6';
   cx.fillRect(8, 0, 7, ch);
   cx.fillRect(cw-15, 0, 7, ch);
-  // Dashed white lane dividers at 1/4, 1/2, 3/4 (dash 160px on, 352px off per 512px tile)
   cx.fillStyle = '#bbbbba';
   for (const tx of [64, 128, 192]) {
     cx.fillRect(tx-3, 0,   5, 160);
-    cx.fillRect(tx-3, 512, 5, 160); // wraps
+    cx.fillRect(tx-3, 512, 5, 160);
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -372,12 +385,106 @@ function drawSpeedLines(intensity) {
   slCtx.restore();
 }
 
+// ── Web Audio ──────────────────────────────────────────────────────────────────
+let audioCtx     = null;
+let audioBuffer  = null;
+let audioSource  = null;
+let masterGain   = null;   // master volume node
+let musicGain    = null;   // music volume node
+let beatMap      = null;   // loaded JSON beat map
+let audioReady   = false;  // true once buffer is decoded
+
+// Beat clock state
+let songStartTime = 0;     // audioCtx.currentTime when song began
+let songTime      = 0;     // seconds into current song (Phase 7+ reads this)
+let nextBeatIdx   = 0;     // index into beatMap.beats[]
+let nextNoteIdx   = 0;     // index into beatMap.notes[] — Phase 7 reads this
+let beatPulse    = 0;      // 0-1, peaks on every beat, decays fast
+
+// Volume levels (0-1) — updated by settings sliders
+let volMaster = 0.8;
+let volMusic  = 0.9;
+
+// Sky lerp targets — updated when entering gameplay
+const skyLerpTop = new THREE.Color(0xf5a060);
+const skyLerpBot = new THREE.Color(0x5c8de0);
+const skyLerpFog = new THREE.Color(0xf0a060);
+const skyLerpAmb = new THREE.Color(0xffd8a0);
+let   skyLerpAmbInt = 2.2;
+
+// Preload beat map and audio immediately (non-blocking)
+async function initAudio() {
+  try {
+    const mapRes = await fetch('beatmaps/chrome-rain-over-midtown.json');
+    if (!mapRes.ok) throw new Error('Beat map fetch failed');
+    beatMap = await mapRes.json();
+  } catch(e) {
+    console.warn('Beat map load failed:', e);
+    return;
+  }
+  try {
+    // AudioContext must be created or resumed after a user gesture,
+    // so we just decode here and create the context on first play.
+    const tmpCtx = new AudioContext();
+    const audioRes = await fetch(beatMap.file);
+    if (!audioRes.ok) throw new Error('Audio fetch failed');
+    const arrayBuf = await audioRes.arrayBuffer();
+    audioBuffer = await tmpCtx.decodeAudioData(arrayBuf);
+    await tmpCtx.close();
+    audioReady = true;
+  } catch(e) {
+    console.warn('Audio decode failed:', e);
+  }
+}
+initAudio(); // fire and forget
+
+function ensureAudioCtx() {
+  if (audioCtx) return;
+  audioCtx   = new AudioContext();
+  masterGain = audioCtx.createGain();
+  musicGain  = audioCtx.createGain();
+  musicGain.connect(masterGain);
+  masterGain.connect(audioCtx.destination);
+  masterGain.gain.value = volMaster;
+  musicGain.gain.value  = volMusic;
+}
+
+function startSong() {
+  if (!audioReady || !audioBuffer) { console.warn('Audio not ready'); return; }
+  ensureAudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  stopSong();
+  audioSource          = audioCtx.createBufferSource();
+  audioSource.buffer   = audioBuffer;
+  audioSource.connect(musicGain);
+  songStartTime        = audioCtx.currentTime;
+  songTime             = 0;
+  nextBeatIdx          = 0;
+  nextNoteIdx          = 0;
+  beatPulse            = 0;
+  audioSource.onended  = () => { audioSource = null; };
+  audioSource.start(0);
+}
+
+function stopSong() {
+  if (audioSource) {
+    try { audioSource.stop(); } catch(_) {}
+    audioSource.onended = null;
+    audioSource = null;
+  }
+}
+
+function onBeat(idx) {
+  // Strong pulse every 4th beat (downbeat), regular pulse otherwise
+  beatPulse = idx % 4 === 0 ? 1.0 : 0.72;
+}
+
 // ── Car physics state ──────────────────────────────────────────────────────────
 const car = {
   x: 0, z: 0,
   heading: 0,
-  lane: 1,                          // target lane index (0-3)
-  laneX: LANE_OFFSETS[1],           // current visual x offset from road centre
+  lane: 1,
+  laneX: LANE_OFFSETS[1],
   lean: 0, wheelRot: 0,
   suspY: 0, suspVel: 0, pitch: 0,
 };
@@ -478,6 +585,16 @@ hud.innerHTML = `
 `;
 document.body.appendChild(hud);
 
+// Beat-sync bar — thin line at top of screen that flashes on beat
+const beatBar = document.createElement('div');
+beatBar.id = 'beat-bar';
+Object.assign(beatBar.style, {
+  position: 'fixed', top: '0', left: '0', width: '100%', height: '3px',
+  background: 'transparent', zIndex: '100', pointerEvents: 'none',
+  transition: 'opacity 0.05s',
+});
+document.body.appendChild(beatBar);
+
 const hitFlash = document.createElement('div');
 hitFlash.id = 'hit-flash';
 document.body.appendChild(hitFlash);
@@ -538,7 +655,7 @@ screenGameOver.innerHTML = `
 document.body.appendChild(screenGameOver);
 
 // ── Modal builder ──────────────────────────────────────────────────────────────
-function showModal(title, bodyHTML) {
+function showModal(title, bodyHTML, onOpen) {
   document.getElementById('modal-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.id = 'modal-overlay';
@@ -548,6 +665,7 @@ function showModal(title, bodyHTML) {
   document.body.appendChild(overlay);
   document.getElementById('modal-close').addEventListener('click', () => overlay.remove());
   overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
+  if (onOpen) onOpen(overlay);
 }
 
 // ── HUD helpers ────────────────────────────────────────────────────────────────
@@ -569,20 +687,70 @@ function showHitFeedback(type, text) {
   hitFlashTimer = 0.65;
 }
 
+// ── Settings modal — wired to gain nodes ───────────────────────────────────────
+function openSettings() {
+  showModal('Settings', `
+    <div class="setting-row">
+      <span>Master Volume</span>
+      <input type="range" id="sl-master" min="0" max="100" value="${(volMaster*100)|0}">
+    </div>
+    <div class="setting-row">
+      <span>Music Volume</span>
+      <input type="range" id="sl-music"  min="0" max="100" value="${(volMusic*100)|0}">
+    </div>
+    <p style="margin-top:1rem;color:var(--muted);font-size:.76rem;letter-spacing:.1em">← → SWITCH LANES</p>
+  `, overlay => {
+    overlay.querySelector('#sl-master').addEventListener('input', e => {
+      volMaster = e.target.value / 100;
+      if (masterGain) masterGain.gain.value = volMaster;
+    });
+    overlay.querySelector('#sl-music').addEventListener('input', e => {
+      volMusic = e.target.value / 100;
+      if (musicGain) musicGain.gain.value = volMusic;
+    });
+  });
+}
+
 // ── State machine ──────────────────────────────────────────────────────────────
 function setState(s) {
+  const prev = gameState;
   gameState = s;
   screenMenu.classList.toggle('hidden',      s !== STATE.MENU);
   screenCarSelect.classList.toggle('hidden', s !== STATE.CAR_SELECT);
   screenGameOver.classList.toggle('hidden',  s !== STATE.GAME_OVER);
   hud.classList.toggle('hidden',             s !== STATE.PLAYING);
 
+  // Stop music when leaving PLAYING
+  if (prev === STATE.PLAYING && s !== STATE.PLAYING) {
+    stopSong();
+    // Fade sky back to menu palette
+    skyLerpTop.set(0xf5a060);
+    skyLerpBot.set(0x5c8de0);
+    skyLerpFog.set(0xf0a060);
+    skyLerpAmb.set(0xffd8a0);
+    skyLerpAmbInt = 2.2;
+  }
+
   if (s === STATE.PLAYING) {
     hp=3.0; score=0; combo=0; maxCombo=0;
     updateHearts(); updateScore(); updateLanePips();
     resetCar();
     redirecting = false;
+
+    // Set sky to song theme
+    if (beatMap?.theme) {
+      const t = beatMap.theme;
+      skyLerpTop.set(t.skyTop);
+      skyLerpBot.set(t.skyBot);
+      skyLerpFog.set(t.fog);
+      skyLerpAmb.set(t.accent);
+      skyLerpAmbInt = 1.8;
+    }
+
+    // Start music (user gesture already happened via button click)
+    startSong();
   }
+
   if (s === STATE.GAME_OVER) {
     document.getElementById('go-score').textContent = score.toLocaleString();
     document.getElementById('go-combo').textContent = `×${maxCombo}`;
@@ -594,14 +762,7 @@ document.getElementById('btn-new-game').addEventListener('click', () => setState
 document.getElementById('btn-load-game').addEventListener('click', () =>
   showModal('Load Game', '<p style="color:var(--muted);font-size:.88rem;letter-spacing:.06em">No saved game found.</p>')
 );
-document.getElementById('btn-settings').addEventListener('click', () =>
-  showModal('Settings', `
-    <div class="setting-row"><span>Master Volume</span><input type="range" min="0" max="100" value="80"></div>
-    <div class="setting-row"><span>Music Volume</span> <input type="range" min="0" max="100" value="90"></div>
-    <div class="setting-row"><span>SFX Volume</span>   <input type="range" min="0" max="100" value="70"></div>
-    <p style="margin-top:1rem;color:var(--muted);font-size:.76rem;letter-spacing:.1em">← → SWITCH LANES</p>
-  `)
-);
+document.getElementById('btn-settings').addEventListener('click', openSettings);
 document.getElementById('btn-exit').addEventListener('click', () =>
   showModal('Exit', '<p style="color:var(--muted);font-size:.88rem;letter-spacing:.06em">Close this tab to exit.</p>')
 );
@@ -642,8 +803,58 @@ function updateMenuCamera(dt) {
   camera.lookAt(curveX(-40), 1.2, -40);
 }
 
+// ── Sky lerp helper ────────────────────────────────────────────────────────────
+function lerpSky(dt) {
+  const rate = dt * 1.4;
+  skyMat.uniforms.uTop.value.lerp(skyLerpTop, rate);
+  skyMat.uniforms.uBot.value.lerp(skyLerpBot, rate);
+  scene.fog.color.lerp(skyLerpFog, rate);
+  ambLight.color.lerp(skyLerpAmb, rate);
+  ambLight.intensity += (skyLerpAmbInt - ambLight.intensity) * rate;
+}
+
 // ── Gameplay update ────────────────────────────────────────────────────────────
 function updatePlaying(dt) {
+  // ── Song time ────────────────────────────────────────────────────────────
+  if (audioCtx && audioSource) {
+    songTime = audioCtx.currentTime - songStartTime;
+  }
+
+  // ── Beat ticks ───────────────────────────────────────────────────────────
+  if (beatMap) {
+    const beats = beatMap.beats;
+    while (nextBeatIdx < beats.length && beats[nextBeatIdx] <= songTime) {
+      onBeat(nextBeatIdx);
+      nextBeatIdx++;
+    }
+    // Advance note pointer so Phase 7 can pick up from the right index
+    const notes = beatMap.notes;
+    // (Phase 7 will consume notes starting at nextNoteIdx)
+    // Keep nextNoteIdx in sync — advance past notes already in the past
+    while (nextNoteIdx < notes.length && notes[nextNoteIdx].time < songTime - 0.5) {
+      nextNoteIdx++;
+    }
+  }
+
+  // ── Beat pulse decay (~100ms half-life) ───────────────────────────────────
+  beatPulse *= Math.pow(0.001, dt);
+
+  // ── Beat bar flash ────────────────────────────────────────────────────────
+  if (beatPulse > 0.05) {
+    const accent = beatMap?.theme?.accent ?? '#4ff0ff';
+    beatBar.style.background = `linear-gradient(90deg, transparent, ${accent}, transparent)`;
+    beatBar.style.opacity = beatPulse;
+    beatBar.style.boxShadow = `0 0 ${(beatPulse*14)|0}px ${accent}`;
+  } else {
+    beatBar.style.opacity = '0';
+  }
+
+  // ── Ambient + beat accent light ────────────────────────────────────────────
+  ambLight.intensity = skyLerpAmbInt + beatPulse * 2.2;
+  beatLight.position.set(car.x, 4, car.z - 8);
+  beatLight.intensity = beatPulse * 5.5;
+  if (beatMap?.theme?.accent) beatLight.color.set(beatMap.theme.accent);
+
   // ── Auto-forward ──────────────────────────────────────────────────────────
   car.z -= CRUISE_SPD * dt;
 
@@ -666,7 +877,7 @@ function updatePlaying(dt) {
   car.lean += (targetLean - car.lean) * Math.min(1, dt * 8);
   car.lean  = Math.max(-0.08, Math.min(0.08, car.lean));
 
-  // ── Suspension ───────────────────────────────────────────────────────────
+  // ── Suspension ────────────────────────────────────────────────────────────
   const vibe = (Math.random()-0.5) * 9;
   car.suspVel += (-100*car.suspY - 18*car.suspVel + vibe) * dt;
   car.suspY   += car.suspVel * dt;
@@ -705,8 +916,8 @@ function updatePlaying(dt) {
     car.z - Math.cos(car.heading) * 8
   );
 
-  // ── Visuals ───────────────────────────────────────────────────────────────
-  const lineIntensity = 0.42; // constant at cruise speed; Phase 9 will pulse this with beat
+  // ── Speed lines — pulse with beat ─────────────────────────────────────────
+  const lineIntensity = 0.28 + beatPulse * 0.50;
   drawSpeedLines(lineIntensity);
 
   // ── Hit flash decay ───────────────────────────────────────────────────────
@@ -729,6 +940,9 @@ function loop(now) {
   } else if (gameState === STATE.PLAYING) {
     updatePlaying(dt);
   }
+
+  // Sky always lerps smoothly
+  lerpSky(dt);
 
   renderer.render(scene, camera);
 
