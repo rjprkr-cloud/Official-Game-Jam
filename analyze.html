@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Beat Analyzer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #111; color: #eee; font-family: ui-monospace, monospace; padding: 2rem; }
+  h1 { color: #c64bff; margin-bottom: 1rem; }
+  button {
+    background: #c64bff; color: #fff; border: none; padding: .6rem 1.4rem;
+    border-radius: 6px; cursor: pointer; font-size: 1rem; margin-right: .5rem;
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  #status { margin: 1rem 0; color: #aaa; min-height: 1.4rem; }
+  #results { display: none; }
+  #results h2 { color: #4ff0ff; margin-bottom: .5rem; }
+  #summary { background: #1a1a2e; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; line-height: 1.8; }
+  #summary span { color: #c64bff; font-weight: bold; }
+  #json-out {
+    width: 100%; height: 340px; background: #0a0a18; color: #7fffb0;
+    border: 1px solid #333; border-radius: 6px; padding: .8rem;
+    font-size: .78rem; resize: vertical;
+  }
+  #copy-btn { margin-top: .5rem; }
+  progress { width: 100%; height: 12px; margin-top: .5rem; border-radius: 4px; }
+  .wave-wrap { margin-top: 1.2rem; }
+  canvas { display: block; width: 100%; border-radius: 6px; background: #0a0a18; }
+  .warn { color: #ffaa44; margin-top: .5rem; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>🎵 Beat Analyzer</h1>
+<p style="color:#888;margin-bottom:1rem">Analyzes the bundled track and outputs a beat-map JSON for the game.</p>
+
+<button id="run-btn">Analyze chrome-rain-over-midtown.mp3</button>
+<button id="play-btn" disabled>▶ Play with beat markers</button>
+<button id="stop-btn" disabled>■ Stop</button>
+
+<div id="status">Ready.</div>
+<progress id="prog" value="0" max="100" style="display:none"></progress>
+
+<div id="results">
+  <h2>Results</h2>
+  <div id="summary"></div>
+  <div class="wave-wrap">
+    <canvas id="wv" height="80"></canvas>
+  </div>
+  <p style="margin:.8rem 0 .3rem;color:#aaa">Beat-map JSON — copy this into beatmaps/chrome-rain-over-midtown.json</p>
+  <textarea id="json-out" readonly></textarea>
+  <button id="copy-btn">Copy JSON</button>
+  <p class="warn" id="warn"></p>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const TRACK_URL = 'music/chrome-rain-over-midtown.mp3';
+
+// Onset detection tunables
+const LOW_PASS_FREQ  = 200;   // Hz — isolate kick/bass for BPM detection
+const PEAK_THRESHOLD = 1.4;   // local-energy ratio to trigger a beat
+const MIN_BEAT_GAP   = 0.25;  // seconds — minimum time between beats (~240 BPM max)
+const HISTORY_BINS   = 43;    // energy history window
+const WINDOW_SIZE    = 1024;
+
+let audioCtx, audioBuffer, playSource, beatTimestamps = [], bpm = 0, duration = 0;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+function status(msg) { $('status').textContent = msg; }
+function setProgress(v) { $('prog').value = v; }
+
+// ── Run analysis ──────────────────────────────────────────────────────────────
+$('run-btn').addEventListener('click', async () => {
+  $('run-btn').disabled = true;
+  $('prog').style.display = 'block';
+  status('Fetching audio…');
+
+  let arrayBuf;
+  try {
+    const res = await fetch(TRACK_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    arrayBuf = await res.arrayBuffer();
+  } catch(e) {
+    status('❌ Could not load track: ' + e.message);
+    $('run-btn').disabled = false;
+    return;
+  }
+
+  status('Decoding audio…');
+  setProgress(10);
+  audioCtx = new AudioContext();
+  audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
+  duration = audioBuffer.duration;
+
+  status('Running offline beat detection…');
+  setProgress(20);
+  beatTimestamps = await detectBeats(audioBuffer);
+  setProgress(80);
+
+  bpm = estimateBPM(beatTimestamps);
+  const snappedBeats = snapBeatsToGrid(beatTimestamps, bpm);
+
+  status('Done ✓');
+  setProgress(100);
+
+  renderWaveform(audioBuffer, snappedBeats);
+  buildOutput(bpm, snappedBeats, audioBuffer);
+  $('results').style.display = 'block';
+  $('play-btn').disabled = false;
+});
+
+// ── Beat detection via energy onset ───────────────────────────────────────────
+async function detectBeats(buf) {
+  const rate    = buf.sampleRate;
+  const frames  = buf.length;
+  const offCtx  = new OfflineAudioContext(1, frames, rate);
+
+  // Low-pass filter to isolate kick/bass
+  const src  = offCtx.createBufferSource();
+  src.buffer = buf;
+  const lpf  = offCtx.createBiquadFilter();
+  lpf.type = 'lowpass'; lpf.frequency.value = LOW_PASS_FREQ;
+  src.connect(lpf); lpf.connect(offCtx.destination);
+  src.start(0);
+
+  const rendered = await offCtx.startRendering();
+  const data = rendered.getChannelData(0);
+
+  const beats = [];
+  const history = new Float32Array(HISTORY_BINS);
+  let histIdx = 0;
+  let lastBeat = -MIN_BEAT_GAP;
+
+  for (let i = 0; i < data.length - WINDOW_SIZE; i += WINDOW_SIZE) {
+    // Instant energy
+    let energy = 0;
+    for (let j = i; j < i + WINDOW_SIZE; j++) energy += data[j] * data[j];
+    energy /= WINDOW_SIZE;
+
+    // Historical average
+    let avg = 0;
+    for (let k = 0; k < HISTORY_BINS; k++) avg += history[k];
+    avg /= HISTORY_BINS;
+
+    const t = i / rate;
+    if (energy > avg * PEAK_THRESHOLD && t - lastBeat > MIN_BEAT_GAP) {
+      beats.push(parseFloat(t.toFixed(4)));
+      lastBeat = t;
+    }
+
+    history[histIdx % HISTORY_BINS] = energy;
+    histIdx++;
+  }
+
+  return beats;
+}
+
+// ── BPM estimation from inter-beat intervals ───────────────────────────────────
+function estimateBPM(beats) {
+  if (beats.length < 4) return 120;
+  const intervals = [];
+  for (let i = 1; i < beats.length; i++) intervals.push(beats[i] - beats[i-1]);
+  intervals.sort((a,b) => a-b);
+  const med = intervals[Math.floor(intervals.length/2)];
+  let raw = 60 / med;
+  // Snap to nearest sensible BPM
+  const candidates = [raw/2, raw, raw*2];
+  const target = candidates.reduce((best, c) => {
+    const inRange = c >= 60 && c <= 200;
+    if (!inRange) return best;
+    return Math.abs(c - 120) < Math.abs(best - 120) ? c : best;
+  }, raw);
+  return Math.round(target * 10) / 10;
+}
+
+// ── Snap detected beats onto a clean BPM grid ─────────────────────────────────
+function snapBeatsToGrid(rawBeats, bpm) {
+  if (rawBeats.length === 0) return [];
+  const interval = 60 / bpm;
+  // Find offset from first beat
+  const offset = rawBeats[0];
+  const snapped = [];
+  // Generate grid beats across full duration
+  for (let t = offset; t < duration; t += interval) {
+    snapped.push(parseFloat(t.toFixed(4)));
+  }
+  return snapped;
+}
+
+// ── Build the output JSON ──────────────────────────────────────────────────────
+function buildOutput(bpm, beats, buf) {
+  // Divide song into 4-bar sections (16 beats each)
+  const beatsPerSection = 16;
+  const sections = [];
+  for (let i = 0; i < beats.length; i += beatsPerSection) {
+    sections.push({
+      startBeat: i,
+      endBeat: Math.min(i + beatsPerSection, beats.length) - 1,
+      startTime: parseFloat(beats[i].toFixed(4)),
+      endTime:   parseFloat((beats[Math.min(i + beatsPerSection, beats.length) - 1]).toFixed(4)),
+    });
+  }
+
+  // Note spawn pattern: one note every 2 beats on a random lane (1-4)
+  // Spread across all 4 lanes with some variety
+  const notes = [];
+  const lanePattern = [1,3,2,4,1,2,4,3]; // cycling pattern
+  let pi = 0;
+  for (let i = 0; i < beats.length; i += 2) {
+    notes.push({
+      time: beats[i],
+      beat: i,
+      lane: lanePattern[pi % lanePattern.length],
+    });
+    pi++;
+  }
+
+  // Rough sections for energy (manual override expected)
+  const map = {
+    id:       'chrome-rain-over-midtown',
+    title:    'Chrome Rain Over Midtown',
+    file:     'music/chrome-rain-over-midtown.mp3',
+    bpm:      bpm,
+    offset:   beats[0] ?? 0,
+    duration: parseFloat(buf.duration.toFixed(3)),
+    beatCount: beats.length,
+    beats,
+    sections,
+    notes,
+    // Hazard slots — to be filled in by hand / Phase 8
+    hazards:  [],
+    // Theme color for this song's visual palette
+    theme: { sky: '#1a1a3e', road: '#2a2a4a', accent: '#4ff0ff' },
+  };
+
+  $('json-out').value = JSON.stringify(map, null, 2);
+
+  $('summary').innerHTML = `
+    <b>File:</b> chrome-rain-over-midtown.mp3<br>
+    <b>Duration:</b> <span>${formatTime(buf.duration)}</span><br>
+    <b>Detected BPM:</b> <span>${bpm}</span><br>
+    <b>Beats found:</b> <span>${beats.length}</span><br>
+    <b>Note events:</b> <span>${notes.length}</span><br>
+    <b>Sections (16-beat):</b> <span>${sections.length}</span>
+  `;
+
+  // Warn if beat count seems off
+  const expectedBeats = Math.round(bpm / 60 * buf.duration);
+  const ratio = beats.length / expectedBeats;
+  if (ratio < 0.7 || ratio > 1.3) {
+    $('warn').textContent = `⚠ Beat count (${beats.length}) differs from expected (${expectedBeats}) by more than 30%. BPM may need manual adjustment.`;
+  }
+}
+
+// ── Waveform + beat marker renderer ───────────────────────────────────────────
+function renderWaveform(buf, beats) {
+  const cv = $('wv');
+  cv.width = cv.offsetWidth || 900;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const data = buf.getChannelData(0);
+  const step = Math.ceil(data.length / W);
+
+  ctx.fillStyle = '#0a0a18';
+  ctx.fillRect(0, 0, W, H);
+
+  // Waveform
+  ctx.strokeStyle = '#4ff0ff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) {
+    let min = 1, max = -1;
+    for (let j = x * step; j < (x+1) * step && j < data.length; j++) {
+      if (data[j] < min) min = data[j];
+      if (data[j] > max) max = data[j];
+    }
+    const y1 = (1 + min) * H / 2;
+    const y2 = (1 + max) * H / 2;
+    if (x === 0) ctx.moveTo(x, y1); else ctx.lineTo(x, y1);
+    ctx.lineTo(x, y2);
+  }
+  ctx.stroke();
+
+  // Beat markers
+  ctx.strokeStyle = 'rgba(198,75,255,0.7)';
+  ctx.lineWidth = 1;
+  for (const t of beats) {
+    const x = (t / buf.duration) * W;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+}
+
+// ── Playback with beat flash ───────────────────────────────────────────────────
+$('play-btn').addEventListener('click', () => {
+  if (!audioBuffer) return;
+  playSource = audioCtx.createBufferSource();
+  playSource.buffer = audioBuffer;
+  playSource.connect(audioCtx.destination);
+  playSource.start(0);
+  $('play-btn').disabled = true;
+  $('stop-btn').disabled = false;
+
+  // Flash body on beat
+  let bi = 0;
+  const checkBeats = () => {
+    if (!playSource) return;
+    const now = audioCtx.currentTime;
+    while (bi < beatTimestamps.length && beatTimestamps[bi] <= now) {
+      document.body.style.background = '#1a0a2e';
+      setTimeout(() => { document.body.style.background = '#111'; }, 80);
+      bi++;
+    }
+    if (bi < beatTimestamps.length) requestAnimationFrame(checkBeats);
+  };
+  requestAnimationFrame(checkBeats);
+
+  playSource.onended = () => {
+    $('play-btn').disabled = false;
+    $('stop-btn').disabled = true;
+    playSource = null;
+  };
+});
+
+$('stop-btn').addEventListener('click', () => {
+  if (playSource) { playSource.stop(); playSource = null; }
+  $('play-btn').disabled = false;
+  $('stop-btn').disabled = true;
+});
+
+$('copy-btn').addEventListener('click', () => {
+  $('json-out').select();
+  navigator.clipboard.writeText($('json-out').value)
+    .then(() => { $('copy-btn').textContent = 'Copied ✓'; setTimeout(() => $('copy-btn').textContent = 'Copy JSON', 2000); })
+    .catch(() => { $('copy-btn').textContent = 'Use Ctrl+C'; });
+});
+
+function formatTime(s) {
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+</script>
+</body>
+</html>
