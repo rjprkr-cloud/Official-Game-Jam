@@ -1,4 +1,4 @@
-// Pulse//Drive — Phase 8: Hazards & HP Damage
+// Pulse//Drive — HTML-first rebuild
 // Portal Protocol preserved.
 
 import * as THREE from 'https://esm.sh/three@0.169';
@@ -71,13 +71,13 @@ const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75];
 // NOTE: beat-map lanes are 1-indexed (1-4). Convert with: lane - 1
 
 // ── Timing constants ──────────────────────────────────────────────────────────
-const PERFECT_WINDOW     = 0.08;   // ±80ms  → PERFECT
-const HIT_WINDOW         = 0.16;   // ±160ms → GOOD
-const MISS_TIMEOUT       = 0.22;   // note past this → MISS
-const ORB_SPAWN_AHEAD    = 3.2;    // seconds before hit to spawn orb
+const PERFECT_WINDOW     = 0.08;
+const HIT_WINDOW         = 0.16;
+const MISS_TIMEOUT       = 0.22;
+const ORB_SPAWN_AHEAD    = 3.2;
 const ORB_POOL_SIZE      = 20;
-const HAZARD_HIT_WINDOW  = 0.20;   // ±200ms → hazard collision window
-const HAZARD_SPAWN_AHEAD = 4.0;    // seconds before hit to show hazard
+const HAZARD_HIT_WINDOW  = 0.20;
+const HAZARD_SPAWN_AHEAD = 4.0;
 
 // ── Ribbon mesh builder ────────────────────────────────────────────────────────
 function buildRibbon(halfWL, halfWR, yOff, tex, tileLen) {
@@ -151,10 +151,14 @@ buildRibbon(ROAD_W/2, ROAD_W/2+CURB_W, 0.010, makeCurbTex(), 6);
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(50, 500);
-  scene.add(Object.assign(
-    new THREE.Mesh(new THREE.PlaneGeometry(600, ROAD_LEN+50), new THREE.MeshLambertMaterial({ map:tex })),
-    { rotation: new THREE.Euler(-Math.PI/2,0,0), position: new THREE.Vector3(0,0,ROAD_START-ROAD_LEN/2), receiveShadow:true }
-  ));
+  const grass = new THREE.Mesh(
+    new THREE.PlaneGeometry(600, ROAD_LEN+50),
+    new THREE.MeshLambertMaterial({ map:tex })
+  );
+  grass.rotation.x = -Math.PI/2;
+  grass.position.set(0, 0, ROAD_START - ROAD_LEN/2);
+  grass.receiveShadow = true;
+  scene.add(grass);
 }
 
 // ── Trees ──────────────────────────────────────────────────────────────────────
@@ -435,7 +439,7 @@ function spawnOrb(noteIdx) {
   const orb  = getFreeOrb(); if (!orb) return;
   const note = beatMap.notes[noteIdx];
   const nz   = noteWorldZ[noteIdx];
-  const nx   = curveX(nz) + LANE_OFFSETS[note.lane - 1];   // ← 1-indexed fix
+  const nx   = curveX(nz) + LANE_OFFSETS[note.lane - 1];
   const th   = beatMap.theme;
   orb.innerMat.color.set(th.noteColor); orb.outerMat.color.set(th.noteGlow); orb.ringMat.color.set(th.noteColor);
   orb.innerMat.opacity = 1; orb.outerMat.opacity = 0.36; orb.ringMat.opacity = 0.50;
@@ -516,67 +520,45 @@ function updateOrbs(dt) {
 }
 
 // ── Hazard system ──────────────────────────────────────────────────────────────
-
-// Build a Three.js mesh group for a given hazard type
 function buildHazardMesh(type) {
   const g = new THREE.Group();
-
   if (type === 'spike_strip') {
-    // Flat metal base
-    const base = new THREE.Mesh(
-      new THREE.BoxGeometry(4.2, 0.13, 0.90),
-      new THREE.MeshLambertMaterial({ color: 0x888899 })
-    );
+    const base = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.13, 0.90), new THREE.MeshLambertMaterial({ color: 0x888899 }));
     base.position.y = 0.065; base.castShadow = true; g.add(base);
-    // Yellow warning stripes
     const stripeMat = new THREE.MeshLambertMaterial({ color: 0xffcc00, emissive: 0x886600, emissiveIntensity: 0.4 });
     for (const xi of [-1.4, -0.4, 0.4, 1.4]) {
       const s = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.15, 0.92), stripeMat);
       s.position.set(xi, 0.075, 0); g.add(s);
     }
-    // Warning cones on either side
     const coneMat = new THREE.MeshLambertMaterial({ color: 0xff6600, emissive: 0x882200, emissiveIntensity: 0.3 });
     for (const xi of [-2.4, 2.4]) {
       const cone = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.65, 6), coneMat);
       cone.position.set(xi, 0.325, 0); g.add(cone);
     }
     g.add(Object.assign(new THREE.PointLight(0xff8800, 3.5, 9), { position: new THREE.Vector3(0, 1.8, 0) }));
-
   } else if (type === 'oil_slick') {
-    // Dark iridescent puddle
-    const poolMat = new THREE.MeshLambertMaterial({
-      color: 0x110011, emissive: 0x550055, emissiveIntensity: 0.7,
-      transparent: true, opacity: 0.92, depthWrite: false,
-    });
+    const poolMat = new THREE.MeshLambertMaterial({ color: 0x110011, emissive: 0x550055, emissiveIntensity: 0.7, transparent: true, opacity: 0.92, depthWrite: false });
     const pool = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.055, 16), poolMat);
     pool.position.y = 0.028; g.add(pool);
-    // Inner shimmer ring
     const shimMat = new THREE.MeshBasicMaterial({ color: 0xcc44ff, transparent: true, opacity: 0.50, depthWrite: false });
     const shim = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.04, 14), shimMat);
     shim.position.y = 0.04; g.add(shim);
     g.add(Object.assign(new THREE.PointLight(0x9900cc, 3, 7), { position: new THREE.Vector3(0, 1.2, 0) }));
-
   } else if (type === 'concrete_barrier') {
-    // Main block
     const blockMat = new THREE.MeshLambertMaterial({ color: 0xb8b8b8 });
     const block = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.65, 0.95), blockMat);
     block.position.y = 0.825; block.castShadow = true; g.add(block);
-    // Red danger stripe
     const stripeMat = new THREE.MeshLambertMaterial({ color: 0xdd1111, emissive: 0x880000, emissiveIntensity: 0.35 });
     const stripe = new THREE.Mesh(new THREE.BoxGeometry(3.85, 0.30, 0.98), stripeMat);
     stripe.position.y = 0.72; g.add(stripe);
-    // Reflective top
-    const topMat = new THREE.MeshLambertMaterial({ color: 0xdddddd });
-    const top = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.12, 0.95), topMat);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.12, 0.95), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
     top.position.y = 1.71; g.add(top);
     g.add(Object.assign(new THREE.PointLight(0xff3300, 4, 10), { position: new THREE.Vector3(0, 2.6, 0) }));
   }
-
   return g;
 }
 
-// Pre-built hazard objects (rebuilt each song via prepareHazards)
-const hazardObjects = [];   // { group, hazardIdx, active, judged, stateTimer }
+const hazardObjects = [];
 let hazardSpawnIdx  = 0;
 
 function prepareHazards() {
@@ -587,10 +569,10 @@ function prepareHazards() {
   for (let i = 0; i < beatMap.hazards.length; i++) {
     const h  = beatMap.hazards[i];
     const nz = -CRUISE_SPD * h.time;
-    const nx = curveX(nz) + LANE_OFFSETS[h.lane - 1];   // ← 1-indexed fix
+    const nx = curveX(nz) + LANE_OFFSETS[h.lane - 1];
     const mesh = buildHazardMesh(h.type);
     mesh.position.set(nx, 0, nz);
-    mesh.rotation.y = Math.atan2(-curveDX(nz), 1);  // align to road tangent
+    mesh.rotation.y = Math.atan2(-curveDX(nz), 1);
     mesh.visible = false;
     scene.add(mesh);
     hazardObjects.push({ group: mesh, hazardIdx: i, active: false, judged: false, stateTimer: 0 });
@@ -605,8 +587,6 @@ function clearAllHazards() {
 function updateHazards(dt) {
   if (!beatMap?.hazards?.length) return;
   const hazards = beatMap.hazards;
-
-  // Show upcoming hazards
   while (hazardSpawnIdx < hazards.length) {
     const h = hazards[hazardSpawnIdx];
     if (h.time - songTime > HAZARD_SPAWN_AHEAD) break;
@@ -616,30 +596,20 @@ function updateHazards(dt) {
     }
     hazardSpawnIdx++;
   }
-
   for (const hobj of hazardObjects) {
     if (!hobj.active) continue;
     const h         = hazards[hobj.hazardIdx];
     const timeDelta = songTime - h.time;
-
-    // Collision: car in same lane within time window
     if (!hobj.judged && Math.abs(timeDelta) <= HAZARD_HIT_WINDOW && car.lane === h.lane - 1) {
       hobj.judged     = true;
       hobj.stateTimer = 0;
       takeDamage();
     }
-
-    // Past safe window — hide
     if (timeDelta > HAZARD_HIT_WINDOW + 0.25) {
-      hobj.judged = true;  // safely dodged
+      hobj.judged = true;
       hobj.stateTimer += dt;
-      if (hobj.stateTimer > 0.4) {
-        hobj.active        = false;
-        hobj.group.visible = false;
-      }
+      if (hobj.stateTimer > 0.4) { hobj.active = false; hobj.group.visible = false; }
     }
-
-    // Oil slick shimmer animation
     if (h.type === 'oil_slick' && hobj.group.children[1]) {
       const t = performance.now() / 1000;
       hobj.group.children[1].scale.setScalar(0.85 + Math.sin(t * 2.8 + hobj.hazardIdx) * 0.18);
@@ -651,34 +621,22 @@ function updateHazards(dt) {
 let gameOverPending = false;
 const camShake = { timer: 0, intensity: 0 };
 
-// Damage flash overlay
-const damageFlash = document.createElement('div');
-Object.assign(damageFlash.style, {
-  position:'fixed', inset:'0', background:'rgba(220,20,20,0)',
-  pointerEvents:'none', zIndex:'90', transition:'background 0.06s',
-});
-document.body.appendChild(damageFlash);
+// DOM references — all structure lives in index.html
+const damageFlash = document.getElementById('damage-flash');
 let damageFlashTimer = 0;
 
 function takeDamage() {
   if (gameOverPending) return;
   hp = Math.max(0, hp - 0.5);
   updateHearts();
-
-  // Screen flash
   damageFlash.style.background = 'rgba(220,20,20,0.50)';
   damageFlashTimer = 0.40;
-
-  // Camera shake
   camShake.timer     = 0.55;
   camShake.intensity = 0.40;
-
-  // Heart pulse
   document.querySelectorAll('.heart').forEach(el => {
     el.classList.add('pulse');
     setTimeout(() => el.classList.remove('pulse'), 220);
   });
-
   if (hp <= 0) {
     gameOverPending = true;
     setTimeout(() => { setState(STATE.GAME_OVER); gameOverPending = false; }, 900);
@@ -745,117 +703,46 @@ const exitGate   = makeGate('#c64bff', ROAD_END+60, nextTarget?`→ ${nextTarget
 const returnGate = incoming.ref ? makeGate('#4ff0ff', 18, '← back', incoming.ref) : null;
 
 // ── Game state ─────────────────────────────────────────────────────────────────
-const STATE = { MENU:'menu', CAR_SELECT:'car-select', PLAYING:'playing', GAME_OVER:'game-over' };
+const STATE = {
+  MENU:       'menu',
+  SETTINGS:   'settings',
+  LOAD:       'load',
+  EXIT:       'exit',
+  CAR_SELECT: 'car-select',
+  PLAYING:    'playing',
+  GAME_OVER:  'game-over',
+};
 let gameState   = STATE.MENU;
 let selectedCar = 0;
 let hp = 3.0, score = 0, combo = 0, maxCombo = 0;
 let notesHit = 0, notesMissed = 0;
 let menuTime = 0, redirecting = false;
 
-// ── DOM: HUD ───────────────────────────────────────────────────────────────────
-const hud = document.createElement('div');
-hud.id = 'hud'; hud.className = 'hidden';
-hud.innerHTML = `
-  <div id="hud-hearts">
-    <span class="heart full" id="h1">♥</span>
-    <span class="heart full" id="h2">♥</span>
-    <span class="heart full" id="h3">♥</span>
-  </div>
-  <div id="hud-score-wrap">
-    <div id="hud-score">0</div>
-    <div id="hud-combo"></div>
-  </div>
-  <div id="hud-username">${incoming.username}</div>
-  <div id="hud-speedo">${(CRUISE_SPD*2.237)|0} MPH</div>
-  <div id="hud-lanes">
-    <div class="lane-pip" id="lp0"></div>
-    <div class="lane-pip active" id="lp1"></div>
-    <div class="lane-pip" id="lp2"></div>
-    <div class="lane-pip" id="lp3"></div>
-  </div>
-  <div id="hud-hint">← → switch lanes</div>
-`;
-document.body.appendChild(hud);
-
-const beatBar = document.createElement('div');
-beatBar.id = 'beat-bar';
-Object.assign(beatBar.style, { position:'fixed', top:'0', left:'0', width:'100%', height:'3px', background:'transparent', zIndex:'100', pointerEvents:'none', transition:'opacity 0.05s' });
-document.body.appendChild(beatBar);
-
-const hitFlash = document.createElement('div');
-hitFlash.id = 'hit-flash';
-document.body.appendChild(hitFlash);
+// ── DOM references (all structure is in index.html) ───────────────────────────
+const hud           = document.getElementById('hud');
+const beatBar       = document.getElementById('beat-bar');
+const hitFlash      = document.getElementById('hit-flash');
+const screenMenu    = document.getElementById('screen-menu');
+const screenSettings= document.getElementById('screen-settings');
+const screenLoad    = document.getElementById('screen-load');
+const screenExit    = document.getElementById('screen-exit');
+const screenCarSelect = document.getElementById('screen-car-select');
+const screenGameOver  = document.getElementById('screen-game-over');
 let hitFlashTimer = 0;
 
-// ── DOM: Main Menu ─────────────────────────────────────────────────────────────
-const screenMenu = document.createElement('div');
-screenMenu.id = 'screen-menu'; screenMenu.className = 'screen';
-screenMenu.innerHTML = `
-  <div class="menu-title">PULSE//DRIVE</div>
-  <div class="menu-subtitle">Ordinary Game Jam #1</div>
-  <nav class="menu-nav">
-    <button class="menu-btn" id="btn-new-game">New Game</button>
-    <button class="menu-btn" id="btn-load-game">Load Game</button>
-    <button class="menu-btn" id="btn-settings">Settings</button>
-    <button class="menu-btn" id="btn-exit">Exit</button>
-  </nav>
-`;
-document.body.appendChild(screenMenu);
-
-// ── DOM: Car Select ────────────────────────────────────────────────────────────
-const screenCarSelect = document.createElement('div');
-screenCarSelect.id = 'screen-car-select'; screenCarSelect.className = 'screen hidden';
-screenCarSelect.innerHTML = `
-  <div class="cs-title">Select Your Car</div>
-  <div class="cs-row">
-    <button class="cs-arrow" id="cs-prev">&#8592;</button>
-    <div class="cs-preview" id="cs-preview-wrap"></div>
-    <button class="cs-arrow" id="cs-next">&#8594;</button>
-  </div>
-  <div class="cs-info">
-    <div class="cs-name" id="cs-name">${CARS[0].name}</div>
-    <div class="cs-desc" id="cs-desc">${CARS[0].desc}</div>
-  </div>
-  <div class="cs-dots">${CARS.map((_,i)=>`<div class="cs-dot${i===0?' active':''}"></div>`).join('')}</div>
-  <button class="cs-select-btn" id="cs-select">Select &amp; Race</button>
-  <button class="cs-back" id="cs-back">← Back to Menu</button>
-`;
-document.body.appendChild(screenCarSelect);
+// Attach the preview renderer canvas into the car select screen
 document.getElementById('cs-preview-wrap').appendChild(prevRenderer.domElement);
 
-// ── DOM: Game Over ─────────────────────────────────────────────────────────────
-const screenGameOver = document.createElement('div');
-screenGameOver.id = 'screen-game-over'; screenGameOver.className = 'screen hidden';
-screenGameOver.innerHTML = `
-  <div class="go-title">Game Over</div>
-  <ul class="go-stats">
-    <li>Score       <span id="go-score">0</span></li>
-    <li>Max Combo   <span id="go-combo">×0</span></li>
-    <li>Notes Hit   <span id="go-hits">0</span></li>
-    <li>Notes Missed <span id="go-miss">0</span></li>
-  </ul>
-  <button class="menu-btn" id="go-menu">Back to Menu</button>
-`;
-document.body.appendChild(screenGameOver);
-
-// ── Modal builder ──────────────────────────────────────────────────────────────
-function showModal(title, bodyHTML, onOpen) {
-  document.getElementById('modal-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'modal-overlay'; overlay.className = 'screen'; overlay.style.zIndex = '200';
-  overlay.innerHTML = `<div class="modal-box"><h2>${title}</h2>${bodyHTML}<button class="modal-close" id="modal-close">Close</button></div>`;
-  document.body.appendChild(overlay);
-  document.getElementById('modal-close').addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
-  if (onOpen) onOpen(overlay);
-}
+// Set dynamic HUD values
+document.getElementById('hud-username').textContent = incoming.username || '';
+document.getElementById('hud-speedo').textContent   = `${(CRUISE_SPD*2.237)|0} MPH`;
 
 // ── HUD helpers ────────────────────────────────────────────────────────────────
 function updateHearts() {
   const full=Math.floor(hp), half=(hp%1)>=0.5?1:0;
   ['h1','h2','h3'].forEach((id,i) => {
     const el = document.getElementById(id);
-    el.className = 'heart ' + (i<full?'full': i<full+half?'half':'empty');
+    el.className = 'heart ' + (i<full ? 'full' : i<full+half ? 'half' : 'empty');
     el.textContent = i<full+half ? '♥' : '♡';
   });
 }
@@ -864,31 +751,31 @@ function updateScore() {
   document.getElementById('hud-combo').textContent = combo > 1 ? `× ${combo} COMBO` : '';
 }
 function showHitFeedback(type, text) {
-  hitFlash.textContent = text; hitFlash.className = `show ${type}`; hitFlashTimer = 0.62;
-}
-
-// ── Settings ───────────────────────────────────────────────────────────────────
-function openSettings() {
-  showModal('Settings', `
-    <div class="setting-row"><span>Master Volume</span>
-      <input type="range" id="sl-master" min="0" max="100" value="${(volMaster*100)|0}"></div>
-    <div class="setting-row"><span>Music Volume</span>
-      <input type="range" id="sl-music" min="0" max="100" value="${(volMusic*100)|0}"></div>
-    <p style="margin-top:1rem;color:var(--muted);font-size:.76rem;letter-spacing:.1em">← → SWITCH LANES</p>
-  `, overlay => {
-    overlay.querySelector('#sl-master').addEventListener('input', e => { volMaster = e.target.value/100; if (masterGain) masterGain.gain.value = volMaster; });
-    overlay.querySelector('#sl-music' ).addEventListener('input', e => { volMusic  = e.target.value/100; if (musicGain)  musicGain.gain.value  = volMusic;  });
-  });
+  hitFlash.textContent = text;
+  hitFlash.className   = `show ${type}`;
+  hitFlashTimer        = 0.62;
 }
 
 // ── State machine ──────────────────────────────────────────────────────────────
-function setState(s) {
-  const prev = gameState; gameState = s;
-  screenMenu.classList.toggle('hidden',      s !== STATE.MENU);
-  screenCarSelect.classList.toggle('hidden', s !== STATE.CAR_SELECT);
-  screenGameOver.classList.toggle('hidden',  s !== STATE.GAME_OVER);
-  hud.classList.toggle('hidden',             s !== STATE.PLAYING);
+const SCREEN_MAP = {
+  [STATE.MENU]:       screenMenu,
+  [STATE.SETTINGS]:   screenSettings,
+  [STATE.LOAD]:       screenLoad,
+  [STATE.EXIT]:       screenExit,
+  [STATE.CAR_SELECT]: screenCarSelect,
+  [STATE.GAME_OVER]:  screenGameOver,
+};
 
+function setState(s) {
+  const prev = gameState;
+  gameState = s;
+
+  // Hide all screens, show the active one
+  Object.values(SCREEN_MAP).forEach(el => el.classList.add('hidden'));
+  if (SCREEN_MAP[s]) SCREEN_MAP[s].classList.remove('hidden');
+  hud.classList.toggle('hidden', s !== STATE.PLAYING);
+
+  // Clean up when leaving gameplay
   if (prev === STATE.PLAYING && s !== STATE.PLAYING) {
     stopSong(); clearAllOrbs(); clearAllHazards();
     damageFlash.style.background = 'rgba(220,20,20,0)';
@@ -896,6 +783,7 @@ function setState(s) {
     skyLerpFog.set(0xf0a060); skyLerpAmb.set(0xffd8a0); skyLerpAmbInt = 2.2;
   }
 
+  // Start gameplay
   if (s === STATE.PLAYING) {
     hp=3.0; score=0; combo=0; maxCombo=0; notesHit=0; notesMissed=0;
     updateHearts(); updateScore(); updateLanePips();
@@ -910,6 +798,7 @@ function setState(s) {
     startSong();
   }
 
+  // Populate game over stats
   if (s === STATE.GAME_OVER) {
     document.getElementById('go-score').textContent = score.toLocaleString();
     document.getElementById('go-combo').textContent = `×${maxCombo}`;
@@ -920,9 +809,23 @@ function setState(s) {
 
 // ── Button wiring ──────────────────────────────────────────────────────────────
 document.getElementById('btn-new-game').addEventListener('click', () => setState(STATE.CAR_SELECT));
-document.getElementById('btn-load-game').addEventListener('click', () => showModal('Load Game','<p style="color:var(--muted);font-size:.88rem;letter-spacing:.06em">No saved game found.</p>'));
-document.getElementById('btn-settings').addEventListener('click', openSettings);
-document.getElementById('btn-exit').addEventListener('click', () => showModal('Exit','<p style="color:var(--muted);font-size:.88rem;letter-spacing:.06em">Close this tab to exit.</p>'));
+document.getElementById('btn-load-game').addEventListener('click', () => setState(STATE.LOAD));
+document.getElementById('btn-settings').addEventListener('click', () => setState(STATE.SETTINGS));
+document.getElementById('btn-exit').addEventListener('click', () => setState(STATE.EXIT));
+
+document.getElementById('settings-back').addEventListener('click', () => setState(STATE.MENU));
+document.getElementById('load-back').addEventListener('click', () => setState(STATE.MENU));
+document.getElementById('exit-back').addEventListener('click', () => setState(STATE.MENU));
+
+document.getElementById('sl-master').addEventListener('input', e => {
+  volMaster = e.target.value / 100;
+  if (masterGain) masterGain.gain.value = volMaster;
+});
+document.getElementById('sl-music').addEventListener('input', e => {
+  volMusic = e.target.value / 100;
+  if (musicGain) musicGain.gain.value = volMusic;
+});
+
 document.getElementById('cs-prev').addEventListener('click', () => setPreviewCar(previewCarIdx-1));
 document.getElementById('cs-next').addEventListener('click', () => setPreviewCar(previewCarIdx+1));
 document.getElementById('cs-select').addEventListener('click', () => {
@@ -967,12 +870,10 @@ function lerpSky(dt) {
 
 // ── Gameplay update ────────────────────────────────────────────────────────────
 function updatePlaying(dt) {
-  if (gameOverPending) return;   // freeze gameplay while waiting for game-over screen
+  if (gameOverPending) return;
 
-  // Song time
   if (audioCtx && audioSource) songTime = audioCtx.currentTime - songStartTime;
 
-  // Beat ticks
   if (beatMap) {
     const beats = beatMap.beats;
     while (nextBeatIdx < beats.length && beats[nextBeatIdx] <= songTime) onBeat(nextBeatIdx++);
@@ -980,70 +881,58 @@ function updatePlaying(dt) {
 
   beatPulse *= Math.pow(0.001, dt);
 
-  // Beat bar
   if (beatPulse > 0.05) {
     const ac = beatMap?.theme?.accent ?? '#4ff0ff';
     beatBar.style.background = `linear-gradient(90deg,transparent,${ac},transparent)`;
-    beatBar.style.opacity = beatPulse;
-    beatBar.style.boxShadow = `0 0 ${(beatPulse*14)|0}px ${ac}`;
+    beatBar.style.opacity    = beatPulse;
+    beatBar.style.boxShadow  = `0 0 ${(beatPulse*14)|0}px ${ac}`;
   } else { beatBar.style.opacity = '0'; }
 
-  // Ambient + beat light
   ambLight.intensity = skyLerpAmbInt + beatPulse * 2.2;
   beatLight.position.set(car.x, 4, car.z - 8);
   beatLight.intensity = beatPulse * 5.5;
   if (beatMap?.theme?.accent) beatLight.color.set(beatMap.theme.accent);
 
-  // Note orbs + hazards
   updateOrbs(dt);
   updateHazards(dt);
 
-  // Damage flash decay
   if (damageFlashTimer > 0) {
     damageFlashTimer -= dt;
     if (damageFlashTimer <= 0) damageFlash.style.background = 'rgba(220,20,20,0)';
   }
 
-  // Auto-forward
   car.z -= CRUISE_SPD * dt;
 
-  // Lane interpolation
   const targetLaneX = LANE_OFFSETS[car.lane];
   const prevLaneX   = car.laneX;
   car.laneX += (targetLaneX - car.laneX) * Math.min(1, dt * 12);
   car.x = curveX(car.z) + car.laneX;
 
-  // Heading
   const tH = Math.atan2(-curveDX(car.z), 1);
   let dH = tH - car.heading;
   while (dH >  Math.PI) dH -= Math.PI*2;
   while (dH < -Math.PI) dH += Math.PI*2;
   car.heading += dH * Math.min(1, dt * 10);
 
-  // Lean
   const lateralVel = (car.laneX - prevLaneX) / Math.max(dt, 0.001);
   car.lean += (-lateralVel*0.011 - car.lean) * Math.min(1, dt*8);
   car.lean  = Math.max(-0.08, Math.min(0.08, car.lean));
 
-  // Suspension
   car.suspVel += (-100*car.suspY - 18*car.suspVel + (Math.random()-0.5)*9) * dt;
   car.suspY   += car.suspVel * dt;
   car.suspY    = Math.max(-0.12, Math.min(0.10, car.suspY));
   car.pitch   += (-car.suspY*0.055 - car.pitch) * Math.min(1, dt*4);
   car.pitch    = Math.max(-0.04, Math.min(0.04, car.pitch));
 
-  // Wheels
   car.wheelRot += CRUISE_SPD * dt * 2.2;
   const steerVis = Math.max(-0.38, Math.min(0.38, lateralVel * 0.038));
   for (const [i, w] of carWheels.entries()) {
     w.rotation.order = 'YXZ'; w.rotation.y = i<2 ? steerVis : 0; w.rotation.x = car.wheelRot;
   }
 
-  // Car transform
   carGroup.position.set(car.x, car.suspY, car.z);
   carGroup.rotation.y = car.heading; carGroup.rotation.x = car.pitch; carGroup.rotation.z = car.lean;
 
-  // Camera + shake
   camera.fov = 72; camera.updateProjectionMatrix();
   const pb = 9.2;
   let cx = car.x - Math.sin(car.heading)*pb;
@@ -1057,10 +946,8 @@ function updatePlaying(dt) {
   camera.position.set(cx, cy, car.z + Math.cos(car.heading)*pb);
   camera.lookAt(car.x + Math.sin(car.heading)*8, 1.4, car.z - Math.cos(car.heading)*8);
 
-  // Speed lines
   drawSpeedLines(0.28 + beatPulse * 0.50);
 
-  // Hit flash decay
   if (hitFlashTimer > 0) { hitFlashTimer -= dt; if (hitFlashTimer <= 0) hitFlash.className = ''; }
 
   checkPortals();
