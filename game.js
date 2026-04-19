@@ -1,4 +1,4 @@
-// Cruise — Phase 4: UI Shell, State Machine, Car Select, HUD
+// Pulse//Drive — Phase 4: UI Shell, State Machine, Car Select, HUD
 // Portal Protocol preserved.
 
 import * as THREE from 'https://esm.sh/three@0.169';
@@ -453,7 +453,7 @@ const screenMenu = document.createElement('div');
 screenMenu.id = 'screen-menu';
 screenMenu.className = 'screen';
 screenMenu.innerHTML = `
-  <div class="menu-title">CRUISE</div>
+  <div class="menu-title">PULSE//DRIVE</div>
   <div class="menu-subtitle">Ordinary Game Jam #1</div>
   <nav class="menu-nav">
     <button class="menu-btn" id="btn-new-game">New Game</button>
