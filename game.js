@@ -8,8 +8,8 @@ const container = document.getElementById('game-container');
 const W = 960, H = 540;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(W, H);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
+renderer.setPixelRatio(1);              // start low; upgraded to full on gameplay
+renderer.shadowMap.enabled = false;     // start off;  enabled on gameplay
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setClearColor(0x08040f);
 container.appendChild(renderer.domElement);
@@ -296,7 +296,7 @@ let carWheels = buildCarIntoGroup(carGroup, CARS[0]);
 const PREV_W = 360, PREV_H = 240;
 const prevRenderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 prevRenderer.setSize(PREV_W, PREV_H);
-prevRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+prevRenderer.setPixelRatio(1);          // preview stays low-res; it's a small panel
 prevRenderer.setClearColor(0x000000, 0);
 const prevScene  = new THREE.Scene();
 const prevCamera = new THREE.PerspectiveCamera(32, PREV_W/PREV_H, 0.1, 50);
@@ -621,7 +621,6 @@ function updateHazards(dt) {
 let gameOverPending = false;
 const camShake = { timer: 0, intensity: 0 };
 
-// DOM references — all structure lives in index.html
 const damageFlash = document.getElementById('damage-flash');
 let damageFlashTimer = 0;
 
@@ -719,21 +718,18 @@ let notesHit = 0, notesMissed = 0;
 let menuTime = 0, redirecting = false;
 
 // ── DOM references (all structure is in index.html) ───────────────────────────
-const hud           = document.getElementById('hud');
-const beatBar       = document.getElementById('beat-bar');
-const hitFlash      = document.getElementById('hit-flash');
-const screenMenu    = document.getElementById('screen-menu');
-const screenSettings= document.getElementById('screen-settings');
-const screenLoad    = document.getElementById('screen-load');
-const screenExit    = document.getElementById('screen-exit');
+const hud             = document.getElementById('hud');
+const beatBar         = document.getElementById('beat-bar');
+const hitFlash        = document.getElementById('hit-flash');
+const screenMenu      = document.getElementById('screen-menu');
+const screenSettings  = document.getElementById('screen-settings');
+const screenLoad      = document.getElementById('screen-load');
+const screenExit      = document.getElementById('screen-exit');
 const screenCarSelect = document.getElementById('screen-car-select');
 const screenGameOver  = document.getElementById('screen-game-over');
 let hitFlashTimer = 0;
 
-// Attach the preview renderer canvas into the car select screen
 document.getElementById('cs-preview-wrap').appendChild(prevRenderer.domElement);
-
-// Set dynamic HUD values
 document.getElementById('hud-username').textContent = incoming.username || '';
 document.getElementById('hud-speedo').textContent   = `${(CRUISE_SPD*2.237)|0} MPH`;
 
@@ -768,9 +764,18 @@ const SCREEN_MAP = {
 
 function setState(s) {
   const prev = gameState;
-  gameState = s;
+  gameState  = s;
 
-  // Hide all screens, show the active one
+  // ── Render quality: high for gameplay, lightweight for menus ──────────────
+  if (s === STATE.PLAYING && prev !== STATE.PLAYING) {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+  } else if (prev === STATE.PLAYING && s !== STATE.PLAYING) {
+    renderer.setPixelRatio(1);
+    renderer.shadowMap.enabled = false;
+  }
+
+  // Show the correct screen, hide all others
   Object.values(SCREEN_MAP).forEach(el => el.classList.add('hidden'));
   if (SCREEN_MAP[s]) SCREEN_MAP[s].classList.remove('hidden');
   hud.classList.toggle('hidden', s !== STATE.PLAYING);
@@ -783,7 +788,7 @@ function setState(s) {
     skyLerpFog.set(0xf0a060); skyLerpAmb.set(0xffd8a0); skyLerpAmbInt = 2.2;
   }
 
-  // Start gameplay
+  // Initialise gameplay
   if (s === STATE.PLAYING) {
     hp=3.0; score=0; combo=0; maxCombo=0; notesHit=0; notesMissed=0;
     updateHearts(); updateScore(); updateLanePips();
@@ -958,15 +963,27 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (gameState !== STATE.PLAYING) updateMenuCamera(dt);
-  else updatePlaying(dt);
+
+  if (gameState === STATE.PLAYING) {
+    updatePlaying(dt);
+  } else {
+    updateMenuCamera(dt);
+  }
+
   lerpSky(dt);
   renderer.render(scene, camera);
+
   if (gameState === STATE.CAR_SELECT) {
     previewAngle += dt * 0.7;
     prevCarGroup.rotation.y = previewAngle;
     prevRenderer.render(prevScene, prevCamera);
   }
-  requestAnimationFrame(loop);
+
+  // Gameplay runs uncapped; menus are capped at ~30 fps
+  if (gameState === STATE.PLAYING) {
+    requestAnimationFrame(loop);
+  } else {
+    setTimeout(() => requestAnimationFrame(loop), 33);
+  }
 }
 requestAnimationFrame(loop);
