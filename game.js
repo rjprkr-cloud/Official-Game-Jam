@@ -30,7 +30,86 @@ try {
     new Promise(r => setTimeout(() => r(null), 800))
   ]);
 } catch (e) { nextTarget = null; }
-console.log('[PulseDrive] portal ready, building world...');
+
+// ══ STATE + DOM + BUTTONS — wired first so they work even if 3D setup fails ════
+
+// ── Game state ─────────────────────────────────────────────────────────────────
+const STATE = {
+  MENU:       'menu',
+  SETTINGS:   'settings',
+  LOAD:       'load',
+  EXIT:       'exit',
+  CAR_SELECT: 'car-select',
+  PLAYING:    'playing',
+  GAME_OVER:  'game-over',
+};
+let gameState      = STATE.MENU;
+let selectedCar    = 0;
+let hp             = 3.0;
+let score          = 0;
+let nearMissCount  = 0;
+let flowBurstCount = 0;
+let collisionCount = 0;
+let menuTime = 0, redirecting = false;
+
+// ── DOM references ─────────────────────────────────────────────────────────────
+const hud             = document.getElementById('hud');
+const beatBar         = document.getElementById('beat-bar');
+const hitFlash        = document.getElementById('hit-flash');
+const screenMenu      = document.getElementById('screen-menu');
+const screenSettings  = document.getElementById('screen-settings');
+const screenLoad      = document.getElementById('screen-load');
+const screenExit      = document.getElementById('screen-exit');
+const screenCarSelect = document.getElementById('screen-car-select');
+const screenGameOver  = document.getElementById('screen-game-over');
+const damageFlash     = document.getElementById('damage-flash');
+let hitFlashTimer = 0;
+
+// ── Screen map & simple show/hide ──────────────────────────────────────────────
+const SCREEN_MAP = {
+  [STATE.MENU]:       screenMenu,
+  [STATE.SETTINGS]:   screenSettings,
+  [STATE.LOAD]:       screenLoad,
+  [STATE.EXIT]:       screenExit,
+  [STATE.CAR_SELECT]: screenCarSelect,
+  [STATE.GAME_OVER]:  screenGameOver,
+};
+
+// ── Button wiring (before Three.js so they work even if scene init fails) ──────
+function wireBtn(id, fn) {
+  const el = document.getElementById(id);
+  if (el) { el.addEventListener('click', fn); }
+  else { console.error('[PulseDrive] button not found: #' + id); }
+}
+
+wireBtn('btn-new-game',  () => setState(STATE.CAR_SELECT));
+wireBtn('btn-load-game', () => setState(STATE.LOAD));
+wireBtn('btn-settings',  () => setState(STATE.SETTINGS));
+wireBtn('btn-exit',      () => setState(STATE.EXIT));
+
+wireBtn('settings-back', () => setState(STATE.MENU));
+wireBtn('load-back',     () => setState(STATE.MENU));
+wireBtn('exit-back',     () => setState(STATE.MENU));
+
+document.getElementById('sl-master')?.addEventListener('input', e => {
+  volMaster = e.target.value / 100;
+  if (masterGain) masterGain.gain.value = volMaster;
+});
+document.getElementById('sl-music')?.addEventListener('input', e => {
+  volMusic = e.target.value / 100;
+  if (musicGain) musicGain.gain.value = volMusic;
+});
+
+wireBtn('cs-prev',   () => setPreviewCar(previewCarIdx - 1));
+wireBtn('cs-next',   () => setPreviewCar(previewCarIdx + 1));
+wireBtn('cs-select', () => { selectedCar = previewCarIdx; setState(STATE.PLAYING); });
+wireBtn('cs-back',   () => setState(STATE.MENU));
+wireBtn('go-menu',   () => setState(STATE.MENU));
+
+console.log('[PulseDrive] ✓ buttons wired early');
+
+// ══ THREE.JS WORLD SETUP ═══════════════════════════════════════════════════════
+console.log('[PulseDrive] building world...');
 
 // ── Lighting ───────────────────────────────────────────────────────────────────
 const ambLight = new THREE.AmbientLight(0xffd8a0, 2.2);
@@ -634,7 +713,6 @@ function updateFlowMeter(dt) {
 let gameOverPending = false;
 const camShake = { timer: 0, intensity: 0 };
 
-const damageFlash = document.getElementById('damage-flash');
 let damageFlashTimer = 0;
 
 function takeDamage() {
@@ -717,37 +795,6 @@ function makeGate(colorHex, zPos, label, target) {
 const exitGate   = makeGate('#c64bff', ROAD_END+60, nextTarget?`→ ${nextTarget.title}`:'→ portal', nextTarget?.url||null);
 const returnGate = incoming.ref ? makeGate('#4ff0ff', 18, '← back', incoming.ref) : null;
 
-// ── Game state ─────────────────────────────────────────────────────────────────
-const STATE = {
-  MENU:       'menu',
-  SETTINGS:   'settings',
-  LOAD:       'load',
-  EXIT:       'exit',
-  CAR_SELECT: 'car-select',
-  PLAYING:    'playing',
-  GAME_OVER:  'game-over',
-};
-let gameState      = STATE.MENU;
-let selectedCar    = 0;
-let hp             = 3.0;
-let score          = 0;   // = distance in metres
-let nearMissCount  = 0;
-let flowBurstCount = 0;
-let collisionCount = 0;
-let menuTime = 0, redirecting = false;
-
-// ── DOM references ────────────────────────────────────────────────────────────
-const hud             = document.getElementById('hud');
-const beatBar         = document.getElementById('beat-bar');
-const hitFlash        = document.getElementById('hit-flash');
-const screenMenu      = document.getElementById('screen-menu');
-const screenSettings  = document.getElementById('screen-settings');
-const screenLoad      = document.getElementById('screen-load');
-const screenExit      = document.getElementById('screen-exit');
-const screenCarSelect = document.getElementById('screen-car-select');
-const screenGameOver  = document.getElementById('screen-game-over');
-let hitFlashTimer = 0;
-
 const csPreviewWrap = document.getElementById('cs-preview-wrap');
 if (csPreviewWrap) {
   csPreviewWrap.appendChild(prevRenderer.domElement);
@@ -756,8 +803,6 @@ if (csPreviewWrap) {
 }
 document.getElementById('hud-username').textContent = incoming.username || '';
 document.getElementById('hud-speedo').textContent   = `${(CRUISE_SPD*2.237)|0} MPH`;
-console.log('[PulseDrive] DOM refs ready, wiring buttons...');
-
 // ── HUD helpers ────────────────────────────────────────────────────────────────
 function updateHearts() {
   const full=Math.floor(hp), half=(hp%1)>=0.5?1:0;
@@ -780,15 +825,6 @@ function showHitFeedback(type, text) {
 }
 
 // ── State machine ──────────────────────────────────────────────────────────────
-const SCREEN_MAP = {
-  [STATE.MENU]:       screenMenu,
-  [STATE.SETTINGS]:   screenSettings,
-  [STATE.LOAD]:       screenLoad,
-  [STATE.EXIT]:       screenExit,
-  [STATE.CAR_SELECT]: screenCarSelect,
-  [STATE.GAME_OVER]:  screenGameOver,
-};
-
 function setState(s) {
   const prev = gameState;
   gameState  = s;
@@ -869,39 +905,6 @@ function setState(s) {
     document.getElementById('go-miss' ).textContent = collisionCount;
   }
 }
-
-// ── Button wiring ──────────────────────────────────────────────────────────────
-function wireBtn(id, fn) {
-  const el = document.getElementById(id);
-  if (el) { el.addEventListener('click', fn); }
-  else { console.error('[PulseDrive] button not found: #' + id); }
-}
-
-wireBtn('btn-new-game',  () => setState(STATE.CAR_SELECT));
-wireBtn('btn-load-game', () => setState(STATE.LOAD));
-wireBtn('btn-settings',  () => setState(STATE.SETTINGS));
-wireBtn('btn-exit',      () => setState(STATE.EXIT));
-
-wireBtn('settings-back', () => setState(STATE.MENU));
-wireBtn('load-back',     () => setState(STATE.MENU));
-wireBtn('exit-back',     () => setState(STATE.MENU));
-
-document.getElementById('sl-master').addEventListener('input', e => {
-  volMaster = e.target.value / 100;
-  if (masterGain) masterGain.gain.value = volMaster;
-});
-document.getElementById('sl-music').addEventListener('input', e => {
-  volMusic = e.target.value / 100;
-  if (musicGain) musicGain.gain.value = volMusic;
-});
-
-wireBtn('cs-prev',   () => setPreviewCar(previewCarIdx - 1));
-wireBtn('cs-next',   () => setPreviewCar(previewCarIdx + 1));
-wireBtn('cs-select', () => { selectedCar = previewCarIdx; setState(STATE.PLAYING); });
-wireBtn('cs-back',   () => setState(STATE.MENU));
-wireBtn('go-menu',   () => setState(STATE.MENU));
-
-console.log('[PulseDrive] ✓ all buttons wired, game ready');
 
 // ── Portal collision ───────────────────────────────────────────────────────────
 function checkPortals() {
