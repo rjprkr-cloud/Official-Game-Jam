@@ -189,12 +189,14 @@ function showUpgradeScreen() {
       <div class="upgrade-desc">${upg.desc.replace(/\n/g, '<br>')}</div>
     `;
     card.addEventListener('click', () => {
+      sfxPlay('upgrade', 0.8);
       upg.apply();
       setState(STATE.PLAYING);
     });
     upgradeCardsEl.appendChild(card);
   });
 
+  sfxPlay('checkpoint', 0.7);
   setState(STATE.UPGRADE);
 }
 
@@ -585,6 +587,18 @@ const carGlowLight = new THREE.PointLight(0x4ff0ff, 0, 14);
 carGlowLight.position.set(0, -0.4, 0);
 carGroup.add(carGlowLight);
 
+// ── Headlights ────────────────────────────────────────────────────────────────
+function makeHeadlight(xOff) {
+  const sl = new THREE.SpotLight(0xddeeff, 0, 42, Math.PI * 0.14, 0.55, 1.8);
+  sl.position.set(xOff, 0.55, -2.0);
+  sl.target.position.set(xOff * 0.8, -1.5, -20);
+  carGroup.add(sl);
+  carGroup.add(sl.target);
+  return sl;
+}
+const headL = makeHeadlight(-0.72);
+const headR = makeHeadlight( 0.72);
+
 // ── Preview renderer ───────────────────────────────────────────────────────────
 const PREV_W = 360, PREV_H = 240;
 const prevRenderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
@@ -792,8 +806,11 @@ function updateTraffic(dt) {
       if (dx < NEAR_MISS_RADIUS + upgradeVars.nearMissBonus) {
         const razor = dx < HIT_RADIUS * 2.2;
         nearMissCount++;
+        nearMissStreak++;
         flowMeter = Math.min(1, flowMeter + (razor ? FLOW_FILL_CLOSE : FLOW_FILL_NORMAL));
-        showHitFeedback('close', razor ? 'RAZOR CLOSE!' : 'CLOSE!');
+        const streakSuffix = nearMissStreak > 1 ? ` ×${nearMissStreak}` : '';
+        showHitFeedback('close', razor ? `RAZOR!${streakSuffix}` : `CLOSE!${streakSuffix}`);
+        sfxPlay('nearMiss', 0.55);
       }
     }
   }
@@ -840,6 +857,35 @@ let beatMap     = null, audioReady  = false;
 let songStartTime = 0,  songTime    = 0;
 let nextBeatIdx = 0,    beatPulse   = 0;
 let volMaster = 0.8,    volMusic    = 0.9;
+
+// ── SFX system (HTMLAudioElement — no AudioContext needed) ─────────────────────
+const SFX_FILES = {
+  damage:     'assets/sfx/Damage_1.mp3',
+  die:        'assets/sfx/Die_1.mp3',
+  checkpoint: 'assets/sfx/Checkpoint_1.mp3',
+  upgrade:    'assets/sfx/Powerup_1.mp3',
+  nearMiss:   'assets/sfx/Coin_1.mp3',
+  burst:      'assets/sfx/Level_Complete_1.mp3',
+  laneSwitch: 'assets/sfx/Switch_1.mp3',
+};
+const SFX = {};
+for (const [key, path] of Object.entries(SFX_FILES)) {
+  const a = new Audio(path);
+  a.preload = 'auto';
+  SFX[key] = a;
+}
+function sfxPlay(key, vol = 1.0) {
+  const snd = SFX[key];
+  if (!snd) return;
+  try {
+    snd.currentTime = 0;
+    snd.volume = Math.min(1, vol * volMaster);
+    snd.play().catch(() => {});
+  } catch(_) {}
+}
+
+// ── Near-miss streak ────────────────────────────────────────────────────────────
+let nearMissStreak = 0;
 
 const skyLerpTop = new THREE.Color(0x080818), skyLerpBot = new THREE.Color(0x0f1a3a);
 const skyLerpFog = new THREE.Color(0x0d0d22), skyLerpAmb = new THREE.Color(0x334466);
@@ -925,6 +971,7 @@ function triggerFlowBurst() {
   flowMeter       = 0;
   flowBurstCount++;
   showHitFeedback('burst', '⚡ FLOW BURST');
+  sfxPlay('burst', 0.75);
   if (_flowWrap) _flowWrap.classList.add('burst');
 
   // ── Visual burst FX on ────────────────────────────────────────────────────
@@ -984,6 +1031,7 @@ function takeDamage() {
   const dmg = upgradeVars.ironSkin > 0 ? 0.5 / Math.pow(2, upgradeVars.ironSkin) : 0.5;
   hp = Math.max(0, hp - dmg);
   collisionCount++;
+  nearMissStreak = 0;
   if (upgradeVars.ghostHits > 0) ghostTimer = 1.5;
   updateHearts();
   damageFlash.style.background = 'rgba(220,20,20,0.50)';
@@ -995,8 +1043,11 @@ function takeDamage() {
     setTimeout(() => el.classList.remove('pulse'), 220);
   });
   if (hp <= 0) {
+    sfxPlay('die', 0.9);
     gameOverPending = true;
     setTimeout(() => { setState(STATE.GAME_OVER); gameOverPending = false; }, 900);
+  } else {
+    sfxPlay('damage', 0.8);
   }
 }
 
@@ -1011,6 +1062,7 @@ function resetCar() {
 
 function switchLane(dir) {
   if (gameState !== STATE.PLAYING) return;
+  sfxPlay('laneSwitch', 0.35);
   car.lane = Math.max(0, Math.min(3, car.lane + dir));
   updateLanePips();
 }
@@ -1092,10 +1144,11 @@ function setState(s) {
     clearAllTraffic();
     damageFlash.style.background = 'rgba(220,20,20,0)';
     if (_flowWrap) _flowWrap.classList.remove('burst');
-    // Clear burst FX
+    // Clear burst FX + lights
     burstVignette.style.opacity      = '0';
     renderer.domElement.style.filter = '';
     carGlowLight.intensity           = 0;
+    headL.intensity = headR.intensity = 0;
     skyLerpTop.set(0x080818); skyLerpBot.set(0x0f1a3a);
     skyLerpFog.set(0x0d0d22); skyLerpAmb.set(0x334466); skyLerpAmbInt = 1.4;
   }
@@ -1104,10 +1157,11 @@ function setState(s) {
     if (prev === STATE.UPGRADE) {
       // ── Resume after upgrade — just unpause, no reset ────────────────────
       trafficSpawnTimer = 0.8;
+      headL.intensity = headR.intensity = 3.5;
     } else {
     // ── Fresh run — reset everything ──────────────────────────────────────
     hp = 3.0; score = 0;
-    nearMissCount = 0; flowBurstCount = 0; collisionCount = 0;
+    nearMissCount = 0; flowBurstCount = 0; collisionCount = 0; nearMissStreak = 0;
     flowMeter = 0; flowBurstActive = false; flowBurstTimer = 0;
     if (_flowWrap) _flowWrap.classList.remove('burst');
     nextCheckpoint = CHECKPOINT_INTERVAL;
@@ -1153,6 +1207,7 @@ function setState(s) {
       skyLerpFog.set(t.fog);   skyLerpAmb.set(t.accent); skyLerpAmbInt = 1.8;
     }
     startSong();
+    headL.intensity = headR.intensity = 3.5;
     } // end fresh-run else
   }
 
@@ -1244,7 +1299,26 @@ function updatePlaying(dt) {
   updateFlowMeter(dt);
 
   // ── Car movement ─────────────────────────────────────────────────────────
+  // ── Key sprite feedback ───────────────────────────────────────────────────
   const accelInput = keys['ArrowUp'] || keys['w'] || keys['W'];
+  const leftInput  = keys['ArrowLeft']  || keys['a'] || keys['A'];
+  const rightInput = keys['ArrowRight'] || keys['d'] || keys['D'];
+  const _ku = document.getElementById('key-up'),
+        _kl = document.getElementById('key-left'),
+        _kr = document.getElementById('key-right');
+  if (_ku) {
+    _ku.src = accelInput ? 'assets/keys/arrowup_pressed_paper.png'    : 'assets/keys/arrowup_paper.png';
+    _ku.classList.toggle('pressed', accelInput);
+  }
+  if (_kl) {
+    _kl.src = leftInput  ? 'assets/keys/arrowleft_pressed_paper.png'  : 'assets/keys/arrowleft_paper.png';
+    _kl.classList.toggle('pressed', leftInput);
+  }
+  if (_kr) {
+    _kr.src = rightInput ? 'assets/keys/arrowright_pressed_paper.png' : 'assets/keys/arrowright_paper.png';
+    _kr.classList.toggle('pressed', rightInput);
+  }
+
   const effectiveMaxSpd = MAX_SPD + upgradeVars.maxSpd;
   const effectiveAccel  = ACCEL_RATE + upgradeVars.accel;
   if (accelInput) {
@@ -1256,8 +1330,16 @@ function updatePlaying(dt) {
   car.z -= car.speed * dt;
   updateScore();
 
-  // Update speedo
-  document.getElementById('hud-speedo').textContent = `${(car.speed * 2.237) | 0} MPH`;
+  // Update speedo + colour ramp (blue → green → yellow → red)
+  const speedoEl  = document.getElementById('hud-speedo');
+  const speedPct  = car.speed / (MAX_SPD + upgradeVars.maxSpd);
+  const speedoCol = speedPct < 0.4 ? '#4ff0ff'
+                  : speedPct < 0.7 ? '#88ff44'
+                  : speedPct < 0.9 ? '#ffcc00'
+                  :                  '#ff4444';
+  speedoEl.textContent  = `${(car.speed * 2.237) | 0} MPH`;
+  speedoEl.style.color  = speedoCol;
+  speedoEl.style.textShadow = `0 0 12px ${speedoCol}`;
 
   // ── Checkpoint detection ──────────────────────────────────────────────────
   if (score >= nextCheckpoint) {
