@@ -37,7 +37,6 @@ try {
 const STATE = {
   MENU:       'menu',
   SETTINGS:   'settings',
-  LOAD:       'load',
   EXIT:       'exit',
   CAR_SELECT: 'car-select',
   PLAYING:    'playing',
@@ -59,7 +58,6 @@ const beatBar         = document.getElementById('beat-bar');
 const hitFlash        = document.getElementById('hit-flash');
 const screenMenu      = document.getElementById('screen-menu');
 const screenSettings  = document.getElementById('screen-settings');
-const screenLoad      = document.getElementById('screen-load');
 const screenExit      = document.getElementById('screen-exit');
 const screenCarSelect = document.getElementById('screen-car-select');
 const screenGameOver  = document.getElementById('screen-game-over');
@@ -124,7 +122,6 @@ const UPGRADE_POOL = [
 const SCREEN_MAP = {
   [STATE.MENU]:       screenMenu,
   [STATE.SETTINGS]:   screenSettings,
-  [STATE.LOAD]:       screenLoad,
   [STATE.EXIT]:       screenExit,
   [STATE.CAR_SELECT]: screenCarSelect,
   [STATE.GAME_OVER]:  screenGameOver,
@@ -138,13 +135,22 @@ function wireBtn(id, fn) {
 }
 
 wireBtn('btn-new-game',  () => setState(STATE.CAR_SELECT));
-wireBtn('btn-load-game', () => setState(STATE.LOAD));
 wireBtn('btn-settings',  () => setState(STATE.SETTINGS));
 wireBtn('btn-exit',      () => setState(STATE.EXIT));
 
 wireBtn('settings-back', () => setState(STATE.MENU));
-wireBtn('load-back',     () => setState(STATE.MENU));
 wireBtn('exit-back',     () => setState(STATE.MENU));
+wireBtn('exit-go', () => {
+  if (nextTarget?.url) {
+    Portal.sendPlayerThroughPortal(nextTarget.url, {
+      username: incoming.username, color: incoming.color, speed: incoming.speed,
+    });
+  } else {
+    Portal.sendPlayerThroughPortal('https://callumhyoung.github.io/gamejam/', {
+      username: incoming.username, color: incoming.color, speed: incoming.speed,
+    });
+  }
+});
 
 document.getElementById('sl-master')?.addEventListener('input', e => {
   volMaster = e.target.value / 100;
@@ -1004,36 +1010,6 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.key] = false; });
 
-// ── Portal gates ───────────────────────────────────────────────────────────────
-function makeGate(colorHex, zPos, label, target) {
-  const col = new THREE.Color(colorHex);
-  const mat = new THREE.MeshLambertMaterial({ color:col, emissive:col, emissiveIntensity:0.55 });
-  const grp = new THREE.Group();
-  for (const x of [-(ROAD_W/2+2.8), ROAD_W/2+2.8]) {
-    const p = new THREE.Mesh(new THREE.BoxGeometry(1.1,10,1.1), mat);
-    p.position.set(x,5,0); p.castShadow=true; grp.add(p);
-  }
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(ROAD_W+8.6,1.3,1.1), mat);
-  bar.position.set(0,10.3,0); grp.add(bar);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W+6,9.2), new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:0.07, side:THREE.DoubleSide }));
-  face.position.set(0,5,0); grp.add(face);
-  const gatePt = new THREE.PointLight(col,6,20);
-  gatePt.position.set(0,5.5,0); grp.add(gatePt);
-  if (label) {
-    const cv = Object.assign(document.createElement('canvas'), { width:320, height:64 });
-    const lx = cv.getContext('2d');
-    lx.fillStyle = colorHex; lx.font = 'bold 26px ui-sans-serif,system-ui,sans-serif';
-    lx.textAlign = 'center'; lx.textBaseline = 'middle'; lx.fillText(label, 160, 32);
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(cv), transparent:true }));
-    sp.scale.set(5.5,1.1,1); sp.position.set(0,12.5,0); grp.add(sp);
-  }
-  grp.rotation.y = Math.atan2(-curveDX(zPos), 1);
-  grp.position.set(curveX(zPos), 0, zPos);
-  scene.add(grp);
-  return { z:zPos, cx:curveX(zPos), target };
-}
-const exitGate   = makeGate('#c64bff', ROAD_END+60, nextTarget?`→ ${nextTarget.title}`:'→ portal', nextTarget?.url||null);
-const returnGate = incoming.ref ? makeGate('#4ff0ff', 18, '← back', incoming.ref) : null;
 
 const csPreviewWrap = document.getElementById('cs-preview-wrap');
 if (csPreviewWrap) {
@@ -1165,19 +1141,11 @@ function setState(s) {
     document.getElementById('go-hits' ).textContent = flowBurstCount;
     document.getElementById('go-miss' ).textContent = collisionCount;
   }
-}
 
-// ── Portal collision ───────────────────────────────────────────────────────────
-function checkPortals() {
-  if (redirecting || gameState !== STATE.PLAYING) return;
-  const check = gate => {
-    if (!gate?.target) return;
-    if (Math.abs(car.z-gate.z)<5 && Math.abs(car.x-gate.cx)<ROAD_W/2+3) {
-      redirecting = true;
-      Portal.sendPlayerThroughPortal(gate.target, { username:incoming.username, color:incoming.color, speed:incoming.speed });
-    }
-  };
-  check(exitGate); check(returnGate);
+  if (s === STATE.EXIT) {
+    const nameEl = document.getElementById('exit-portal-name');
+    if (nameEl) nameEl.textContent = nextTarget ? `→ ${nextTarget.title}` : '→ Jam Hub';
+  }
 }
 
 // ── Menu camera ────────────────────────────────────────────────────────────────
@@ -1320,7 +1288,6 @@ function updatePlaying(dt) {
 
   if (hitFlashTimer > 0) { hitFlashTimer -= dt; if (hitFlashTimer <= 0) hitFlash.className = ''; }
 
-  checkPortals();
 }
 
 // ── Main loop ──────────────────────────────────────────────────────────────────
