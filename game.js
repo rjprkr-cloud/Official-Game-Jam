@@ -41,6 +41,7 @@ const STATE = {
   EXIT:       'exit',
   CAR_SELECT: 'car-select',
   PLAYING:    'playing',
+  UPGRADE:    'upgrade',
   GAME_OVER:  'game-over',
 };
 let gameState      = STATE.MENU;
@@ -64,6 +65,60 @@ const screenCarSelect = document.getElementById('screen-car-select');
 const screenGameOver  = document.getElementById('screen-game-over');
 const damageFlash     = document.getElementById('damage-flash');
 let hitFlashTimer = 0;
+
+// ── Upgrade system ─────────────────────────────────────────────────────────────
+const CHECKPOINT_INTERVAL = 500;  // metres between upgrade offers
+let nextCheckpoint = CHECKPOINT_INTERVAL;
+
+// Live upgrade multipliers — reset each run
+const upgradeVars = {
+  maxSpd:            0,     // flat bonus to MAX_SPD
+  accel:             0,     // flat bonus to ACCEL_RATE
+  flowDrainMult:     1.0,   // multiplier on FLOW_DRAIN_RATE  (<1 = slower drain)
+  nearMissBonus:     0,     // flat bonus to NEAR_MISS_RADIUS
+  ghostHits:         0,     // stacks: adds post-hit invincibility
+  ironSkin:          0,     // stacks: halves damage per stack
+  burstDurationBonus:0,     // seconds added to FLOW_BURST_DURATION
+};
+let ghostTimer = 0;   // seconds of post-hit invincibility remaining
+
+const UPGRADE_POOL = [
+  {
+    id: 'afterburner', icon: '🔥', name: 'Afterburner',
+    desc: 'Top speed +12\nAcceleration +8',
+    apply() { upgradeVars.maxSpd += 12; upgradeVars.accel += 8; },
+  },
+  {
+    id: 'plating', icon: '🛡️', name: 'Reactive Plating',
+    desc: 'Restore 1 heart\n(max 5)',
+    apply() { hp = Math.min(5, hp + 1); updateHearts(); },
+  },
+  {
+    id: 'slipstream', icon: '💨', name: 'Slipstream',
+    desc: 'Flow drains\n40% slower',
+    apply() { upgradeVars.flowDrainMult *= 0.60; },
+  },
+  {
+    id: 'hairtrigger', icon: '⚡', name: 'Hair Trigger',
+    desc: 'Near-miss window\nwidens by 1.6 m',
+    apply() { upgradeVars.nearMissBonus += 1.6; },
+  },
+  {
+    id: 'ghostdrive', icon: '👻', name: 'Ghost Drive',
+    desc: '1.5 s invincibility\nafter each hit',
+    apply() { upgradeVars.ghostHits += 1; },
+  },
+  {
+    id: 'ironskin', icon: '⚙️', name: 'Iron Skin',
+    desc: 'Collisions deal\nhalf damage',
+    apply() { upgradeVars.ironSkin += 1; },
+  },
+  {
+    id: 'overclock', icon: '📡', name: 'Overclock',
+    desc: 'Flow Burst\nlasts 2 s longer',
+    apply() { upgradeVars.burstDurationBonus += 2.0; },
+  },
+];
 
 // ── Screen map & simple show/hide ──────────────────────────────────────────────
 const SCREEN_MAP = {
@@ -105,6 +160,37 @@ wireBtn('cs-next',   () => setPreviewCar(previewCarIdx + 1));
 wireBtn('cs-select', () => { selectedCar = previewCarIdx; setState(STATE.PLAYING); });
 wireBtn('cs-back',   () => setState(STATE.MENU));
 wireBtn('go-menu',   () => setState(STATE.MENU));
+
+// ── Upgrade screen ─────────────────────────────────────────────────────────────
+const screenUpgrade  = document.getElementById('screen-upgrade');
+const upgradeCardsEl = document.getElementById('upgrade-cards');
+const upgradeDistEl  = document.getElementById('upgrade-dist');
+
+function showUpgradeScreen() {
+  // Pick 3 unique random upgrades from the pool
+  const shuffled = [...UPGRADE_POOL].sort(() => Math.random() - 0.5);
+  const picks = shuffled.slice(0, 3);
+
+  upgradeCardsEl.innerHTML = '';
+  upgradeDistEl.textContent = `${(score | 0).toLocaleString()} m`;
+
+  picks.forEach(upg => {
+    const card = document.createElement('div');
+    card.className = 'upgrade-card';
+    card.innerHTML = `
+      <div class="upgrade-icon">${upg.icon}</div>
+      <div class="upgrade-name">${upg.name}</div>
+      <div class="upgrade-desc">${upg.desc.replace(/\n/g, '<br>')}</div>
+    `;
+    card.addEventListener('click', () => {
+      upg.apply();
+      setState(STATE.PLAYING);
+    });
+    upgradeCardsEl.appendChild(card);
+  });
+
+  setState(STATE.UPGRADE);
+}
 
 console.log('[PulseDrive] ✓ buttons wired early');
 
@@ -586,7 +672,7 @@ function updateTraffic(dt) {
     // ── Near-miss window: traffic Z just crossed player Z ────────────────────
     if (slot.prevZ < car.z && slot.worldZ >= car.z) {
       slot.judged = true;
-      if (dx < NEAR_MISS_RADIUS) {
+      if (dx < NEAR_MISS_RADIUS + upgradeVars.nearMissBonus) {
         const razor = dx < HIT_RADIUS * 2.2;
         nearMissCount++;
         flowMeter = Math.min(1, flowMeter + (razor ? FLOW_FILL_CLOSE : FLOW_FILL_NORMAL));
@@ -718,7 +804,7 @@ function _burstAccent() { return beatMap?.theme?.accent ?? '#4ff0ff'; }
 
 function triggerFlowBurst() {
   flowBurstActive = true;
-  flowBurstTimer  = FLOW_BURST_DURATION;
+  flowBurstTimer  = FLOW_BURST_DURATION + upgradeVars.burstDurationBonus;
   flowMeter       = 0;
   flowBurstCount++;
   showHitFeedback('burst', '⚡ FLOW BURST');
@@ -764,7 +850,7 @@ function updateFlowMeter(dt) {
     }
     if (_flowFill) _flowFill.style.width = '100%';
   } else {
-    flowMeter = Math.max(0, flowMeter - FLOW_DRAIN_RATE * dt);
+    flowMeter = Math.max(0, flowMeter - FLOW_DRAIN_RATE * upgradeVars.flowDrainMult * dt);
     if (flowMeter >= 1.0) triggerFlowBurst();
     if (_flowFill) _flowFill.style.width = (flowMeter * 100).toFixed(1) + '%';
   }
@@ -777,9 +863,11 @@ const camShake = { timer: 0, intensity: 0 };
 let damageFlashTimer = 0;
 
 function takeDamage() {
-  if (gameOverPending || flowBurstActive) return; // invincible during burst
-  hp = Math.max(0, hp - 0.5);
+  if (gameOverPending || flowBurstActive || ghostTimer > 0) return; // invincible during burst or ghost
+  const dmg = upgradeVars.ironSkin > 0 ? 0.5 / Math.pow(2, upgradeVars.ironSkin) : 0.5;
+  hp = Math.max(0, hp - dmg);
   collisionCount++;
+  if (upgradeVars.ghostHits > 0) ghostTimer = 1.5;
   updateHearts();
   damageFlash.style.background = 'rgba(220,20,20,0.50)';
   damageFlashTimer = 0.40;
@@ -900,7 +988,12 @@ function setState(s) {
 
   Object.values(SCREEN_MAP).forEach(el => el.classList.add('hidden'));
   if (SCREEN_MAP[s]) SCREEN_MAP[s].classList.remove('hidden');
-  hud.classList.toggle('hidden', s !== STATE.PLAYING);
+
+  // Upgrade screen lives outside SCREEN_MAP — manage manually
+  if (screenUpgrade) screenUpgrade.classList.toggle('hidden', s !== STATE.UPGRADE);
+
+  // HUD visible during play AND during upgrade pause
+  hud.classList.toggle('hidden', s !== STATE.PLAYING && s !== STATE.UPGRADE);
 
   if (s === STATE.CAR_SELECT) {
     previewAngle = 0;
@@ -921,11 +1014,22 @@ function setState(s) {
   }
 
   if (s === STATE.PLAYING) {
-    // ── Reset run stats ──────────────────────────────────────────────────────
+    if (prev === STATE.UPGRADE) {
+      // ── Resume after upgrade — just unpause, no reset ────────────────────
+      trafficSpawnTimer = 0.8;
+    } else {
+    // ── Fresh run — reset everything ──────────────────────────────────────
     hp = 3.0; score = 0;
     nearMissCount = 0; flowBurstCount = 0; collisionCount = 0;
     flowMeter = 0; flowBurstActive = false; flowBurstTimer = 0;
     if (_flowWrap) _flowWrap.classList.remove('burst');
+    nextCheckpoint = CHECKPOINT_INTERVAL;
+    // Reset upgrade vars
+    upgradeVars.maxSpd = 0; upgradeVars.accel = 0;
+    upgradeVars.flowDrainMult = 1.0; upgradeVars.nearMissBonus = 0;
+    upgradeVars.ghostHits = 0; upgradeVars.ironSkin = 0;
+    upgradeVars.burstDurationBonus = 0;
+    ghostTimer = 0;
     updateHearts(); updateScore(); updateLanePips();
     resetCar(); redirecting = false;
     trafficSpawnTimer = 1.2;  // first car after 1.2 s
@@ -961,6 +1065,7 @@ function setState(s) {
       skyLerpFog.set(t.fog);   skyLerpAmb.set(t.accent); skyLerpAmbInt = 1.8;
     }
     startSong();
+    } // end fresh-run else
   }
 
   if (s === STATE.GAME_OVER) {
@@ -1040,13 +1145,18 @@ function updatePlaying(dt) {
   }
   updateTraffic(dt);
 
+  // ── Ghost timer ──────────────────────────────────────────────────────────
+  if (ghostTimer > 0) ghostTimer = Math.max(0, ghostTimer - dt);
+
   // ── Flow meter ────────────────────────────────────────────────────────────
   updateFlowMeter(dt);
 
   // ── Car movement ─────────────────────────────────────────────────────────
   const accelInput = keys['ArrowUp'] || keys['w'] || keys['W'];
+  const effectiveMaxSpd = MAX_SPD + upgradeVars.maxSpd;
+  const effectiveAccel  = ACCEL_RATE + upgradeVars.accel;
   if (accelInput) {
-    car.speed = Math.min(MAX_SPD, car.speed + ACCEL_RATE * dt);
+    car.speed = Math.min(effectiveMaxSpd, car.speed + effectiveAccel * dt);
   } else {
     car.speed = Math.max(0, car.speed - DECEL_RATE * dt);
   }
@@ -1056,6 +1166,13 @@ function updatePlaying(dt) {
 
   // Update speedo
   document.getElementById('hud-speedo').textContent = `${(car.speed * 2.237) | 0} MPH`;
+
+  // ── Checkpoint detection ──────────────────────────────────────────────────
+  if (score >= nextCheckpoint) {
+    nextCheckpoint += CHECKPOINT_INTERVAL;
+    showUpgradeScreen();
+    return; // skip rest of frame — we just changed state
+  }
 
   const targetLaneX = LANE_OFFSETS[car.lane];
   const prevLaneX   = car.laneX;
@@ -1123,11 +1240,15 @@ function loop(now) {
 
   if (gameState === STATE.PLAYING) {
     updatePlaying(dt);
+  } else if (gameState === STATE.UPGRADE) {
+    // World frozen — only tick beat visuals so the scene stays alive
+    beatPulse *= Math.pow(0.001, dt);
+    lerpSky(dt);
   } else {
     updateMenuCamera(dt);
   }
 
-  lerpSky(dt);
+  if (gameState !== STATE.UPGRADE) lerpSky(dt);
   renderer.render(scene, camera);
 
   if (gameState === STATE.CAR_SELECT) {
@@ -1140,7 +1261,7 @@ function loop(now) {
     prevRenderer.render(prevScene, prevCamera);
   }
 
-  if (gameState === STATE.PLAYING) {
+  if (gameState === STATE.PLAYING || gameState === STATE.UPGRADE) {
     requestAnimationFrame(loop);
   } else {
     setTimeout(() => requestAnimationFrame(loop), 33);

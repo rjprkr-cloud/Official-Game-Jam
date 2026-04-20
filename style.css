@@ -708,3 +708,111 @@ body {
   border-color: var(--accent3);
   box-shadow: 0 0 10px var(--accent3), 0 0 22px rgba(79,240,255,0.45);
 }
+
+/* ── Upgrade / Checkpoint screen ────────────────────────────────────────── */
+#screen-upgrade {
+  background: rgba(6, 2, 16, 0.80);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.upgrade-header {
+  text-align: center;
+  margin-bottom: 2.2rem;
+  animation: menuFadeUp 0.4s ease both;
+}
+
+.upgrade-dist {
+  font-size: 0.68rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--accent3);
+  opacity: 0.75;
+  margin-bottom: 0.5rem;
+}
+
+.upgrade-title-text {
+  font-family: 'Buzzer11', ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: linear-gradient(125deg, var(--accent2) 20%, var(--accent3) 80%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 20px rgba(198,75,255,0.7));
+}
+
+.upgrade-sub {
+  font-size: 0.68rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 0.4rem;
+}
+
+.upgrade-cards {
+  display: flex;
+  gap: 1.2rem;
+  animation: menuFadeUp 0.4s 0.08s ease both;
+}
+
+.upgrade-card {
+  width: 168px;
+  padding: 1.6rem 1.1rem 1.4rem;
+  background: rgba(12, 5, 28, 0.92);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s, background 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+.upgrade-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(198,75,255,0.06), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.upgrade-card:hover::before { opacity: 1; }
+
+.upgrade-card:hover {
+  border-color: var(--accent3);
+  box-shadow: 0 0 28px rgba(79,240,255,0.28), 0 0 6px rgba(79,240,255,0.15);
+  transform: translateY(-4px);
+  background: rgba(16, 7, 38, 0.95);
+}
+
+.upgrade-card:active { transform: translateY(-1px); }
+
+.upgrade-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(198,75,255,0.55));
+}
+
+.upgrade-name {
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg);
+  font-weight: 600;
+  text-align: center;
+}
+
+.upgrade-desc {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.55;
+  letter-spacing: 0.04em;
+}
