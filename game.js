@@ -636,6 +636,14 @@ async function initAudio() {
     const r = await fetch('beatmaps/chrome-rain-over-midtown.json');
     if (!r.ok) throw new Error('map 404');
     beatMap = await r.json();
+    // Generate beats array from bpm/offset if not pre-baked in the JSON
+    if (!beatMap.beats && beatMap.beatInterval && beatMap.offset != null) {
+      const interval = beatMap.beatInterval;
+      const end      = beatMap.songEndTime ?? beatMap.duration ?? 300;
+      const arr = [];
+      for (let t = beatMap.offset; t < end; t += interval) arr.push(t);
+      beatMap.beats = arr;
+    }
   } catch(e) { console.warn('Beat map:', e); return; }
   try {
     const tmp = new AudioContext();
@@ -944,7 +952,7 @@ function updatePlaying(dt) {
 
   // ── Audio beat tracking (drives visual ambiance) ─────────────────────────
   if (audioCtx && audioSource) songTime = audioCtx.currentTime - songStartTime;
-  if (beatMap) {
+  if (beatMap?.beats) {
     const beats = beatMap.beats;
     while (nextBeatIdx < beats.length && beats[nextBeatIdx] <= songTime) onBeat(nextBeatIdx++);
   }
