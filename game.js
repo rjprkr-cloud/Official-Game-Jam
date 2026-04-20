@@ -570,6 +570,67 @@ const SETTING_ROWS = [
   { key:'locationSharing', label:'Location Sharing', sub:'Share your location with contacts'               },
 ];
 
+// ── Slide-to-unlock ────────────────────────────────────────────────
+const SLIDE_W  = 200, SLIDE_H = 28, SLIDE_TR = 12;
+const SLIDE_X  = Math.round((W - SLIDE_W) / 2);
+const SLIDE_Y  = H - 52;
+const lockSlide = { progress: 0, dragging: false, snapBack: false };
+let   lockDragOriginX = 0;
+
+function lockThumbCX() {
+  return SLIDE_X + SLIDE_TR + lockSlide.progress * (SLIDE_W - SLIDE_TR * 2 - 4);
+}
+
+function canvasCoords(e) {
+  const r = canvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return [(src.clientX-r.left)*(W/r.width), (src.clientY-r.top)*(H/r.height)];
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (screen !== SCR.LOCK) return;
+  const [mx, my] = canvasCoords(e);
+  const tx = lockThumbCX(), cy = SLIDE_Y + SLIDE_H / 2;
+  if (Math.abs(mx - tx) <= SLIDE_TR + 8 && Math.abs(my - cy) <= SLIDE_H) {
+    lockSlide.dragging  = true;
+    lockSlide.snapBack  = false;
+    lockDragOriginX     = mx - lockSlide.progress * (SLIDE_W - SLIDE_TR * 2 - 4);
+    e.preventDefault();
+  }
+});
+canvas.addEventListener('touchstart', e => {
+  if (screen !== SCR.LOCK) return;
+  const [mx, my] = canvasCoords(e);
+  const tx = lockThumbCX(), cy = SLIDE_Y + SLIDE_H / 2;
+  if (Math.abs(mx - tx) <= SLIDE_TR + 12 && Math.abs(my - cy) <= SLIDE_H + 4) {
+    lockSlide.dragging  = true;
+    lockSlide.snapBack  = false;
+    lockDragOriginX     = mx - lockSlide.progress * (SLIDE_W - SLIDE_TR * 2 - 4);
+    e.preventDefault();
+  }
+}, { passive: false });
+
+function onSlideMove(mx) {
+  if (!lockSlide.dragging) return;
+  const raw = (mx - lockDragOriginX) / (SLIDE_W - SLIDE_TR * 2 - 4);
+  lockSlide.progress = Math.max(0, Math.min(1, raw));
+}
+function onSlideEnd() {
+  if (!lockSlide.dragging) return;
+  lockSlide.dragging = false;
+  if (lockSlide.progress >= 0.75) {
+    lockSlide.progress = 0;
+    screen = SCR.HOME;
+  } else {
+    lockSlide.snapBack = true;
+  }
+}
+
+window.addEventListener('mousemove',  e => onSlideMove(canvasCoords(e)[0]));
+window.addEventListener('mouseup',    () => onSlideEnd());
+window.addEventListener('touchmove',  e => { onSlideMove(canvasCoords(e)[0]); e.preventDefault(); }, { passive: false });
+window.addEventListener('touchend',   () => onSlideEnd());
+
 // ── Input ──────────────────────────────────────────────────────────
 canvas.addEventListener('click', e => {
   const r = canvas.getBoundingClientRect();
@@ -595,7 +656,7 @@ function goBack() {
   else                          { screen=SCR.HOME; }
 }
 
-function onClickLock() { screen=SCR.HOME; }
+function onClickLock() { /* unlock via slide only */ }
 
 function onClickHome(mx,my) {
   for (const app of APP_GRID) {
@@ -675,6 +736,11 @@ function update(dt) {
   if (screen===SCR.THREAD&&!choiceMade&&!typingActive) choiceAnim=Math.min(1,choiceAnim+dt*2.8);
   if (typingActive) { typingTimer-=dt; if (typingTimer<=0) deliverPending(); }
   if (notifToast)   { notifToast.timer-=dt; if (notifToast.timer<=0) notifToast=null; }
+  // Slide snap-back
+  if (lockSlide.snapBack) {
+    lockSlide.progress = Math.max(0, lockSlide.progress - dt * 5);
+    if (lockSlide.progress <= 0) lockSlide.snapBack = false;
+  }
 }
 
 // ── Draw ───────────────────────────────────────────────────────────
@@ -765,8 +831,45 @@ function drawLock() {
     const msg=t.messages.findLast(m=>!m.read)||t.messages[t.messages.length-1];
     drawLockCard(8,cy,W-16,rel[t.contact]?.name||t.contact,msg?.text||''); cy+=62;
   }
-  ctx.font='8px monospace'; ctx.fillStyle='rgba(255,255,255,0.22)';
-  ctx.fillText('tap to unlock',W/2,H-14);
+  drawLockSlider();
+}
+
+function drawLockSlider() {
+  const tx = lockThumbCX(), cy = SLIDE_Y + SLIDE_H / 2;
+
+  // Track background
+  ctx.fillStyle = 'rgba(255,255,255,0.09)';
+  roundRect(SLIDE_X, SLIDE_Y, SLIDE_W, SLIDE_H, SLIDE_H / 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1;
+  roundRect(SLIDE_X, SLIDE_Y, SLIDE_W, SLIDE_H, SLIDE_H / 2); ctx.stroke();
+
+  // Progress glow fill
+  if (lockSlide.progress > 0) {
+    const fillW = tx - SLIDE_X;
+    ctx.save();
+    ctx.beginPath();
+    roundRect(SLIDE_X, SLIDE_Y, SLIDE_W, SLIDE_H, SLIDE_H / 2); ctx.clip();
+    const fg = ctx.createLinearGradient(SLIDE_X, 0, SLIDE_X + fillW, 0);
+    fg.addColorStop(0, 'rgba(90,140,255,0.0)');
+    fg.addColorStop(1, 'rgba(90,140,255,0.3)');
+    ctx.fillStyle = fg; ctx.fillRect(SLIDE_X, SLIDE_Y, fillW, SLIDE_H);
+    ctx.restore();
+  }
+
+  // Label — fades as thumb moves right
+  ctx.globalAlpha = Math.max(0, 1 - lockSlide.progress * 2.5);
+  ctx.font = '8px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.38)';
+  ctx.fillText('slide to unlock  ›', SLIDE_X + SLIDE_W / 2 + SLIDE_TR, cy + 3);
+  ctx.globalAlpha = 1;
+
+  // Thumb
+  ctx.fillStyle = lockSlide.dragging ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.88)';
+  ctx.beginPath(); ctx.arc(tx, cy, SLIDE_TR, 0, Math.PI * 2); ctx.fill();
+  // Arrow chevron on thumb
+  ctx.fillStyle = 'rgba(30,30,50,0.6)';
+  ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('›', tx + 1, cy + 4);
+  ctx.textAlign = 'left';
 }
 
 function drawLockCard(x,y,w,sender,preview) {
