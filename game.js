@@ -143,7 +143,7 @@ wireBtn('btn-exit',      () => setState(STATE.EXIT));
 wireBtn('settings-back', () => setState(STATE.MENU));
 wireBtn('exit-back',     () => setState(STATE.MENU));
 wireBtn('exit-go', () => {
-  const dest = nextTarget?.url ?? 'https://callumhyoung.github.io/gamejam/';
+  const dest = 'https://callumhyoung.github.io/gamejam/';
   try {
     Portal.sendPlayerThroughPortal(dest, {
       username: incoming.username, color: incoming.color, speed: incoming.speed,
@@ -697,7 +697,7 @@ async function populateTrafficPool() {
       const cached = await loadCarModel(cfg);
       const { group: model, wheels } = cloneForScene(cached);
       model.scale.setScalar(cfg.scale);
-      model.rotation.y = Math.PI;   // face oncoming (+Z direction)
+      model.rotation.y = 0;          // front faces +Z (toward player — oncoming)
       trafficPool[i].group.add(model);
       trafficPool[i].wheels      = wheels;
       trafficPool[i].loadedFile  = cfg.file;
@@ -752,7 +752,7 @@ function spawnTraffic() {
 
   const worldX  = curveX(spawnZ) + LANE_OFFSETS[lane];
   slot.group.position.set(worldX, 0, spawnZ);
-  slot.group.rotation.y = Math.atan2(-curveDX(spawnZ), 1);
+  slot.group.rotation.y = Math.atan2(curveDX(spawnZ), 1);
   slot.group.visible = true;
 }
 
@@ -772,13 +772,13 @@ function updateTraffic(dt) {
 
     const worldX = curveX(slot.worldZ) + LANE_OFFSETS[slot.lane];
     slot.group.position.set(worldX, 0, slot.worldZ);
-    slot.group.rotation.y = Math.atan2(-curveDX(slot.worldZ), 1);
+    slot.group.rotation.y = Math.atan2(curveDX(slot.worldZ), 1);
 
-    // Wheel spin (wheels rotate opposite to player since car faces other way)
+    // Wheel spin — traffic moves in +Z, same spin direction as player (forward)
     slot.wheelRot += slot.speed * dt * 2.2;
-    if (slot.wheels.back)       slot.wheels.back.rotation.x       = -slot.wheelRot;
-    if (slot.wheels.frontLeft)  slot.wheels.frontLeft.rotation.x  = -slot.wheelRot;
-    if (slot.wheels.frontRight) slot.wheels.frontRight.rotation.x = -slot.wheelRot;
+    if (slot.wheels.back)       slot.wheels.back.rotation.x       = slot.wheelRot;
+    if (slot.wheels.frontLeft)  slot.wheels.frontLeft.rotation.x  = slot.wheelRot;
+    if (slot.wheels.frontRight) slot.wheels.frontRight.rotation.x = slot.wheelRot;
 
     // Despawn when it has passed well behind the player
     if (slot.worldZ > car.z + TRAFFIC_DESPAWN_DIST) {
@@ -1142,7 +1142,7 @@ function setState(s) {
     setPreviewCar(previewCarIdx);
   }
 
-  if (prev === STATE.PLAYING && s !== STATE.PLAYING) {
+  if (prev === STATE.PLAYING && s !== STATE.PLAYING && s !== STATE.UPGRADE) {
     stopSong();
     clearAllTraffic();
     damageFlash.style.background = 'rgba(220,20,20,0)';
@@ -1187,6 +1187,7 @@ function setState(s) {
       while (carGroup.children.length) carGroup.remove(carGroup.children[0]);
       const { group, wheels } = cloneForScene(cached);
       group.scale.setScalar(CARS[selectedCar].scale);
+      group.rotation.y = Math.PI;   // front faces -Z so camera behind sees the rear
       carGroup.add(group);
       carWheelInfo = wheels;
     };
@@ -1224,7 +1225,7 @@ function setState(s) {
 
   if (s === STATE.EXIT) {
     const nameEl = document.getElementById('exit-portal-name');
-    if (nameEl) nameEl.textContent = nextTarget ? `→ ${nextTarget.title}` : '→ Jam Hub';
+    if (nameEl) nameEl.textContent = '→ Jam Lobby';
   }
 }
 
