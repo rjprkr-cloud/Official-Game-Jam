@@ -2,6 +2,8 @@
 // Portal Protocol preserved.
 
 import * as THREE from 'https://esm.sh/three@0.169';
+import { OBJLoader } from 'https://esm.sh/three@0.169/examples/jsm/loaders/OBJLoader';
+import { MTLLoader } from 'https://esm.sh/three@0.169/examples/jsm/loaders/MTLLoader';
 
 // ── Renderer ───────────────────────────────────────────────────────────────────
 const container = document.getElementById('game-container');
@@ -206,100 +208,114 @@ for (let i=0; i<55; i++) {
   m.rotation.y = Math.random()*Math.PI; scene.add(m);
 }
 
-// ── Car model definitions ──────────────────────────────────────────────────────
+// ── Car definitions ────────────────────────────────────────────────────────────
+// All OBJ models live in assets/cars/{file}.obj + .mtl
+// Bounds: ~1.8 wide × ~1.1 tall × ~4.0 long; Y=0 is ground level
 const CARS = [
-  { id:'street',  name:'Street Car', desc:'Balanced · Fast · Agile',    color:0x2266ee },
-  { id:'truck',   name:'Truck',      desc:'Heavy · Wide · Tough',        color:0xcc3311 },
-  { id:'luxury',  name:'Luxury',     desc:'Elegant · Smooth · Refined',  color:0xd0d4dd },
-  { id:'muscle',  name:'Muscle',     desc:'Raw Power · Aggressive',      color:0xff6600 },
-  { id:'compact', name:'Compact',    desc:'Small · Nimble · Responsive', color:0x22bb44 },
+  { file:'NormalCar1',  name:'City Cruiser',  desc:'Balanced · Reliable',       accent:'#4a6eb5', scale:1.30, stats:{ speed:6, handling:7, armor:5 } },
+  { file:'NormalCar2',  name:'Street Runner', desc:'Nimble · Quick · Responsive',accent:'#55bb33', scale:1.30, stats:{ speed:7, handling:8, armor:4 } },
+  { file:'SportsCar',   name:'Sports Car',    desc:'Fast · Low · Aggressive',    accent:'#cc4422', scale:1.30, stats:{ speed:9, handling:7, armor:3 } },
+  { file:'SportsCar2',  name:'Speed Demon',   desc:'Track-Ready · Raw Power',    accent:'#c64bff', scale:1.30, stats:{ speed:10,handling:6, armor:2 } },
+  { file:'SUV',         name:'SUV',           desc:'Wide · Tough · Heavy',       accent:'#55aa33', scale:1.10, stats:{ speed:5, handling:4, armor:9 } },
+  { file:'Cop',         name:'Police',        desc:'Authority · Built Tough',    accent:'#4488cc', scale:1.30, stats:{ speed:8, handling:7, armor:7 } },
+  { file:'Taxi',        name:'Yellow Cab',    desc:'Classic · Boxy · Bold',      accent:'#ffcc00', scale:1.30, stats:{ speed:5, handling:6, armor:6 } },
 ];
 
-function makeCarMats(hexColor) {
-  const col = new THREE.Color(hexColor);
-  return {
-    body:   new THREE.MeshLambertMaterial({ color: col }),
-    dark:   new THREE.MeshLambertMaterial({ color: col.clone().multiplyScalar(0.6) }),
-    glass:  new THREE.MeshLambertMaterial({ color:0x88ccff, transparent:true, opacity:0.65 }),
-    wheel:  new THREE.MeshLambertMaterial({ color:0x232323 }),
-    rim:    new THREE.MeshLambertMaterial({ color:0xbbbbbb }),
-    hl:     new THREE.MeshLambertMaterial({ color:0xffffc8, emissive:0xffff44, emissiveIntensity:0.55 }),
-    tl:     new THREE.MeshLambertMaterial({ color:0xff1100, emissive:0xff0000, emissiveIntensity:0.5  }),
-    stripe: new THREE.MeshLambertMaterial({ color:0xffffff }),
-  };
+// ── OBJ model loader & cache ───────────────────────────────────────────────────
+const modelCache = new Map();   // file → { obj: Object3D, wheels: WheelInfo }
+
+// Center a mesh's geometry at its bounding-box origin so rotation.x spins in place.
+function centerMeshGeometry(mesh) {
+  const geo = mesh.geometry;
+  if (!geo) return;
+  geo.computeBoundingBox();
+  const c = new THREE.Vector3();
+  geo.boundingBox.getCenter(c);
+  geo.translate(-c.x, -c.y, -c.z);
+  mesh.position.add(c);
 }
 
-function buildCarIntoGroup(group, carCfg) {
-  while (group.children.length) group.remove(group.children[0]);
-  const m = makeCarMats(carCfg.color);
-  function box(mat,w,h,d,x,y,z) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
-    mesh.position.set(x,y,z); mesh.castShadow = true; group.add(mesh);
-  }
-  const wheels = [];
-  function addWheel(wx,wy,wz,sc=1) {
-    const wg = new THREE.Group(), r=0.33*sc, t=0.28*sc;
-    wg.position.set(wx,wy,wz);
-    const tire = new THREE.Mesh(new THREE.BoxGeometry(t,r*2,r*2), m.wheel);
-    tire.castShadow = true;
-    wg.add(tire, new THREE.Mesh(new THREE.BoxGeometry(t+0.02,r*1.4,r*1.4), m.rim));
-    group.add(wg); wheels.push(wg);
-  }
-  switch (carCfg.id) {
-    case 'street':
-      box(m.body,  2.22,0.58,4.30, 0,0.52, 0.00); box(m.dark,  2.38,0.24,4.50, 0,0.22, 0.00);
-      box(m.dark,  1.78,0.48,2.15, 0,0.98,+0.18); box(m.glass, 1.72,0.38,0.07, 0,0.94,-1.02);
-      box(m.glass, 1.72,0.34,0.07, 0,0.94,+1.28); box(m.stripe,0.34,0.59,1.90, 0,0.52,-0.82);
-      box(m.dark,  2.14,0.25,0.18, 0,0.28,-2.22); box(m.dark,  2.14,0.25,0.18, 0,0.28,+2.22);
-      for(const x of[-0.7,0.7]) { box(m.hl,0.38,0.18,0.08, x,0.52,-2.22); box(m.tl,0.44,0.20,0.08, x,0.52,+2.22); }
-      addWheel(-1.19,0.35,-1.36); addWheel(1.19,0.35,-1.36); addWheel(-1.19,0.35,+1.36); addWheel(1.19,0.35,+1.36); break;
-    case 'truck':
-      box(m.body,  2.60,0.90,4.00, 0,0.65, 0.00); box(m.dark,  2.76,0.28,4.20, 0,0.22, 0.00);
-      box(m.dark,  2.20,0.82,2.00, 0,1.36,+0.30); box(m.glass, 2.10,0.52,0.07, 0,1.40,-0.72);
-      box(m.glass, 2.10,0.46,0.07, 0,1.38,+1.30); box(m.dark,  2.52,0.28,0.20, 0,0.26,-2.02);
-      box(m.dark,  2.52,0.28,0.20, 0,0.26,+2.02);
-      for(const x of[-0.8,0.8]) { box(m.hl,0.44,0.22,0.08, x,0.70,-2.02); box(m.tl,0.50,0.24,0.08, x,0.70,+2.02); }
-      addWheel(-1.25,0.46,-1.30,1.12); addWheel(1.25,0.46,-1.30,1.12); addWheel(-1.25,0.46,+1.30,1.12); addWheel(1.25,0.46,+1.30,1.12); break;
-    case 'luxury':
-      box(m.body,  2.08,0.48,5.20, 0,0.48, 0.00); box(m.dark,  2.22,0.22,5.40, 0,0.22, 0.00);
-      box(m.dark,  1.68,0.44,2.60, 0,0.88,+0.30); box(m.glass, 1.60,0.36,0.07, 0,0.90,-0.98);
-      box(m.glass, 1.60,0.32,0.07, 0,0.88,+1.60); box(m.stripe,0.26,0.49,2.10, 0,0.48,-0.70);
-      box(m.dark,  2.00,0.22,0.18, 0,0.26,-2.62); box(m.dark,  2.00,0.22,0.18, 0,0.26,+2.62);
-      for(const x of[-0.62,0.62]) { box(m.hl,0.36,0.14,0.08, x,0.48,-2.62); box(m.tl,0.44,0.16,0.08, x,0.48,+2.62); }
-      addWheel(-1.00,0.30,-1.80,0.90); addWheel(1.00,0.30,-1.80,0.90); addWheel(-1.00,0.30,+1.80,0.90); addWheel(1.00,0.30,+1.80,0.90); break;
-    case 'muscle':
-      box(m.body,  2.78,0.58,4.20, 0,0.52, 0.00); box(m.dark,  2.94,0.24,4.40, 0,0.22, 0.00);
-      box(m.dark,  2.00,0.50,1.92, 0,0.98,+0.50); box(m.glass, 1.90,0.40,0.07, 0,0.94,-0.64);
-      box(m.glass, 1.90,0.36,0.07, 0,0.94,+1.44); box(m.stripe,0.52,0.59,2.40, 0,0.52,-0.50);
-      box(m.dark,  0.52,0.14,1.80, 0,0.80,-0.50); box(m.dark,  2.70,0.26,0.20, 0,0.28,-2.12);
-      box(m.dark,  2.70,0.26,0.20, 0,0.28,+2.12);
-      for(const x of[-0.80,0.80]) { box(m.hl,0.42,0.20,0.08, x,0.52,-2.12); box(m.tl,0.50,0.22,0.08, x,0.52,+2.12); }
-      addWheel(-1.32,0.36,-1.30,1.06); addWheel(1.32,0.36,-1.30,1.06); addWheel(-1.32,0.36,+1.30,1.06); addWheel(1.32,0.36,+1.30,1.06); break;
-    case 'compact':
-      box(m.body,  1.82,0.62,3.20, 0,0.50, 0.00); box(m.dark,  1.96,0.22,3.38, 0,0.22, 0.00);
-      box(m.dark,  1.52,0.58,1.90, 0,0.98,+0.10); box(m.glass, 1.44,0.44,0.07, 0,0.98,-0.84);
-      box(m.glass, 1.44,0.38,0.07, 0,0.96,+1.06); box(m.dark,  1.74,0.24,0.16, 0,0.26,-1.62);
-      box(m.dark,  1.74,0.24,0.16, 0,0.26,+1.62);
-      for(const x of[-0.52,0.52]) { box(m.hl,0.34,0.16,0.08, x,0.50,-1.62); box(m.tl,0.40,0.18,0.08, x,0.50,+1.62); }
-      addWheel(-0.90,0.30,-0.95,0.90); addWheel(0.90,0.30,-0.95,0.90); addWheel(-0.90,0.30,+0.95,0.90); addWheel(0.90,0.30,+0.95,0.90); break;
-  }
-  return wheels;
+// Walk an Object3D and return the three named wheel meshes.
+function findWheelMeshes(root) {
+  const info = { back: null, frontLeft: null, frontRight: null };
+  root.traverse(child => {
+    if (!child.isMesh) return;
+    const n = child.name.toLowerCase();
+    if      (n.includes('backwheel'))  info.back       = child;
+    else if (n.includes('frontleft'))  info.frontLeft  = child;
+    else if (n.includes('frontright')) info.frontRight = child;
+  });
+  return info;
+}
+
+function loadCarModel(carCfg) {
+  if (modelCache.has(carCfg.file)) return Promise.resolve(modelCache.get(carCfg.file));
+
+  return new Promise((resolve, reject) => {
+    const mtlLoader = new MTLLoader();
+    mtlLoader.setPath('assets/cars/');
+    mtlLoader.load(
+      carCfg.file + '.mtl',
+      mats => {
+        mats.preload();
+        const objLoader = new OBJLoader();
+        objLoader.setMaterials(mats);
+        objLoader.setPath('assets/cars/');
+        objLoader.load(
+          carCfg.file + '.obj',
+          obj => {
+            // Shadow + center wheel geometries for proper pivot rotation
+            obj.traverse(child => {
+              if (!child.isMesh) return;
+              child.castShadow = true;
+              child.receiveShadow = false;
+              const n = child.name.toLowerCase();
+              if (n.includes('wheel') || n.includes('front')) {
+                centerMeshGeometry(child);
+              }
+            });
+            // Set front wheel rotation order: steer (Y) then spin (X)
+            const wheels = findWheelMeshes(obj);
+            if (wheels.frontLeft)  wheels.frontLeft.rotation.order  = 'YXZ';
+            if (wheels.frontRight) wheels.frontRight.rotation.order = 'YXZ';
+
+            const result = { obj, wheels };
+            modelCache.set(carCfg.file, result);
+            resolve(result);
+          },
+          undefined,
+          reject
+        );
+      },
+      undefined,
+      reject
+    );
+  });
+}
+
+// Clone a cached model and re-locate the wheel mesh references in the clone.
+function cloneForScene(cached) {
+  const group = cached.obj.clone(true);
+  const wheels = findWheelMeshes(group);
+  if (wheels.frontLeft)  wheels.frontLeft.rotation.order  = 'YXZ';
+  if (wheels.frontRight) wheels.frontRight.rotation.order = 'YXZ';
+  return { group, wheels };
 }
 
 // ── Player car group ───────────────────────────────────────────────────────────
 const carGroup = new THREE.Group();
 carGroup.rotation.order = 'YXZ';
 scene.add(carGroup);
-let carWheels = buildCarIntoGroup(carGroup, CARS[0]);
+let carWheelInfo = { back: null, frontLeft: null, frontRight: null };
 
 // ── Preview renderer ───────────────────────────────────────────────────────────
 const PREV_W = 360, PREV_H = 240;
 const prevRenderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 prevRenderer.setSize(PREV_W, PREV_H);
-prevRenderer.setPixelRatio(1);          // preview stays low-res; it's a small panel
+prevRenderer.setPixelRatio(1);
 prevRenderer.setClearColor(0x000000, 0);
 const prevScene  = new THREE.Scene();
-const prevCamera = new THREE.PerspectiveCamera(32, PREV_W/PREV_H, 0.1, 50);
+const prevCamera = new THREE.PerspectiveCamera(34, PREV_W/PREV_H, 0.1, 50);
 prevCamera.position.set(5.5, 3.2, 7.5); prevCamera.lookAt(0, 0.8, 0);
 prevScene.add(new THREE.AmbientLight(0xffeedd, 3.0));
 const prevSun = new THREE.DirectionalLight(0xffffff, 4.5);
@@ -307,17 +323,59 @@ prevSun.position.set(5,10,8); prevScene.add(prevSun);
 prevScene.add(Object.assign(new THREE.PointLight(0x4ff0ff, 5, 18), { position: new THREE.Vector3(-4,2,-3) }));
 prevScene.add(Object.assign(new THREE.PointLight(0xc64bff, 3, 14), { position: new THREE.Vector3(3,-1,3) }));
 const prevCarGroup = new THREE.Group();
-prevCarGroup.rotation.order = 'YXZ';
 prevScene.add(prevCarGroup);
-buildCarIntoGroup(prevCarGroup, CARS[0]);
 let previewCarIdx = 0, previewAngle = 0;
+let prevCarWheelInfo = { back: null, frontLeft: null, frontRight: null };
 
 function setPreviewCar(idx) {
   previewCarIdx = ((idx % CARS.length) + CARS.length) % CARS.length;
-  buildCarIntoGroup(prevCarGroup, CARS[previewCarIdx]);
-  document.getElementById('cs-name').textContent = CARS[previewCarIdx].name;
-  document.getElementById('cs-desc').textContent = CARS[previewCarIdx].desc;
+  const carCfg  = CARS[previewCarIdx];
+
+  // Update info text immediately
+  document.getElementById('cs-name').textContent = carCfg.name;
+  document.getElementById('cs-desc').textContent = carCfg.desc;
   document.querySelectorAll('.cs-dot').forEach((d,i) => d.classList.toggle('active', i === previewCarIdx));
+
+  // Stat bars
+  const statsEl = document.getElementById('cs-stats');
+  if (statsEl) {
+    statsEl.innerHTML = [
+      ['Speed',    carCfg.stats.speed],
+      ['Handling', carCfg.stats.handling],
+      ['Armor',    carCfg.stats.armor],
+    ].map(([label, val]) =>
+      `<div class="cs-stat-row">` +
+        `<span class="cs-stat-label">${label}</span>` +
+        `<div class="cs-stat-track">` +
+          `<div class="cs-stat-fill" style="width:${val*10}%;background:${carCfg.accent};box-shadow:0 0 6px ${carCfg.accent}"></div>` +
+        `</div>` +
+      `</div>`
+    ).join('');
+  }
+
+  // Show spinner, clear previous model
+  const overlay = document.getElementById('cs-load-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  while (prevCarGroup.children.length) prevCarGroup.remove(prevCarGroup.children[0]);
+  prevCarWheelInfo = { back: null, frontLeft: null, frontRight: null };
+
+  loadCarModel(carCfg).then(cached => {
+    const { group, wheels } = cloneForScene(cached);
+    group.scale.setScalar(carCfg.scale);
+    prevCarGroup.add(group);
+    prevCarWheelInfo = wheels;
+    if (overlay) overlay.style.display = 'none';
+  }).catch(err => {
+    console.warn('Car preview load failed:', err);
+    if (overlay) overlay.style.display = 'none';
+    // Fallback placeholder
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(1.8, 0.9, 3.8),
+      new THREE.MeshLambertMaterial({ color: parseInt(carCfg.accent.replace('#',''), 16) })
+    );
+    box.position.y = 0.45;
+    prevCarGroup.add(box);
+  });
 }
 
 // ── Speed lines overlay ────────────────────────────────────────────────────────
@@ -378,6 +436,9 @@ async function initAudio() {
   } catch(e) { console.warn('Audio:', e); }
 }
 initAudio();
+
+// Preload first car in background so it's ready when user opens car select
+loadCarModel(CARS[0]).catch(() => {});
 
 function ensureAudioCtx() {
   if (audioCtx) return;
@@ -780,6 +841,12 @@ function setState(s) {
   if (SCREEN_MAP[s]) SCREEN_MAP[s].classList.remove('hidden');
   hud.classList.toggle('hidden', s !== STATE.PLAYING);
 
+  // Entering car select: load/refresh preview
+  if (s === STATE.CAR_SELECT) {
+    previewAngle = 0;
+    setPreviewCar(previewCarIdx);
+  }
+
   // Clean up when leaving gameplay
   if (prev === STATE.PLAYING && s !== STATE.PLAYING) {
     stopSong(); clearAllOrbs(); clearAllHazards();
@@ -793,6 +860,33 @@ function setState(s) {
     hp=3.0; score=0; combo=0; maxCombo=0; notesHit=0; notesMissed=0;
     updateHearts(); updateScore(); updateLanePips();
     resetCar(); redirecting = false;
+
+    // Apply the selected car model (cached from car select preview)
+    while (carGroup.children.length) carGroup.remove(carGroup.children[0]);
+    carWheelInfo = { back: null, frontLeft: null, frontRight: null };
+
+    const applyCarModel = cached => {
+      while (carGroup.children.length) carGroup.remove(carGroup.children[0]);
+      const { group, wheels } = cloneForScene(cached);
+      group.scale.setScalar(CARS[selectedCar].scale);
+      carGroup.add(group);
+      carWheelInfo = wheels;
+    };
+
+    const cachedCar = modelCache.get(CARS[selectedCar].file);
+    if (cachedCar) {
+      applyCarModel(cachedCar);
+    } else {
+      // Fallback box while model loads (shouldn't happen after car select)
+      const placeholder = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, 0.85, 4.2),
+        new THREE.MeshLambertMaterial({ color: parseInt(CARS[selectedCar].accent.replace('#',''), 16) })
+      );
+      placeholder.position.y = 0.43; placeholder.castShadow = true;
+      carGroup.add(placeholder);
+      loadCarModel(CARS[selectedCar]).then(applyCarModel).catch(() => {});
+    }
+
     if (beatMap?.theme) {
       const t = beatMap.theme;
       skyLerpTop.set(t.skyTop); skyLerpBot.set(t.skyBot);
@@ -831,11 +925,10 @@ document.getElementById('sl-music').addEventListener('input', e => {
   if (musicGain) musicGain.gain.value = volMusic;
 });
 
-document.getElementById('cs-prev').addEventListener('click', () => setPreviewCar(previewCarIdx-1));
-document.getElementById('cs-next').addEventListener('click', () => setPreviewCar(previewCarIdx+1));
+document.getElementById('cs-prev').addEventListener('click', () => setPreviewCar(previewCarIdx - 1));
+document.getElementById('cs-next').addEventListener('click', () => setPreviewCar(previewCarIdx + 1));
 document.getElementById('cs-select').addEventListener('click', () => {
   selectedCar = previewCarIdx;
-  carWheels = buildCarIntoGroup(carGroup, CARS[selectedCar]);
   setState(STATE.PLAYING);
 });
 document.getElementById('cs-back').addEventListener('click', () => setState(STATE.MENU));
@@ -931,8 +1024,18 @@ function updatePlaying(dt) {
 
   car.wheelRot += CRUISE_SPD * dt * 2.2;
   const steerVis = Math.max(-0.38, Math.min(0.38, lateralVel * 0.038));
-  for (const [i, w] of carWheels.entries()) {
-    w.rotation.order = 'YXZ'; w.rotation.y = i<2 ? steerVis : 0; w.rotation.x = car.wheelRot;
+
+  // Animate OBJ wheel meshes
+  if (carWheelInfo.back) {
+    carWheelInfo.back.rotation.x = car.wheelRot;
+  }
+  if (carWheelInfo.frontLeft) {
+    carWheelInfo.frontLeft.rotation.y = steerVis;
+    carWheelInfo.frontLeft.rotation.x = car.wheelRot;
+  }
+  if (carWheelInfo.frontRight) {
+    carWheelInfo.frontRight.rotation.y = steerVis;
+    carWheelInfo.frontRight.rotation.x = car.wheelRot;
   }
 
   carGroup.position.set(car.x, car.suspY, car.z);
@@ -976,6 +1079,11 @@ function loop(now) {
   if (gameState === STATE.CAR_SELECT) {
     previewAngle += dt * 0.7;
     prevCarGroup.rotation.y = previewAngle;
+    // Spin preview wheels
+    const wSpin = dt * 2.5;
+    if (prevCarWheelInfo.back)       prevCarWheelInfo.back.rotation.x      += wSpin;
+    if (prevCarWheelInfo.frontLeft)  prevCarWheelInfo.frontLeft.rotation.x  += wSpin;
+    if (prevCarWheelInfo.frontRight) prevCarWheelInfo.frontRight.rotation.x += wSpin;
     prevRenderer.render(prevScene, prevCamera);
   }
 

@@ -99,15 +99,22 @@
     <div class="cs-title">Select Your Car</div>
     <div class="cs-row">
       <button class="cs-arrow" id="cs-prev">&#8592;</button>
-      <div class="cs-preview" id="cs-preview-wrap"></div>
+      <div class="cs-preview" id="cs-preview-wrap">
+        <div class="cs-load-overlay" id="cs-load-overlay" style="display:none">
+          <div class="cs-spinner"></div>
+        </div>
+      </div>
       <button class="cs-arrow" id="cs-next">&#8594;</button>
     </div>
     <div class="cs-info">
-      <div class="cs-name" id="cs-name">Street Car</div>
-      <div class="cs-desc" id="cs-desc">Balanced · Fast · Agile</div>
+      <div class="cs-name" id="cs-name">City Cruiser</div>
+      <div class="cs-desc" id="cs-desc">Balanced · Reliable</div>
     </div>
+    <div id="cs-stats"></div>
     <div class="cs-dots">
       <div class="cs-dot active"></div>
+      <div class="cs-dot"></div>
+      <div class="cs-dot"></div>
       <div class="cs-dot"></div>
       <div class="cs-dot"></div>
       <div class="cs-dot"></div>
