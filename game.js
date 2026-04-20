@@ -35,14 +35,16 @@ const SCR = Object.freeze({
   MESSAGES:'messages', THREAD:'thread',
   NOTES:'notes', PHOTOS:'photos',
   CALLS:'calls', SETTINGS:'settings',
+  END:'end',
 });
 let screen = SCR.LOCK;
 
 // ── Story phases ───────────────────────────────────────────────────
-const PHASE = Object.freeze({ NIGHT:0, MORNING:1, AFTERNOON:2 });
+const PHASE = Object.freeze({ NIGHT:0, MORNING:1, AFTERNOON:2, EVENING:3 });
 let timePhase      = PHASE.NIGHT;
 let phaseTimer     = -1;
 let afternoonTimer = -1;
+let eveningTimer   = -1;
 
 // ── Interpretation profile ─────────────────────────────────────────
 const profile = { defensive:0, trusting:0, avoidant:0 };
@@ -84,6 +86,18 @@ const voicemails = [
   },
 ];
 let callsVoicemailOpen = false;
+
+// ── Call-back overlay ──────────────────────────────────────────────
+let callBack = {
+  active: false,
+  state: 'idle',   // 'calling' | 'connected' | 'ended'
+  timer: 0,
+  lineTimer: 0,
+  lineIdx: 0,
+  lines: [],
+};
+const CALLOUT_DELAY = 1.6;   // seconds before answer
+const LINE_DELAY    = 1.4;   // seconds between transcript lines
 
 // Call log entries (fabricated history around the night)
 const callLog = [
@@ -394,6 +408,22 @@ const SCRIPT = {
   riley_2d: { incoming:{ text:'yeah. I figured.', time:'10:26 AM' }, choices:null,
     onEnd:()=>{ flags.add('riley_end_known'); rel.riley.trust+=8; } },
 
+  // ── Morgan — evening ──────────────────────────────────────────
+  morgan_eve: {
+    incoming: { text:'you doing ok?', time:'6:48 PM' },
+    choices: [
+      { text:'yeah. I think so',           next:'meve_1a', fx:()=>{ profile.trusting++;  } },
+      { text:'not really',                 next:'meve_1b', fx:()=>{ profile.trusting+=2; rel.morgan.trust+=8; } },
+      { text:'(leave it)', silent:true,    next:'meve_silence', fx:()=>{ profile.avoidant++; rel.morgan.tension+=10; } },
+    ],
+  },
+  meve_1a: { incoming:{ text:"ok. that's something.", time:'6:49 PM' }, choices:null,
+    onEnd:()=>flags.add('eve_ok') },
+  meve_1b: { incoming:{ text:'me neither.', time:'6:49 PM' }, choices:null,
+    onEnd:()=>{ flags.add('eve_honest'); rel.morgan.trust+=5; } },
+  meve_silence: { incoming:null, choices:null,
+    onEnd:()=>flags.add('eve_silence') },
+
 };
 
 // ── Threads ────────────────────────────────────────────────────────
@@ -475,6 +505,80 @@ function getMorganAftNode() {
   if (flags.has('morgan_silence') || flags.has('morgan_aft_silence2'))
     return 'morgan_aft_cold';
   return 'morgan_aft_warm';
+}
+
+function queueEvening() {
+  if (timePhase >= PHASE.EVENING || eveningTimer >= 0) return;
+  eveningTimer = 5.0;
+}
+
+function seedEvening() {
+  if (timePhase >= PHASE.EVENING) return;
+  timePhase = PHASE.EVENING;
+
+  notes.push({ time:'7:22 PM', body:eveningNoteBody() });
+
+  const eveId = getMorganEveNode();
+  if (eveId) {
+    threads.morgan.scriptNode = eveId;
+    const eNode = SCRIPT[eveId];
+    if (eNode?.incoming) {
+      threads.morgan.messages.push({ from:'them', text:eNode.incoming.text, time:eNode.incoming.time, read:false });
+      threads.morgan.unread += 1;
+    }
+    pushNotif('Morgan', eNode?.incoming?.text || '');
+  }
+}
+
+function getMorganEveNode() {
+  if (flags.has('morgan_final_silence')) return null;
+  if (flags.has('called_morgan_back'))   return null;
+  if (rel.morgan.trust < 28)             return null;
+  return 'morgan_eve';
+}
+
+function eveningNoteBody() {
+  if (flags.has('eve_honest'))                                   return "told her I wasn't ok. it was the most honest thing I said all day.";
+  if (flags.has('called_morgan_back'))                           return "called her back. we didn't say much. it was enough.";
+  if (flags.has('morgan_aft_honest_moment')||flags.has('morgan_aft_open')) return "maybe I don't have to figure this all out tonight.";
+  if (flags.has('admitted_rileys')||flags.has('riley_gap_admitted'))       return "I keep playing last night back. I don't know what I was hoping would happen.";
+  if (flags.has('morgan_final_silence')||flags.has('eve_silence'))         return "I didn't answer again. I don't know what that says about me.";
+  return "the phone's quiet now. probably for the best.";
+}
+
+function getCallBackLines() {
+  if (flags.has('morgan_aft_honest_moment') || flags.has('morgan_aft_open') || flags.has('eve_honest')) {
+    return [
+      "Morgan: hey.",
+      "you: hey. I just... wanted to actually talk.",
+      "Morgan: yeah.",
+      "Morgan: I'm glad you called.",
+    ];
+  }
+  if (flags.has('morgan_aft_direct') || flags.has('admitted_rileys')) {
+    return [
+      "Morgan: oh. hey.",
+      "you: I know. I'm sorry I didn't pick up.",
+      "Morgan: are you ok?",
+      "you: I don't know yet.",
+      "Morgan: ok. that's honest.",
+    ];
+  }
+  if (flags.has('morgan_final_silence') || flags.has('eve_silence')) {
+    return [
+      "Morgan: ...",
+      "Morgan: you called.",
+      "you: yeah.",
+      "Morgan: ok.",
+    ];
+  }
+  return [
+    "Morgan: hey.",
+    "you: hey.",
+    "Morgan: ...",
+    "you: I don't know what to say.",
+    "Morgan: you called. that's something.",
+  ];
 }
 
 // ── Active thread state ────────────────────────────────────────────
@@ -638,6 +742,7 @@ canvas.addEventListener('click', e => {
 });
 
 function handleClick(mx, my) {
+  if (screen===SCR.END) { onClickEnd(mx,my); return; }
   if (screen!==SCR.LOCK && screen!==SCR.HOME && my>=H-NAV_H) { goBack(); return; }
   switch(screen) {
     case SCR.LOCK:     onClickLock();           break;
@@ -659,6 +764,11 @@ function goBack() {
 function onClickLock() { /* unlock via slide only */ }
 
 function onClickHome(mx,my) {
+  // Evening quiet-phone epilogue button
+  if (timePhase>=PHASE.EVENING && Object.values(threads).every(t=>!t.scriptNode)) {
+    const qy=H-NAV_H-30;
+    if (my>=qy && my<=qy+22) { screen=SCR.END; return; }
+  }
   for (const app of APP_GRID) {
     if (mx>=app.x && mx<=app.x+APP_SZ && my>=app.y && my<=app.y+APP_SZ+14) {
       switch(app.id) {
@@ -694,14 +804,30 @@ function onClickThread(mx,my) {
 }
 
 function onClickCalls(mx,my) {
+  // Call-back overlay buttons
+  if (callBack.active) {
+    if (callBack.state==='connected' && callBack.lineIdx>=callBack.lines.length) {
+      // "hang up" button
+      if (my>=H-NAV_H-44 && my<=H-NAV_H-16) { callBack.active=false; callBack.state='idle'; }
+    }
+    return;
+  }
+  // Call-back initiate
+  if (timePhase>=PHASE.EVENING && !flags.has('called_morgan_back')) {
+    const cby=H-NAV_H-36;
+    if (my>=cby && my<=cby+28) {
+      callBack.active=true; callBack.state='calling';
+      callBack.timer=0; callBack.lineIdx=0; callBack.lineTimer=0; callBack.lines=[];
+      return;
+    }
+  }
   // Voicemail section tap
   const vmRowY = STATUS_H+36+callLog.length*43+18;
   if (!callsVoicemailOpen) {
     if (my>=vmRowY && my<vmRowY+36) { callsVoicemailOpen=true; return; }
   } else {
-    const vmY = vmRowY;
     const vm = voicemails[0];
-    if (!vm.listened && my>=vmY && my<vmY+60) {
+    if (!vm.listened && my>=vmRowY && my<vmRowY+60) {
       vm.listened=true;
       flags.add('voicemail_listened');
     }
@@ -733,6 +859,11 @@ function update(dt) {
   totalTime+=dt;
   if (phaseTimer>=0)     { phaseTimer-=dt;     if (phaseTimer<=0)     { phaseTimer=-1;     seedMorning();   } }
   if (afternoonTimer>=0) { afternoonTimer-=dt;  if (afternoonTimer<=0) { afternoonTimer=-1; seedAfternoon(); } }
+  if (eveningTimer>=0)   { eveningTimer-=dt;    if (eveningTimer<=0)   { eveningTimer=-1;   seedEvening();   } }
+  // Auto-queue evening once all afternoon threads go quiet
+  if (timePhase===PHASE.AFTERNOON && eveningTimer<0) {
+    if (Object.values(threads).every(t=>!t.scriptNode)) queueEvening();
+  }
   if (screen===SCR.THREAD&&!choiceMade&&!typingActive) choiceAnim=Math.min(1,choiceAnim+dt*2.8);
   if (typingActive) { typingTimer-=dt; if (typingTimer<=0) deliverPending(); }
   if (notifToast)   { notifToast.timer-=dt; if (notifToast.timer<=0) notifToast=null; }
@@ -740,6 +871,25 @@ function update(dt) {
   if (lockSlide.snapBack) {
     lockSlide.progress = Math.max(0, lockSlide.progress - dt * 5);
     if (lockSlide.progress <= 0) lockSlide.snapBack = false;
+  }
+  // Call-back animation
+  if (callBack.active) {
+    callBack.timer += dt;
+    if (callBack.state === 'calling' && callBack.timer >= CALLOUT_DELAY) {
+      callBack.state = 'connected';
+      callBack.lines  = getCallBackLines();
+      callBack.lineIdx = 0;
+      callBack.lineTimer = 0;
+      flags.add('called_morgan_back');
+      rel.morgan.trust = Math.min(100, rel.morgan.trust + 10);
+    }
+    if (callBack.state === 'connected') {
+      callBack.lineTimer += dt;
+      if (callBack.lineTimer >= LINE_DELAY && callBack.lineIdx < callBack.lines.length) {
+        callBack.lineIdx++;
+        callBack.lineTimer = 0;
+      }
+    }
   }
 }
 
@@ -756,8 +906,9 @@ function draw() {
     case SCR.PHOTOS:   drawPhotos();   break;
     case SCR.CALLS:    drawCalls();    break;
     case SCR.SETTINGS: drawSettings(); break;
+    case SCR.END:      drawEnd();      break;
   }
-  if (screen!==SCR.LOCK) {
+  if (screen!==SCR.LOCK && screen!==SCR.END) {
     drawStatusBar();
     drawBottomNav();
     if (notifToast&&screen===SCR.HOME) drawNotifToast();
@@ -888,7 +1039,9 @@ function drawLockCard(x,y,w,sender,preview) {
 // ── Home screen ────────────────────────────────────────────────────
 function drawHome() {
   const g=ctx.createLinearGradient(0,0,0,H);
-  if (timePhase===PHASE.AFTERNOON) {
+  if (timePhase===PHASE.EVENING) {
+    g.addColorStop(0,'#080410'); g.addColorStop(1,'#10061a');
+  } else if (timePhase===PHASE.AFTERNOON) {
     g.addColorStop(0,'#1a1020'); g.addColorStop(1,'#2a0f1c');
   } else if (timePhase===PHASE.MORNING) {
     g.addColorStop(0,'#0e1828'); g.addColorStop(1,'#180e2a');
@@ -900,6 +1053,14 @@ function drawHome() {
   ctx.fillStyle='rgba(0,0,0,0.45)';
   roundRect(W/2-18,5,36,8,4); ctx.fill();
   for (const app of APP_GRID) drawAppIcon(app);
+  // Evening: show quiet-phone / epilogue prompt
+  if (timePhase>=PHASE.EVENING && Object.values(threads).every(t=>!t.scriptNode)) {
+    const qy=H-NAV_H-30;
+    ctx.fillStyle='rgba(255,255,255,0.05)'; roundRect(8,qy,W-16,22,6); ctx.fill();
+    ctx.font='7px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.28)';
+    ctx.fillText('the phone goes quiet  ·  tap to reflect',W/2,qy+14);
+    ctx.textAlign='left';
+  }
 }
 
 function drawAppIcon(app) {
@@ -1204,6 +1365,19 @@ function drawCalls() {
       ctx.textAlign='left';
     }
   }
+
+  // Call-back section — appears in evening phase if not already called
+  if (timePhase>=PHASE.EVENING && !flags.has('called_morgan_back')) {
+    const cby=H-NAV_H-36;
+    ctx.fillStyle='rgba(60,140,74,0.12)'; roundRect(8,cby,W-16,28,6); ctx.fill();
+    ctx.strokeStyle='rgba(60,140,74,0.35)'; ctx.lineWidth=1; roundRect(8,cby,W-16,28,6); ctx.stroke();
+    ctx.font='8px monospace'; ctx.textAlign='center'; ctx.fillStyle='#7ed87f';
+    ctx.fillText('📞  Call Morgan back',W/2,cby+17);
+    ctx.textAlign='left';
+  }
+
+  // Call-back overlay
+  if (callBack.active) drawCallOverlay();
 }
 
 // ── Settings ───────────────────────────────────────────────────────
@@ -1226,6 +1400,120 @@ function drawSettings() {
     ctx.fillText('Morgan noticed your read receipts are off',W/2,ry+14);
     ctx.textAlign='left';
   }
+}
+
+// ── Call overlay ───────────────────────────────────────────────────
+function drawCallOverlay() {
+  // Full-screen dark overlay
+  ctx.fillStyle='rgba(10,8,20,0.96)'; ctx.fillRect(0,0,W,H);
+  // Avatar
+  ctx.fillStyle=rel.morgan.color; ctx.beginPath(); ctx.arc(W/2,100,28,0,Math.PI*2); ctx.fill();
+  ctx.font='bold 18px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.fillText('M',W/2,108);
+  ctx.font='bold 11px monospace'; ctx.fillStyle='#fff'; ctx.fillText('Morgan',W/2,148);
+
+  if (callBack.state==='calling') {
+    // Pulsing ring
+    const pulse=0.5+0.5*Math.sin(totalTime*4);
+    ctx.strokeStyle=`rgba(${rel.morgan.color.slice(1).match(/../g).map(h=>parseInt(h,16)).join(',')},${0.2+0.3*pulse})`;
+    ctx.lineWidth=2+pulse*3;
+    ctx.beginPath(); ctx.arc(W/2,100,(30+pulse*8),0,Math.PI*2); ctx.stroke();
+    ctx.font='8px monospace'; ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.fillText('calling…',W/2,170);
+  } else {
+    // Transcript lines
+    ctx.font='8px monospace'; ctx.textAlign='left';
+    let ly=185;
+    for (let i=0;i<callBack.lineIdx;i++) {
+      const line=callBack.lines[i];
+      const isMe=line.startsWith('you:');
+      ctx.fillStyle=isMe?'rgba(100,160,255,0.85)':'rgba(255,255,255,0.72)';
+      ctx.fillText(line,14,ly); ly+=14;
+    }
+    // Hang up button once all lines shown
+    if (callBack.lineIdx>=callBack.lines.length) {
+      ctx.fillStyle='rgba(220,60,60,0.85)'; ctx.beginPath(); ctx.arc(W/2,H-NAV_H-30,16,0,Math.PI*2); ctx.fill();
+      ctx.font='13px sans-serif'; ctx.textAlign='center'; ctx.fillText('📵',W/2,H-NAV_H-23);
+    }
+  }
+  ctx.textAlign='left';
+}
+
+// ── Epilogue screen ────────────────────────────────────────────────
+function drawEnd() {
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#080612'); g.addColorStop(1,'#0e0820');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // Soft ambient glow
+  const ag=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,160);
+  ag.addColorStop(0,'rgba(80,50,120,0.12)'); ag.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=ag; ctx.fillRect(0,0,W,H);
+
+  // Title line
+  ctx.font='7px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.2)';
+  ctx.fillText('end of day',W/2,42);
+
+  // Closing line based on final state
+  ctx.font='bold 10px monospace'; ctx.fillStyle='rgba(255,255,255,0.72)';
+  ctx.fillText(endingLine(),W/2,72);
+
+  // Relationship bars
+  const rels=[
+    { name:'Morgan', r:rel.morgan },
+    { name:'Alex',   r:rel.alex   },
+    { name:'Riley',  r:rel.riley  },
+  ];
+  let ry=106;
+  for (const {name,r} of rels) {
+    ctx.font='7px monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillText(name,14,ry);
+    // Trust bar
+    const bw=W-90, bx=60, trust=Math.max(0,Math.min(100,r.trust));
+    ctx.fillStyle='rgba(255,255,255,0.06)'; roundRect(bx,ry-8,bw,6,3); ctx.fill();
+    ctx.fillStyle=r.color||'#666'; roundRect(bx,ry-8,Math.round(bw*trust/100),6,3); ctx.fill();
+    ctx.font='6px monospace'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.22)';
+    ctx.fillText(r.tone,W-10,ry);
+    ry+=22;
+  }
+
+  // Profile breakdown
+  ry+=8;
+  ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(14,ry,W-28,1);
+  ry+=12;
+  ctx.font='7px monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.2)';
+  ctx.fillText('how you communicate',14,ry); ry+=14;
+  const total=Math.max(1,profile.defensive+profile.trusting+profile.avoidant);
+  const bars=[
+    { label:'open',      val:profile.trusting,  col:'#5aafff' },
+    { label:'guarded',   val:profile.defensive, col:'#ffaa44' },
+    { label:'withdrawn', val:profile.avoidant,  col:'#aa88cc' },
+  ];
+  for (const b of bars) {
+    const pct=b.val/total, bw2=Math.round((W-70)*pct);
+    ctx.font='7px monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.32)';
+    ctx.fillText(b.label,14,ry);
+    ctx.fillStyle=b.col+'44'; roundRect(58,ry-8,(W-70),6,3); ctx.fill();
+    if (bw2>0) { ctx.fillStyle=b.col; roundRect(58,ry-8,bw2,6,3); ctx.fill(); }
+    ry+=16;
+  }
+
+  // Restart hint
+  ctx.font='6px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.fillText('tap anywhere to go back',W/2,H-16);
+}
+
+function endingLine() {
+  if (flags.has('eve_honest'))            return 'you said the true thing.';
+  if (flags.has('called_morgan_back'))    return 'you called.';
+  if (flags.has('morgan_aft_open')||flags.has('morgan_aft_warm_end')) return 'maybe that was enough.';
+  if (flags.has('morgan_final_silence')||flags.has('eve_silence'))    return 'you said nothing.';
+  if (flags.has('admitted_rileys'))       return "you were honest, eventually.";
+  return 'the phone is quiet now.';
+}
+
+function onClickEnd(mx, my) {
+  screen = SCR.HOME;
 }
 
 // ── Shared header ──────────────────────────────────────────────────
