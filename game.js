@@ -251,7 +251,7 @@ const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75];
 const TRAFFIC_SPAWN_DIST   = 140;   // units ahead to spawn (reaction window)
 const TRAFFIC_DESPAWN_DIST = 25;    // units behind player before removal
 const TRAFFIC_SPEED_BASE   = 22;    // oncoming speed (closing ~50 u/s total)
-const TRAFFIC_POOL_SIZE    = 14;
+const TRAFFIC_POOL_SIZE    = 20;
 const HIT_RADIUS           = 1.9;   // collision radius (cars ~2 wide at scale 1.3)
 const NEAR_MISS_RADIUS     = 4.8;   // lateral radius to score a near-miss
 const NEAR_MISS_WINDOW     = 4.0;   // Z window around player for detection
@@ -261,6 +261,26 @@ const FLOW_FILL_CLOSE      = 0.40;  // razor-close near-miss fill
 const FLOW_FILL_NORMAL     = 0.25;  // standard near-miss fill
 const FLOW_DRAIN_RATE      = 0.032; // passive drain per second
 const FLOW_BURST_DURATION  = 5.0;
+
+// ── Difficulty scaling ─────────────────────────────────────────────────────────
+// 0.0 at start → 1.0 at 2000 m, stays 1.0 beyond
+function diffScale() { return Math.min(1.0, score / 2000); }
+
+// Spawn interval shrinks 2.4 s → 0.75 s
+function trafficSpawnInterval() { return (2.4 - diffScale() * 1.65) + Math.random() * 0.45; }
+
+// Traffic closing speed climbs 22 → 44 u/s
+function trafficSpawnSpeed() { return TRAFFIC_SPEED_BASE + diffScale() * 22 + (Math.random() - 0.5) * 8; }
+
+// Zone callouts
+const ZONES = [
+  { dist:    0, name: 'CITY STREETS' },
+  { dist:  600, name: 'OUTSKIRTS'    },
+  { dist: 1200, name: 'HIGHWAY'      },
+  { dist: 2000, name: 'RUSH HOUR'    },
+  { dist: 3200, name: 'GRIDLOCK'     },
+];
+let lastZoneIdx = -1;
 
 // ── Ribbon mesh builder ────────────────────────────────────────────────────────
 function buildRibbon(halfWL, halfWR, yOff, tex, tileLen) {
@@ -715,7 +735,7 @@ function spawnTraffic() {
   slot.active   = true;
   slot.judged   = false;
   slot.wheelRot = 0;
-  slot.speed    = TRAFFIC_SPEED_BASE + (Math.random() - 0.5) * 10;
+  slot.speed    = trafficSpawnSpeed();
 
   const worldX  = curveX(spawnZ) + LANE_OFFSETS[lane];
   slot.group.position.set(worldX, 0, spawnZ);
@@ -1037,7 +1057,7 @@ function updateScore() {
 function showHitFeedback(type, text) {
   hitFlash.textContent = text;
   hitFlash.className   = `show ${type}`;
-  hitFlashTimer        = type === 'burst' ? 1.2 : 0.62;
+  hitFlashTimer        = type === 'burst' ? 1.2 : type === 'zone' ? 2.0 : 0.62;
 }
 
 // ── State machine ──────────────────────────────────────────────────────────────
@@ -1091,6 +1111,7 @@ function setState(s) {
     flowMeter = 0; flowBurstActive = false; flowBurstTimer = 0;
     if (_flowWrap) _flowWrap.classList.remove('burst');
     nextCheckpoint = CHECKPOINT_INTERVAL;
+    lastZoneIdx = -1;
     // Reset upgrade vars
     upgradeVars.maxSpd = 0; upgradeVars.accel = 0;
     upgradeVars.flowDrainMult = 1.0; upgradeVars.nearMissBonus = 0;
@@ -1200,9 +1221,21 @@ function updatePlaying(dt) {
   trafficSpawnTimer -= dt;
   if (trafficSpawnTimer <= 0) {
     spawnTraffic();
-    trafficSpawnTimer = 1.6 + Math.random() * 1.4; // 1.6–3.0 s between spawns
+    // At high difficulty occasionally spawn a second car in a different lane
+    if (diffScale() > 0.55 && Math.random() < (diffScale() - 0.55) * 1.8) {
+      spawnTraffic();
+    }
+    trafficSpawnTimer = trafficSpawnInterval();
   }
   updateTraffic(dt);
+
+  // ── Zone callouts ─────────────────────────────────────────────────────────
+  let zi = 0;
+  for (let i = 0; i < ZONES.length; i++) { if (score >= ZONES[i].dist) zi = i; }
+  if (zi > lastZoneIdx) {
+    lastZoneIdx = zi;
+    showHitFeedback('zone', ZONES[zi].name);
+  }
 
   // ── Ghost timer ──────────────────────────────────────────────────────────
   if (ghostTimer > 0) ghostTimer = Math.max(0, ghostTimer - dt);

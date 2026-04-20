@@ -535,6 +535,7 @@ body {
 #hit-flash.miss    { color: #ff5555;        text-shadow: 0 0 12px #ff2222; }
 #hit-flash.close   { color: var(--accent3); text-shadow: 0 0 18px var(--accent3), 0 0 32px rgba(79,240,255,0.5); }
 #hit-flash.burst   { color: var(--gold);    text-shadow: 0 0 22px var(--gold), 0 0 44px rgba(255,204,0,0.6); font-size: 2rem; }
+#hit-flash.zone    { color: var(--accent);  text-shadow: 0 0 18px var(--accent), 0 0 36px rgba(198,75,255,0.5); font-size: 1.1rem; letter-spacing: 0.28em; }
 
 /* ── Game over screen ────────────────────────────────────────────────────── */
 .go-title {
