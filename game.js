@@ -375,6 +375,11 @@ carGroup.rotation.order = 'YXZ';
 scene.add(carGroup);
 let carWheelInfo = { back: null, frontLeft: null, frontRight: null };
 
+// ── Flow burst car glow light ──────────────────────────────────────────────────
+const carGlowLight = new THREE.PointLight(0x4ff0ff, 0, 14);
+carGlowLight.position.set(0, -0.4, 0);
+carGroup.add(carGlowLight);
+
 // ── Preview renderer ───────────────────────────────────────────────────────────
 const PREV_W = 360, PREV_H = 240;
 const prevRenderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
@@ -597,14 +602,18 @@ container.appendChild(slCanvas);
 const slCtx = slCanvas.getContext('2d');
 const SPEED_LINES = Array.from({length:30}, ()=>({ angle:Math.random()*Math.PI*2, len:0.05+Math.random()*0.13, width:0.4+Math.random()*1.5, phase:Math.random() }));
 
-function drawSpeedLines(intensity) {
+function drawSpeedLines(intensity, hexColor) {
   slCtx.clearRect(0,0,W,H);
   if (intensity < 0.02) return;
   const t=performance.now()/1000, cx=W/2, cy=H/2, R=Math.min(W,H);
+  // Parse hex color to rgb for rgba() lines
+  const hc = (hexColor||'#ffffff').replace('#','');
+  const sr = parseInt(hc.slice(0,2),16), sg = parseInt(hc.slice(2,4),16), sb = parseInt(hc.slice(4,6),16);
   slCtx.save();
   for (const sl of SPEED_LINES) {
     const f=(t*(1.0+intensity*2.5)+sl.phase)%1, r0=(0.22+f*0.48)*R, r1=r0+sl.len*R*intensity;
-    slCtx.strokeStyle=`rgba(255,255,255,${(0.15+intensity*0.45)*(1-f*0.55)})`;
+    const alpha = (0.15+intensity*0.45)*(1-f*0.55);
+    slCtx.strokeStyle=`rgba(${sr},${sg},${sb},${alpha})`;
     slCtx.lineWidth=sl.width*intensity; slCtx.beginPath();
     slCtx.moveTo(cx+Math.cos(sl.angle)*r0, cy+Math.sin(sl.angle)*r0);
     slCtx.lineTo(cx+Math.cos(sl.angle)*r1, cy+Math.sin(sl.angle)*r1);
@@ -693,6 +702,18 @@ let flowBurstTimer  = 0;
 const _flowFill = document.getElementById('hud-flow-fill');
 const _flowWrap = document.getElementById('hud-flow-wrap');
 
+// ── Burst vignette overlay ─────────────────────────────────────────────────────
+const burstVignette = document.createElement('div');
+Object.assign(burstVignette.style, {
+  position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: '6',
+  opacity: '0', transition: 'opacity 0.25s ease',
+  background: 'radial-gradient(ellipse at center, transparent 45%, rgba(79,240,255,0.18) 100%)',
+  boxShadow: 'inset 0 0 120px rgba(79,240,255,0.22)',
+});
+document.body.appendChild(burstVignette);
+
+function _burstAccent() { return beatMap?.theme?.accent ?? '#4ff0ff'; }
+
 function triggerFlowBurst() {
   flowBurstActive = true;
   flowBurstTimer  = FLOW_BURST_DURATION;
@@ -700,6 +721,26 @@ function triggerFlowBurst() {
   flowBurstCount++;
   showHitFeedback('burst', '⚡ FLOW BURST');
   if (_flowWrap) _flowWrap.classList.add('burst');
+
+  // ── Visual burst FX on ────────────────────────────────────────────────────
+  const ac = _burstAccent();
+  // Car glow colour
+  carGlowLight.color.set(ac);
+  // Vignette colour + show
+  const vigColor = ac + '2e';  // 18% alpha hex
+  burstVignette.style.background = `radial-gradient(ellipse at center, transparent 45%, ${ac}2e 100%)`;
+  burstVignette.style.boxShadow  = `inset 0 0 140px ${ac}38`;
+  burstVignette.style.opacity    = '1';
+  // CSS filter on canvas — boost saturation & contrast
+  renderer.domElement.style.filter = 'saturate(2.1) contrast(1.12) brightness(1.06)';
+  // Sky shift: vivid neon version of theme
+  if (beatMap?.theme) {
+    const t = beatMap.theme;
+    skyLerpTop.set(t.skyTop).multiplyScalar(0.4).addScalar(0.05);
+    skyLerpBot.set(t.skyBot);
+    skyLerpFog.set(t.fog);
+    skyLerpAmb.set(ac); skyLerpAmbInt = 3.8;
+  }
 }
 
 function updateFlowMeter(dt) {
@@ -708,6 +749,16 @@ function updateFlowMeter(dt) {
     if (flowBurstTimer <= 0) {
       flowBurstActive = false;
       if (_flowWrap) _flowWrap.classList.remove('burst');
+
+      // ── Visual burst FX off ────────────────────────────────────────────────
+      burstVignette.style.opacity    = '0';
+      renderer.domElement.style.filter = '';
+      // Sky back to normal play theme
+      if (beatMap?.theme) {
+        const t = beatMap.theme;
+        skyLerpTop.set(t.skyTop); skyLerpBot.set(t.skyBot);
+        skyLerpFog.set(t.fog);   skyLerpAmb.set(t.accent); skyLerpAmbInt = 1.8;
+      }
     }
     if (_flowFill) _flowFill.style.width = '100%';
   } else {
@@ -859,6 +910,10 @@ function setState(s) {
     clearAllTraffic();
     damageFlash.style.background = 'rgba(220,20,20,0)';
     if (_flowWrap) _flowWrap.classList.remove('burst');
+    // Clear burst FX
+    burstVignette.style.opacity      = '0';
+    renderer.domElement.style.filter = '';
+    carGlowLight.intensity           = 0;
     skyLerpTop.set(0xf5a060); skyLerpBot.set(0x5c8de0);
     skyLerpFog.set(0xf0a060); skyLerpAmb.set(0xffd8a0); skyLerpAmbInt = 2.2;
   }
@@ -1035,9 +1090,13 @@ function updatePlaying(dt) {
   camera.position.set(cx, cy, car.z + Math.cos(car.heading)*pb);
   camera.lookAt(car.x + Math.sin(car.heading)*8, 1.4, car.z - Math.cos(car.heading)*8);
 
-  // ── Speed lines — intensify during flow burst ─────────────────────────────
+  // ── Speed lines — intensify + recolour during flow burst ─────────────────
   const slIntensity = flowBurstActive ? 0.65 + beatPulse*0.3 : 0.28 + beatPulse*0.50;
-  drawSpeedLines(slIntensity);
+  const slColor     = flowBurstActive ? _burstAccent() : '#ffffff';
+  drawSpeedLines(slIntensity, slColor);
+
+  // ── Car glow — pulse with beats during burst ──────────────────────────────
+  carGlowLight.intensity = flowBurstActive ? 7.0 + beatPulse * 6.0 : 0;
 
   if (hitFlashTimer > 0) { hitFlashTimer -= dt; if (hitFlashTimer <= 0) hitFlash.className = ''; }
 
