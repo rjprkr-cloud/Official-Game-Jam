@@ -4,6 +4,7 @@
 import * as THREE from 'https://esm.sh/three@0.169';
 import { OBJLoader } from 'https://esm.sh/three@0.169/examples/jsm/loaders/OBJLoader';
 import { MTLLoader } from 'https://esm.sh/three@0.169/examples/jsm/loaders/MTLLoader';
+import { GLTFLoader } from 'https://esm.sh/three@0.169/examples/jsm/loaders/GLTFLoader';
 
 // ── Renderer ───────────────────────────────────────────────────────────────────
 const container = document.getElementById('game-container');
@@ -392,6 +393,84 @@ buildEmissiveRibbon( ROAD_W/2-0.10,  ROAD_W/2+0.05, 0.015, 0x6622bb); // right k
   scene.add(ground);
 }
 
+// ── Kenney GLB loader ──────────────────────────────────────────────────────────
+const gltfLoader  = new GLTFLoader();
+const glbCache    = new Map();
+
+function loadGLB(path) {
+  if (glbCache.has(path)) return Promise.resolve(glbCache.get(path));
+  return new Promise((resolve, reject) =>
+    gltfLoader.load(path, gltf => {
+      glbCache.set(path, gltf.scene);
+      resolve(gltf.scene);
+    }, undefined, reject)
+  );
+}
+
+// Apply night-city tint to a loaded GLB model instance
+function applyNightTint(model) {
+  model.traverse(child => {
+    if (!child.isMesh || !child.material) return;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    const cloned = mats.map(m => {
+      const c = m.clone();
+      c.color.multiplyScalar(0.28);           // dark night base
+      c.color.b = Math.min(1, c.color.b + 0.12); // cool blue tint
+      const nm = (m.name || '').toLowerCase();
+      if (nm.includes('window') || nm.includes('glass') || nm.includes('light')) {
+        c.emissive = c.emissive.clone().set(0x112233);
+        c.emissiveIntensity = 0.9;
+      }
+      return c;
+    });
+    child.material = Array.isArray(child.material) ? cloned : cloned[0];
+    child.castShadow = true;
+  });
+}
+
+const K_CARS = [
+  { path:'assets/kenney/cars/sedan.glb',           scale:1.5 },
+  { path:'assets/kenney/cars/sedan-sports.glb',    scale:1.5 },
+  { path:'assets/kenney/cars/hatchback-sports.glb',scale:1.5 },
+  { path:'assets/kenney/cars/suv.glb',             scale:1.5 },
+  { path:'assets/kenney/cars/suv-luxury.glb',      scale:1.5 },
+  { path:'assets/kenney/cars/taxi.glb',            scale:1.5 },
+  { path:'assets/kenney/cars/police.glb',          scale:1.5 },
+  { path:'assets/kenney/cars/van.glb',             scale:1.5 },
+  { path:'assets/kenney/cars/truck.glb',           scale:1.4 },
+  { path:'assets/kenney/cars/delivery.glb',        scale:1.4 },
+];
+
+const K_BUILDINGS_TALL = [
+  'assets/kenney/commercial/building-skyscraper-a.glb',
+  'assets/kenney/commercial/building-skyscraper-b.glb',
+  'assets/kenney/commercial/building-skyscraper-c.glb',
+  'assets/kenney/commercial/building-skyscraper-d.glb',
+  'assets/kenney/commercial/building-skyscraper-e.glb',
+];
+const K_BUILDINGS_MID = [
+  'assets/kenney/commercial/building-a.glb','assets/kenney/commercial/building-b.glb',
+  'assets/kenney/commercial/building-c.glb','assets/kenney/commercial/building-d.glb',
+  'assets/kenney/commercial/building-e.glb','assets/kenney/commercial/building-f.glb',
+  'assets/kenney/commercial/building-g.glb','assets/kenney/commercial/building-h.glb',
+];
+const K_BUILDINGS_CLOSE = [
+  'assets/kenney/suburban/building-type-a.glb','assets/kenney/suburban/building-type-b.glb',
+  'assets/kenney/suburban/building-type-c.glb','assets/kenney/suburban/building-type-d.glb',
+  'assets/kenney/suburban/building-type-e.glb','assets/kenney/suburban/building-type-f.glb',
+  'assets/kenney/suburban/building-type-g.glb','assets/kenney/suburban/building-type-h.glb',
+];
+const K_STREETLIGHT = 'assets/kenney/road/light-curved.glb';
+const K_CONE        = 'assets/kenney/road/construction-cone.glb';
+
+// ── Preload Kenney GLBs (fire-and-forget; each has a .catch so failures are silent) ──
+const _allKenneyPaths = [
+  ...K_CARS.map(c => c.path),
+  ...K_BUILDINGS_TALL, ...K_BUILDINGS_MID, ...K_BUILDINGS_CLOSE,
+  K_STREETLIGHT, K_CONE,
+];
+Promise.all(_allKenneyPaths.map(p => loadGLB(p).catch(() => null)));
+
 // ── Neon city props ────────────────────────────────────────────────────────────
 
 // Shared building window textures (3 accent variants)
@@ -417,52 +496,76 @@ const bldMats = [bldMatA, bldMatB, bldMatC];
 
 const NEON_ACCENT_COLORS = [0x4ff0ff, 0xc64bff, 0xff44cc, 0xffcc00, 0xff3366];
 
-function makeBuilding(x, z) {
-  const w = 4+Math.random()*10, d = 3+Math.random()*8, h = 5+Math.random()*22;
-  const mat = bldMats[Math.random()*bldMats.length|0];
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
-  mesh.position.set(x, h/2, z);
-  scene.add(mesh);
-  // Neon rooftop accent strip
-  if (Math.random() > 0.42) {
-    const ac = NEON_ACCENT_COLORS[Math.random()*NEON_ACCENT_COLORS.length|0];
-    const strip = new THREE.Mesh(
-      new THREE.BoxGeometry(w+0.2, 0.35, d+0.2),
-      new THREE.MeshBasicMaterial({ color: ac })
-    );
-    strip.position.set(x, h+0.18, z);
+function makeBuilding(x, z, isFar = false) {
+  // Neon accent rooftop (always — acts as fallback and adds colour)
+  const ac = NEON_ACCENT_COLORS[Math.random()*NEON_ACCENT_COLORS.length|0];
+
+  const pool = isFar ? K_BUILDINGS_TALL
+             : Math.random() > 0.5 ? K_BUILDINGS_MID : K_BUILDINGS_CLOSE;
+  const path = pool[Math.floor(Math.random() * pool.length)];
+  const cached = glbCache.get(path);
+
+  if (cached) {
+    const model = cached.clone(true);
+    const scale = isFar ? (2.8 + Math.random()*2.2) : (1.6 + Math.random()*1.4);
+    model.scale.setScalar(scale);
+    model.position.set(x, 0, z);
+    model.rotation.y = (Math.random()*4|0) * Math.PI/2;
+    applyNightTint(model);
+    scene.add(model);
+    // Add neon rooftop accent strip
+    const h = scale * 3.5; // approximate height
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(scale*1.8+0.3, 0.35, scale*1.8+0.3),
+                                 new THREE.MeshBasicMaterial({ color: ac }));
+    strip.position.set(x, h, z);
     scene.add(strip);
-  }
-  // Occasional vertical neon sign bar
-  if (Math.random() > 0.72) {
-    const ac = NEON_ACCENT_COLORS[Math.random()*NEON_ACCENT_COLORS.length|0];
-    const sh = 3+Math.random()*4;
-    const sign = new THREE.Mesh(
-      new THREE.BoxGeometry(0.25, sh, 0.25),
-      new THREE.MeshBasicMaterial({ color: ac })
-    );
-    sign.position.set(x + (Math.random()-0.5)*w*0.6, h*0.55, z + d/2 + 0.15);
-    scene.add(sign);
+  } else {
+    // Procedural fallback (original code)
+    const w = 4+Math.random()*10, d = 3+Math.random()*8, h = 5+Math.random()*22;
+    const mat = bldMats[Math.random()*bldMats.length|0];
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    mesh.position.set(x, h/2, z);
+    scene.add(mesh);
+    if (Math.random() > 0.42) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(w+0.2,0.35,d+0.2),
+                                   new THREE.MeshBasicMaterial({ color: ac }));
+      strip.position.set(x, h+0.18, z);
+      scene.add(strip);
+    }
+    if (Math.random() > 0.72) {
+      const sh = 3+Math.random()*4;
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(0.25,sh,0.25),
+                                  new THREE.MeshBasicMaterial({ color: ac }));
+      sign.position.set(x+(Math.random()-0.5)*w*0.6, h*0.55, z+d/2+0.15);
+      scene.add(sign);
+    }
   }
 }
 
 // Streetlights every ~40 m
 const poleMat = new THREE.MeshLambertMaterial({ color: 0x1a2233 });
 function makeStreetlight(x, z, side) {
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,8,5), poleMat);
-  pole.position.y = 4; g.add(pole);
-  // Horizontal arm
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2.2,4), poleMat);
-  arm.rotation.z = Math.PI/2; arm.position.set(side*1.1, 8.1, 0); g.add(arm);
-  // Lamp head (emissive — no real light cost)
-  const lamp = new THREE.Mesh(
-    new THREE.BoxGeometry(0.55,0.28,0.55),
-    new THREE.MeshBasicMaterial({ color: 0x88eeff })
-  );
-  lamp.position.set(side*2.25, 8.0, 0); g.add(lamp);
-  g.position.set(x, 0, z);
-  scene.add(g);
+  const cached = glbCache.get(K_STREETLIGHT);
+  if (cached) {
+    const model = cached.clone(true);
+    model.scale.setScalar(2.2);
+    model.position.set(x, 0, z);
+    model.rotation.y = side < 0 ? Math.PI : 0;
+    model.traverse(c => { if (c.isMesh) c.castShadow = true; });
+    scene.add(model);
+  } else {
+    // Procedural fallback
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,8,5), poleMat);
+    pole.position.y = 4; g.add(pole);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2.2,4), poleMat);
+    arm.rotation.z = Math.PI/2; arm.position.set(side*1.1, 8.1, 0); g.add(arm);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.28,0.55),
+                                new THREE.MeshBasicMaterial({ color: 0x88eeff }));
+    lamp.position.set(side*2.25, 8.0, 0); g.add(lamp);
+    g.position.set(x, 0, z);
+    scene.add(g);
+  }
 }
 
 // Spawn buildings + streetlights along road
@@ -473,8 +576,8 @@ for (let z=ROAD_START; z>ROAD_END; z -= 16+Math.random()*12) {
   makeBuilding(cx + edge + 2  + Math.random()*6, z);
   // Mid-row buildings (denser city feel)
   if (Math.random() > 0.44) {
-    makeBuilding(cx - edge - 10 - Math.random()*10, z + (Math.random()-0.5)*8);
-    makeBuilding(cx + edge + 10 + Math.random()*10, z + (Math.random()-0.5)*8);
+    makeBuilding(cx - edge - 10 - Math.random()*10, z + (Math.random()-0.5)*8, true);
+    makeBuilding(cx + edge + 10 + Math.random()*10, z + (Math.random()-0.5)*8, true);
   }
 }
 
@@ -488,18 +591,36 @@ for (let z=ROAD_START-5; z>ROAD_END; z -= 38+Math.random()*18) {
 for (let i=0; i<70; i++) {
   const side = Math.random()>0.5 ? 1:-1, z = -(Math.random()*(ROAD_LEN-100));
   const cx = curveX(z);
-  const w = 10+Math.random()*24, d = 10+Math.random()*18, h = 22+Math.random()*55;
   const dist = 90+Math.random()*90;
-  const mat = bldMats[Math.random()*bldMats.length|0];
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
-  m.position.set(cx + side*dist, h/2-2, z);
-  scene.add(m);
-  // Skyline rooftop accent
-  if (Math.random() > 0.5) {
-    const ac = NEON_ACCENT_COLORS[Math.random()*NEON_ACCENT_COLORS.length|0];
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(w+0.3,0.5,d+0.3), new THREE.MeshBasicMaterial({ color: ac }));
-    cap.position.set(cx + side*dist, h-1.5, z);
+  const ac = NEON_ACCENT_COLORS[Math.random()*NEON_ACCENT_COLORS.length|0];
+  const skyPath = K_BUILDINGS_TALL[Math.floor(Math.random()*K_BUILDINGS_TALL.length)];
+  const skyCached = glbCache.get(skyPath);
+  if (skyCached) {
+    const m = skyCached.clone(true);
+    const scale = 4.0 + Math.random()*5.0;
+    m.scale.setScalar(scale);
+    m.position.set(cx + side*dist, 0, z);
+    m.rotation.y = (Math.random()*4|0)*Math.PI/2;
+    applyNightTint(m);
+    scene.add(m);
+    const h = scale * 4.0;
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(scale*1.5+0.3,0.5,scale*1.5+0.3),
+                               new THREE.MeshBasicMaterial({ color: ac }));
+    cap.position.set(cx + side*dist, h, z);
     scene.add(cap);
+  } else {
+    // Procedural fallback
+    const w = 10+Math.random()*24, d = 10+Math.random()*18, h = 22+Math.random()*55;
+    const mat = bldMats[Math.random()*bldMats.length|0];
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    m.position.set(cx + side*dist, h/2-2, z);
+    scene.add(m);
+    if (Math.random() > 0.5) {
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w+0.3,0.5,d+0.3),
+                                 new THREE.MeshBasicMaterial({ color: ac }));
+      cap.position.set(cx + side*dist, h-1.5, z);
+      scene.add(cap);
+    }
   }
 }
 
@@ -695,24 +816,22 @@ const trafficPool = Array.from({ length: TRAFFIC_POOL_SIZE }, () => {
 // Pre-load all traffic car models and assign to pool slots
 async function populateTrafficPool() {
   for (let i = 0; i < TRAFFIC_POOL_SIZE; i++) {
-    const cfg = trafficCfgList[i % trafficCfgList.length];
+    const cfg = K_CARS[i % K_CARS.length];
     try {
-      const cached = await loadCarModel(cfg);
-      const { group: model, wheels } = cloneForScene(cached);
+      const orig = await loadGLB(cfg.path);
+      const model = orig.clone(true);
       model.scale.setScalar(cfg.scale);
-      model.rotation.y = 0;          // front faces +Z (toward player — oncoming)
+      model.rotation.y = 0;          // front faces +Z (toward player)
+      applyNightTint(model);
       trafficPool[i].group.add(model);
-      trafficPool[i].wheels      = wheels;
-      trafficPool[i].loadedFile  = cfg.file;
+      trafficPool[i].loadedFile = cfg.path;
     } catch (_) {
-      // Coloured box fallback
-      const colors = [0xcc3322, 0x228844, 0x224488, 0xcc9922, 0x882288];
+      const colors = [0xcc3322,0x228844,0x224488,0xcc9922,0x882288];
       const box = new THREE.Mesh(
-        new THREE.BoxGeometry(2.0, 0.9, 4.0),
+        new THREE.BoxGeometry(2.0,0.9,4.0),
         new THREE.MeshLambertMaterial({ color: colors[i % colors.length] })
       );
-      box.position.y = 0.45;
-      box.castShadow = true;
+      box.position.y = 0.45; box.castShadow = true;
       trafficPool[i].group.add(box);
       trafficPool[i].loadedFile = 'fallback';
     }
