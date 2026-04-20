@@ -429,16 +429,16 @@ function applyNightTint(model) {
 }
 
 const K_CARS = [
-  { path:'assets/kenney/cars/sedan.glb',           scale:1.5 },
-  { path:'assets/kenney/cars/sedan-sports.glb',    scale:1.5 },
-  { path:'assets/kenney/cars/hatchback-sports.glb',scale:1.5 },
-  { path:'assets/kenney/cars/suv.glb',             scale:1.5 },
-  { path:'assets/kenney/cars/suv-luxury.glb',      scale:1.5 },
-  { path:'assets/kenney/cars/taxi.glb',            scale:1.5 },
-  { path:'assets/kenney/cars/police.glb',          scale:1.5 },
-  { path:'assets/kenney/cars/van.glb',             scale:1.5 },
-  { path:'assets/kenney/cars/truck.glb',           scale:1.4 },
-  { path:'assets/kenney/cars/delivery.glb',        scale:1.4 },
+  { path:'assets/kenney/cars/sedan.glb',           scale:2.0 },
+  { path:'assets/kenney/cars/sedan-sports.glb',    scale:2.0 },
+  { path:'assets/kenney/cars/hatchback-sports.glb',scale:2.0 },
+  { path:'assets/kenney/cars/suv.glb',             scale:2.2 },
+  { path:'assets/kenney/cars/suv-luxury.glb',      scale:2.2 },
+  { path:'assets/kenney/cars/taxi.glb',            scale:2.0 },
+  { path:'assets/kenney/cars/police.glb',          scale:2.0 },
+  { path:'assets/kenney/cars/van.glb',             scale:2.1 },
+  { path:'assets/kenney/cars/truck.glb',           scale:2.2 },
+  { path:'assets/kenney/cars/delivery.glb',        scale:2.1 },
 ];
 
 const K_BUILDINGS_TALL = [
@@ -507,7 +507,7 @@ function makeBuilding(x, z, isFar = false) {
 
   if (cached) {
     const model = cached.clone(true);
-    const scale = isFar ? (2.8 + Math.random()*2.2) : (1.6 + Math.random()*1.4);
+    const scale = isFar ? (3.5 + Math.random()*3.5) : (2.0 + Math.random()*2.0);
     model.scale.setScalar(scale);
     model.position.set(x, 0, z);
     model.rotation.y = (Math.random()*4|0) * Math.PI/2;
@@ -542,13 +542,56 @@ function makeBuilding(x, z, isFar = false) {
   }
 }
 
+// ── Construction cones ─────────────────────────────────────────────────────────
+// Procedural fallback cone (orange traffic cone shape)
+function makeProceduralCone(x, y, z) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.ConeGeometry(0.22, 0.72, 6),
+    new THREE.MeshLambertMaterial({ color: 0xff6600 })
+  );
+  body.position.y = 0.36;
+  const band = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.14, 0.09, 6),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  band.position.y = 0.48;
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.28, 0.28, 0.09, 6),
+    new THREE.MeshLambertMaterial({ color: 0xcc3300 })
+  );
+  base.position.y = 0.045;
+  g.add(body, band, base);
+  g.position.set(x, y, z);
+  scene.add(g);
+}
+
+// Place a cluster of 1-3 cones at (x, z). useGLB=true when cache is warm.
+function makeConeGroup(x, z, count = 2) {
+  const cached = glbCache.get(K_CONE);
+  for (let i = 0; i < count; i++) {
+    const ox = (Math.random() - 0.5) * 1.1;
+    const oz = (Math.random() - 0.5) * 1.4;
+    if (cached) {
+      const m = cached.clone(true);
+      m.scale.setScalar(1.8);
+      m.position.set(x + ox, 0, z + oz);
+      m.rotation.y = Math.random() * Math.PI * 2;
+      m.traverse(c => { if (c.isMesh) c.castShadow = true; });
+      scene.add(m);
+    } else {
+      makeProceduralCone(x + ox, 0, z + oz);
+    }
+  }
+}
+
 // Streetlights every ~40 m
 const poleMat = new THREE.MeshLambertMaterial({ color: 0x1a2233 });
 function makeStreetlight(x, z, side) {
   const cached = glbCache.get(K_STREETLIGHT);
   if (cached) {
     const model = cached.clone(true);
-    model.scale.setScalar(2.2);
+    model.scale.setScalar(2.8);
     model.position.set(x, 0, z);
     model.rotation.y = side < 0 ? Math.PI : 0;
     model.traverse(c => { if (c.isMesh) c.castShadow = true; });
@@ -587,6 +630,21 @@ for (let z=ROAD_START-5; z>ROAD_END; z -= 38+Math.random()*18) {
   makeStreetlight(cx + edge, z,  1);
 }
 
+// Construction cones — road-shoulder decoration every ~80-130 m
+// Placed just inside the curb edge so they're visible but not in the lanes
+for (let z=ROAD_START-20; z>ROAD_END; z -= 80+Math.random()*50) {
+  const cx = curveX(z);
+  // Shoulder X positions: just outside lane 0 / lane 3
+  const innerEdge = ROAD_W/2 - 0.8;  // just inside the road edge stripe
+  const side = Math.random() > 0.5 ? 1 : -1;  // random side each cluster
+  const count = Math.random() > 0.5 ? 3 : 2;
+  makeConeGroup(cx + side * innerEdge, z, count);
+  // ~30% chance of a second cluster on the opposite side nearby
+  if (Math.random() > 0.68) {
+    makeConeGroup(cx - side * (innerEdge - Math.random()*0.8), z + (Math.random()-0.5)*6, 2);
+  }
+}
+
 // ── Distant city skyline ───────────────────────────────────────────────────────
 for (let i=0; i<70; i++) {
   const side = Math.random()>0.5 ? 1:-1, z = -(Math.random()*(ROAD_LEN-100));
@@ -597,7 +655,7 @@ for (let i=0; i<70; i++) {
   const skyCached = glbCache.get(skyPath);
   if (skyCached) {
     const m = skyCached.clone(true);
-    const scale = 4.0 + Math.random()*5.0;
+    const scale = 6.0 + Math.random()*8.0;
     m.scale.setScalar(scale);
     m.position.set(cx + side*dist, 0, z);
     m.rotation.y = (Math.random()*4|0)*Math.PI/2;
