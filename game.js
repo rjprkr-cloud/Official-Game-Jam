@@ -150,7 +150,9 @@ const ROAD_W       = 18;
 const CURB_W       = 1.6;
 const ROAD_START   = 25;
 const ROAD_END     = -(ROAD_LEN - 25);
-const CRUISE_SPD   = 28;
+const MAX_SPD      = 48;    // top speed (units/s)
+const ACCEL_RATE   = 30;    // units/s² when ↑ held
+const DECEL_RATE   = 20;    // units/s² when ↑ released
 const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75];
 
 // ── Traffic constants ──────────────────────────────────────────────────────────
@@ -794,12 +796,12 @@ function takeDamage() {
 }
 
 // ── Car physics state ──────────────────────────────────────────────────────────
-const car = { x:0, z:0, heading:0, lane:1, laneX:LANE_OFFSETS[1], lean:0, wheelRot:0, suspY:0, suspVel:0, pitch:0 };
+const car = { x:0, z:0, heading:0, lane:1, laneX:LANE_OFFSETS[1], lean:0, wheelRot:0, suspY:0, suspVel:0, pitch:0, speed:0 };
 
 function resetCar() {
   car.z = 0; car.lane = 1; car.laneX = LANE_OFFSETS[1];
   car.x = curveX(0) + car.laneX; car.heading = Math.atan2(-curveDX(0), 1);
-  car.lean = 0; car.wheelRot = 0; car.suspY = 0; car.suspVel = 0; car.pitch = 0;
+  car.lean = 0; car.wheelRot = 0; car.suspY = 0; car.suspVel = 0; car.pitch = 0; car.speed = 0;
 }
 
 function switchLane(dir) {
@@ -861,7 +863,7 @@ if (csPreviewWrap) {
   console.error('[PulseDrive] #cs-preview-wrap not found — preview renderer not mounted');
 }
 document.getElementById('hud-username').textContent = incoming.username || '';
-document.getElementById('hud-speedo').textContent   = `${(CRUISE_SPD*2.237)|0} MPH`;
+document.getElementById('hud-speedo').textContent   = '0 MPH';
 // ── HUD helpers ────────────────────────────────────────────────────────────────
 function updateHearts() {
   const full=Math.floor(hp), half=(hp%1)>=0.5?1:0;
@@ -1042,8 +1044,18 @@ function updatePlaying(dt) {
   updateFlowMeter(dt);
 
   // ── Car movement ─────────────────────────────────────────────────────────
-  car.z -= CRUISE_SPD * dt;
+  const accelInput = keys['ArrowUp'] || keys['w'] || keys['W'];
+  if (accelInput) {
+    car.speed = Math.min(MAX_SPD, car.speed + ACCEL_RATE * dt);
+  } else {
+    car.speed = Math.max(0, car.speed - DECEL_RATE * dt);
+  }
+
+  car.z -= car.speed * dt;
   updateScore();
+
+  // Update speedo
+  document.getElementById('hud-speedo').textContent = `${(car.speed * 2.237) | 0} MPH`;
 
   const targetLaneX = LANE_OFFSETS[car.lane];
   const prevLaneX   = car.laneX;
@@ -1066,7 +1078,7 @@ function updatePlaying(dt) {
   car.pitch   += (-car.suspY*0.055 - car.pitch) * Math.min(1, dt*4);
   car.pitch    = Math.max(-0.04, Math.min(0.04, car.pitch));
 
-  car.wheelRot += CRUISE_SPD * dt * 2.2;
+  car.wheelRot += car.speed * dt * 2.2;
   const steerVis = Math.max(-0.38, Math.min(0.38, lateralVel * 0.038));
 
   if (carWheelInfo.back)       carWheelInfo.back.rotation.x       = car.wheelRot;
