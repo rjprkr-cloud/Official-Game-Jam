@@ -1,4 +1,4 @@
-// Pulse//Drive — HTML-first rebuild
+// Pulse//Drive — Phase 1: Dodge & Flow
 // Portal Protocol preserved.
 
 import * as THREE from 'https://esm.sh/three@0.169';
@@ -10,8 +10,8 @@ const container = document.getElementById('game-container');
 const W = 960, H = 540;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(W, H);
-renderer.setPixelRatio(1);              // start low; upgraded to full on gameplay
-renderer.shadowMap.enabled = false;     // start off;  enabled on gameplay
+renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setClearColor(0x08040f);
 container.appendChild(renderer.domElement);
@@ -70,16 +70,21 @@ const ROAD_START   = 25;
 const ROAD_END     = -(ROAD_LEN - 25);
 const CRUISE_SPD   = 28;
 const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75];
-// NOTE: beat-map lanes are 1-indexed (1-4). Convert with: lane - 1
 
-// ── Timing constants ──────────────────────────────────────────────────────────
-const PERFECT_WINDOW     = 0.08;
-const HIT_WINDOW         = 0.16;
-const MISS_TIMEOUT       = 0.22;
-const ORB_SPAWN_AHEAD    = 3.2;
-const ORB_POOL_SIZE      = 20;
-const HAZARD_HIT_WINDOW  = 0.20;
-const HAZARD_SPAWN_AHEAD = 4.0;
+// ── Traffic constants ──────────────────────────────────────────────────────────
+const TRAFFIC_SPAWN_DIST   = 140;   // units ahead to spawn (reaction window)
+const TRAFFIC_DESPAWN_DIST = 25;    // units behind player before removal
+const TRAFFIC_SPEED_BASE   = 22;    // oncoming speed (closing ~50 u/s total)
+const TRAFFIC_POOL_SIZE    = 14;
+const HIT_RADIUS           = 1.9;   // collision radius (cars ~2 wide at scale 1.3)
+const NEAR_MISS_RADIUS     = 4.8;   // lateral radius to score a near-miss
+const NEAR_MISS_WINDOW     = 4.0;   // Z window around player for detection
+
+// ── Flow constants ─────────────────────────────────────────────────────────────
+const FLOW_FILL_CLOSE      = 0.40;  // razor-close near-miss fill
+const FLOW_FILL_NORMAL     = 0.25;  // standard near-miss fill
+const FLOW_DRAIN_RATE      = 0.032; // passive drain per second
+const FLOW_BURST_DURATION  = 5.0;
 
 // ── Ribbon mesh builder ────────────────────────────────────────────────────────
 function buildRibbon(halfWL, halfWR, yOff, tex, tileLen) {
@@ -209,8 +214,6 @@ for (let i=0; i<55; i++) {
 }
 
 // ── Car definitions ────────────────────────────────────────────────────────────
-// All OBJ models live in assets/cars/{file}.obj + .mtl
-// Bounds: ~1.8 wide × ~1.1 tall × ~4.0 long; Y=0 is ground level
 const CARS = [
   { file:'NormalCar1',  name:'City Cruiser',  desc:'Balanced · Reliable',       accent:'#4a6eb5', scale:1.30, stats:{ speed:6, handling:7, armor:5 } },
   { file:'NormalCar2',  name:'Street Runner', desc:'Nimble · Quick · Responsive',accent:'#55bb33', scale:1.30, stats:{ speed:7, handling:8, armor:4 } },
@@ -222,9 +225,8 @@ const CARS = [
 ];
 
 // ── OBJ model loader & cache ───────────────────────────────────────────────────
-const modelCache = new Map();   // file → { obj: Object3D, wheels: WheelInfo }
+const modelCache = new Map();
 
-// Center a mesh's geometry at its bounding-box origin so rotation.x spins in place.
 function centerMeshGeometry(mesh) {
   const geo = mesh.geometry;
   if (!geo) return;
@@ -235,7 +237,6 @@ function centerMeshGeometry(mesh) {
   mesh.position.add(c);
 }
 
-// Walk an Object3D and return the three named wheel meshes.
 function findWheelMeshes(root) {
   const info = { back: null, frontLeft: null, frontRight: null };
   root.traverse(child => {
@@ -250,50 +251,34 @@ function findWheelMeshes(root) {
 
 function loadCarModel(carCfg) {
   if (modelCache.has(carCfg.file)) return Promise.resolve(modelCache.get(carCfg.file));
-
   return new Promise((resolve, reject) => {
     const mtlLoader = new MTLLoader();
     mtlLoader.setPath('assets/cars/');
-    mtlLoader.load(
-      carCfg.file + '.mtl',
-      mats => {
-        mats.preload();
-        const objLoader = new OBJLoader();
-        objLoader.setMaterials(mats);
-        objLoader.setPath('assets/cars/');
-        objLoader.load(
-          carCfg.file + '.obj',
-          obj => {
-            // Shadow + center wheel geometries for proper pivot rotation
-            obj.traverse(child => {
-              if (!child.isMesh) return;
-              child.castShadow = true;
-              child.receiveShadow = false;
-              const n = child.name.toLowerCase();
-              if (n.includes('wheel') || n.includes('front')) {
-                centerMeshGeometry(child);
-              }
-            });
-            // Set front wheel rotation order: steer (Y) then spin (X)
-            const wheels = findWheelMeshes(obj);
-            if (wheels.frontLeft)  wheels.frontLeft.rotation.order  = 'YXZ';
-            if (wheels.frontRight) wheels.frontRight.rotation.order = 'YXZ';
-
-            const result = { obj, wheels };
-            modelCache.set(carCfg.file, result);
-            resolve(result);
-          },
-          undefined,
-          reject
-        );
-      },
-      undefined,
-      reject
-    );
+    mtlLoader.load(carCfg.file + '.mtl', mats => {
+      mats.preload();
+      const objLoader = new OBJLoader();
+      objLoader.setMaterials(mats);
+      objLoader.setPath('assets/cars/');
+      objLoader.load(carCfg.file + '.obj', obj => {
+        obj.traverse(child => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          if (child.name.toLowerCase().includes('wheel') ||
+              child.name.toLowerCase().includes('front')) {
+            centerMeshGeometry(child);
+          }
+        });
+        const wheels = findWheelMeshes(obj);
+        if (wheels.frontLeft)  wheels.frontLeft.rotation.order  = 'YXZ';
+        if (wheels.frontRight) wheels.frontRight.rotation.order = 'YXZ';
+        const result = { obj, wheels };
+        modelCache.set(carCfg.file, result);
+        resolve(result);
+      }, undefined, reject);
+    }, undefined, reject);
   });
 }
 
-// Clone a cached model and re-locate the wheel mesh references in the clone.
 function cloneForScene(cached) {
   const group = cached.obj.clone(true);
   const wheels = findWheelMeshes(group);
@@ -330,13 +315,10 @@ let prevCarWheelInfo = { back: null, frontLeft: null, frontRight: null };
 function setPreviewCar(idx) {
   previewCarIdx = ((idx % CARS.length) + CARS.length) % CARS.length;
   const carCfg  = CARS[previewCarIdx];
-
-  // Update info text immediately
   document.getElementById('cs-name').textContent = carCfg.name;
   document.getElementById('cs-desc').textContent = carCfg.desc;
   document.querySelectorAll('.cs-dot').forEach((d,i) => d.classList.toggle('active', i === previewCarIdx));
 
-  // Stat bars
   const statsEl = document.getElementById('cs-stats');
   if (statsEl) {
     statsEl.innerHTML = [
@@ -353,7 +335,6 @@ function setPreviewCar(idx) {
     ).join('');
   }
 
-  // Show spinner, clear previous model
   const overlay = document.getElementById('cs-load-overlay');
   if (overlay) overlay.style.display = 'flex';
   while (prevCarGroup.children.length) prevCarGroup.remove(prevCarGroup.children[0]);
@@ -368,7 +349,6 @@ function setPreviewCar(idx) {
   }).catch(err => {
     console.warn('Car preview load failed:', err);
     if (overlay) overlay.style.display = 'none';
-    // Fallback placeholder
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(1.8, 0.9, 3.8),
       new THREE.MeshLambertMaterial({ color: parseInt(carCfg.accent.replace('#',''), 16) })
@@ -376,6 +356,153 @@ function setPreviewCar(idx) {
     box.position.y = 0.45;
     prevCarGroup.add(box);
   });
+}
+
+// ── Traffic system ─────────────────────────────────────────────────────────────
+// Cars that come toward the player — dodge or take damage.
+const TRAFFIC_CAR_FILES = ['NormalCar1', 'NormalCar2', 'Taxi', 'SUV', 'Cop'];
+const trafficCfgList    = CARS.filter(c => TRAFFIC_CAR_FILES.includes(c.file));
+
+// Build pool of empty slots (models populated async after load)
+const trafficPool = Array.from({ length: TRAFFIC_POOL_SIZE }, () => {
+  const group = new THREE.Group();
+  group.visible = false;
+  scene.add(group);
+  return {
+    group,
+    wheels:      { back: null, frontLeft: null, frontRight: null },
+    active:      false,
+    lane:        0,
+    worldZ:      0,
+    prevZ:       0,
+    judged:      false,
+    wheelRot:    0,
+    speed:       TRAFFIC_SPEED_BASE,
+    loadedFile:  null,
+  };
+});
+
+// Pre-load all traffic car models and assign to pool slots
+async function populateTrafficPool() {
+  for (let i = 0; i < TRAFFIC_POOL_SIZE; i++) {
+    const cfg = trafficCfgList[i % trafficCfgList.length];
+    try {
+      const cached = await loadCarModel(cfg);
+      const { group: model, wheels } = cloneForScene(cached);
+      model.scale.setScalar(cfg.scale);
+      model.rotation.y = Math.PI;   // face oncoming (+Z direction)
+      trafficPool[i].group.add(model);
+      trafficPool[i].wheels      = wheels;
+      trafficPool[i].loadedFile  = cfg.file;
+    } catch (_) {
+      // Coloured box fallback
+      const colors = [0xcc3322, 0x228844, 0x224488, 0xcc9922, 0x882288];
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(2.0, 0.9, 4.0),
+        new THREE.MeshLambertMaterial({ color: colors[i % colors.length] })
+      );
+      box.position.y = 0.45;
+      box.castShadow = true;
+      trafficPool[i].group.add(box);
+      trafficPool[i].loadedFile = 'fallback';
+    }
+  }
+}
+populateTrafficPool(); // fire-and-forget
+
+let trafficSpawnTimer = 0;
+
+function getFreeTrafficSlot() {
+  return trafficPool.find(t => !t.active) || null;
+}
+
+function spawnTraffic() {
+  const slot = getFreeTrafficSlot();
+  if (!slot || !slot.loadedFile) return; // pool not ready yet
+
+  // Avoid spawning in a lane that already has a car close ahead
+  const busyLanes = new Set();
+  for (const t of trafficPool) {
+    if (!t.active) continue;
+    const distAhead = car.z - t.worldZ; // positive = t is ahead of player
+    if (distAhead > -30 && distAhead < TRAFFIC_SPAWN_DIST * 0.8) {
+      busyLanes.add(t.lane);
+    }
+  }
+  const freeLanes = [0,1,2,3].filter(l => !busyLanes.has(l));
+  const lane = freeLanes.length > 0
+    ? freeLanes[Math.floor(Math.random() * freeLanes.length)]
+    : Math.floor(Math.random() * 4);
+
+  const spawnZ = car.z - TRAFFIC_SPAWN_DIST;
+  slot.lane     = lane;
+  slot.worldZ   = spawnZ;
+  slot.prevZ    = spawnZ;
+  slot.active   = true;
+  slot.judged   = false;
+  slot.wheelRot = 0;
+  slot.speed    = TRAFFIC_SPEED_BASE + (Math.random() - 0.5) * 10;
+
+  const worldX  = curveX(spawnZ) + LANE_OFFSETS[lane];
+  slot.group.position.set(worldX, 0, spawnZ);
+  slot.group.rotation.y = Math.atan2(-curveDX(spawnZ), 1);
+  slot.group.visible = true;
+}
+
+function clearAllTraffic() {
+  for (const t of trafficPool) {
+    t.active = false;
+    t.group.visible = false;
+  }
+}
+
+function updateTraffic(dt) {
+  for (const slot of trafficPool) {
+    if (!slot.active) continue;
+
+    slot.prevZ    = slot.worldZ;
+    slot.worldZ  += slot.speed * dt;   // moving toward player (+Z)
+
+    const worldX = curveX(slot.worldZ) + LANE_OFFSETS[slot.lane];
+    slot.group.position.set(worldX, 0, slot.worldZ);
+    slot.group.rotation.y = Math.atan2(-curveDX(slot.worldZ), 1);
+
+    // Wheel spin (wheels rotate opposite to player since car faces other way)
+    slot.wheelRot += slot.speed * dt * 2.2;
+    if (slot.wheels.back)       slot.wheels.back.rotation.x       = -slot.wheelRot;
+    if (slot.wheels.frontLeft)  slot.wheels.frontLeft.rotation.x  = -slot.wheelRot;
+    if (slot.wheels.frontRight) slot.wheels.frontRight.rotation.x = -slot.wheelRot;
+
+    // Despawn when it has passed well behind the player
+    if (slot.worldZ > car.z + TRAFFIC_DESPAWN_DIST) {
+      slot.active = false;
+      slot.group.visible = false;
+      continue;
+    }
+
+    if (slot.judged) continue;
+
+    const dx  = Math.abs(worldX - car.x);
+    const dz  = Math.abs(slot.worldZ - car.z);
+
+    // ── Collision ────────────────────────────────────────────────────────────
+    if (dx < HIT_RADIUS && dz < HIT_RADIUS * 1.6) {
+      slot.judged = true;
+      takeDamage();
+      continue;
+    }
+
+    // ── Near-miss window: traffic Z just crossed player Z ────────────────────
+    if (slot.prevZ < car.z && slot.worldZ >= car.z) {
+      slot.judged = true;
+      if (dx < NEAR_MISS_RADIUS) {
+        const razor = dx < HIT_RADIUS * 2.2;
+        nearMissCount++;
+        flowMeter = Math.min(1, flowMeter + (razor ? FLOW_FILL_CLOSE : FLOW_FILL_NORMAL));
+        showHitFeedback('close', razor ? 'RAZOR CLOSE!' : 'CLOSE!');
+      }
+    }
+  }
 }
 
 // ── Speed lines overlay ────────────────────────────────────────────────────────
@@ -408,7 +535,7 @@ function drawSpeedLines(intensity) {
   slCtx.restore();
 }
 
-// ── Web Audio ──────────────────────────────────────────────────────────────────
+// ── Web Audio (background atmosphere — beats still drive visual pulse) ─────────
 let audioCtx    = null, audioBuffer = null, audioSource = null;
 let masterGain  = null, musicGain   = null;
 let beatMap     = null, audioReady  = false;
@@ -437,8 +564,8 @@ async function initAudio() {
 }
 initAudio();
 
-// Preload first car in background so it's ready when user opens car select
-loadCarModel(CARS[0]).catch(() => {});
+// Preload all car models (player + traffic) in the background
+CARS.forEach(cfg => loadCarModel(cfg).catch(() => {}));
 
 function ensureAudioCtx() {
   if (audioCtx) return;
@@ -466,215 +593,35 @@ function stopSong() {
 }
 function onBeat(idx) { beatPulse = idx % 4 === 0 ? 1.0 : 0.72; }
 
-// ── Note orb system ────────────────────────────────────────────────────────────
-let noteWorldZ = [];
+// ── Flow meter ─────────────────────────────────────────────────────────────────
+let flowMeter      = 0;
+let flowBurstActive = false;
+let flowBurstTimer  = 0;
 
-function prepareNotes() {
-  noteWorldZ = beatMap ? beatMap.notes.map(n => -CRUISE_SPD * n.time) : [];
+const _flowFill = document.getElementById('hud-flow-fill');
+const _flowWrap = document.getElementById('hud-flow-wrap');
+
+function triggerFlowBurst() {
+  flowBurstActive = true;
+  flowBurstTimer  = FLOW_BURST_DURATION;
+  flowMeter       = 0;
+  flowBurstCount++;
+  showHitFeedback('burst', '⚡ FLOW BURST');
+  if (_flowWrap) _flowWrap.classList.add('burst');
 }
 
-const _orbSphereGeo = new THREE.SphereGeometry(0.52, 9, 6);
-const _orbOuterGeo  = new THREE.SphereGeometry(0.82, 9, 6);
-const _orbRingGeo   = new THREE.RingGeometry(0.55, 1.15, 22);
-
-function makeOrb() {
-  const group    = new THREE.Group();
-  const innerMat = new THREE.MeshBasicMaterial({ color:0xff44ff, transparent:true });
-  const outerMat = new THREE.MeshBasicMaterial({ color:0xcc00ff, transparent:true, opacity:0.36, depthWrite:false });
-  const ringMat  = new THREE.MeshBasicMaterial({ color:0xff44ff, transparent:true, opacity:0.50, side:THREE.DoubleSide, depthWrite:false });
-  const inner = new THREE.Mesh(_orbSphereGeo, innerMat); inner.position.y = 1.25;
-  const outer = new THREE.Mesh(_orbOuterGeo,  outerMat); outer.position.y = 1.25;
-  const ring  = new THREE.Mesh(_orbRingGeo,   ringMat);  ring.rotation.x = -Math.PI/2; ring.position.y = 0.015;
-  group.add(inner, outer, ring); group.visible = false; scene.add(group);
-  return { group, inner, outer, ring, innerMat, outerMat, ringMat,
-           noteIdx:-1, judged:false, state:'done', stateTimer:0, phase:Math.random()*Math.PI*2 };
-}
-
-const orbPool  = Array.from({ length: ORB_POOL_SIZE }, makeOrb);
-const liveOrbs = new Set();
-let   spawnIdx = 0;
-
-function getFreeOrb() { for (const o of orbPool) if (o.state === 'done') return o; return null; }
-
-function spawnOrb(noteIdx) {
-  const orb  = getFreeOrb(); if (!orb) return;
-  const note = beatMap.notes[noteIdx];
-  const nz   = noteWorldZ[noteIdx];
-  const nx   = curveX(nz) + LANE_OFFSETS[note.lane - 1];
-  const th   = beatMap.theme;
-  orb.innerMat.color.set(th.noteColor); orb.outerMat.color.set(th.noteGlow); orb.ringMat.color.set(th.noteColor);
-  orb.innerMat.opacity = 1; orb.outerMat.opacity = 0.36; orb.ringMat.opacity = 0.50;
-  orb.group.position.set(nx, 0, nz); orb.group.scale.setScalar(1); orb.group.visible = true;
-  orb.noteIdx = noteIdx; orb.judged = false; orb.state = 'active'; orb.stateTimer = 0;
-  liveOrbs.add(orb);
-}
-
-function despawnOrb(orb) {
-  orb.group.visible = false; orb.state = 'done'; orb.noteIdx = -1; liveOrbs.delete(orb);
-}
-
-function judgeNote(orb, result) {
-  if (orb.judged) return;
-  orb.judged = true; orb.stateTimer = 0;
-  if (result === 'perfect' || result === 'good') {
-    const mult = Math.min(8, 1 + Math.floor(combo / 4));
-    score += (result === 'perfect' ? 300 : 100) * mult;
-    combo++; maxCombo = Math.max(maxCombo, combo);
-    notesHit++;
-    showHitFeedback(result, result === 'perfect' ? 'PERFECT' : 'GOOD');
-    orb.state = 'hit';
+function updateFlowMeter(dt) {
+  if (flowBurstActive) {
+    flowBurstTimer -= dt;
+    if (flowBurstTimer <= 0) {
+      flowBurstActive = false;
+      if (_flowWrap) _flowWrap.classList.remove('burst');
+    }
+    if (_flowFill) _flowFill.style.width = '100%';
   } else {
-    combo = 0; notesMissed++;
-    showHitFeedback('miss', 'MISS');
-    orb.state = 'miss';
-  }
-  updateScore();
-}
-
-function clearAllOrbs() {
-  for (const orb of [...liveOrbs]) despawnOrb(orb);
-  spawnIdx = 0;
-}
-
-function updateOrbs(dt) {
-  if (!beatMap?.notes?.length) return;
-  const t = performance.now() / 1000;
-  while (spawnIdx < beatMap.notes.length) {
-    const note = beatMap.notes[spawnIdx];
-    if (note.time - songTime > ORB_SPAWN_AHEAD) break;
-    if (note.time - songTime > -MISS_TIMEOUT) spawnOrb(spawnIdx);
-    spawnIdx++;
-  }
-  const toRemove = [];
-  for (const orb of liveOrbs) {
-    const note      = beatMap.notes[orb.noteIdx];
-    const timeDelta = songTime - note.time;
-    if (orb.state === 'active') {
-      const bob = Math.sin(t * 3.2 + orb.phase) * 0.18;
-      orb.inner.position.y = 1.25 + bob; orb.outer.position.y = 1.25 + bob;
-      const ahead = -timeDelta;
-      orb.ring.scale.setScalar(ahead > 0 ? 0.75 + Math.min(1, ahead/ORB_SPAWN_AHEAD)*2.25 : 0.75);
-      orb.ringMat.opacity  = ahead > 0 ? 0.18 + (1-Math.min(1,ahead/ORB_SPAWN_AHEAD))*0.42 : 0.60;
-      orb.outerMat.opacity = 0.28 + beatPulse * 0.22;
-      if (!orb.judged) {
-        if      (Math.abs(timeDelta) <= HIT_WINDOW && car.lane === note.lane - 1)
-          judgeNote(orb, Math.abs(timeDelta) <= PERFECT_WINDOW ? 'perfect' : 'good');
-        else if (timeDelta > MISS_TIMEOUT)
-          judgeNote(orb, 'miss');
-      }
-    } else if (orb.state === 'hit') {
-      orb.stateTimer += dt;
-      const frac = Math.min(1, orb.stateTimer / 0.28);
-      orb.group.scale.setScalar(1 + frac * 0.9);
-      orb.innerMat.opacity = 1 - frac; orb.outerMat.opacity = (1-frac)*0.36; orb.ringMat.opacity = (1-frac)*0.55;
-      if (frac >= 1) toRemove.push(orb);
-    } else if (orb.state === 'miss') {
-      orb.stateTimer += dt;
-      const frac = Math.min(1, orb.stateTimer / 0.30);
-      orb.innerMat.color.set(frac < 0.45 ? '#ff3333' : beatMap.theme.noteColor);
-      orb.innerMat.opacity = 1-frac; orb.outerMat.opacity = (1-frac)*0.36;
-      orb.ringMat.opacity  = (1-frac)*0.55; orb.group.scale.setScalar(1-frac*0.55);
-      if (frac >= 1) toRemove.push(orb);
-    }
-  }
-  for (const orb of toRemove) despawnOrb(orb);
-}
-
-// ── Hazard system ──────────────────────────────────────────────────────────────
-function buildHazardMesh(type) {
-  const g = new THREE.Group();
-  if (type === 'spike_strip') {
-    const base = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.13, 0.90), new THREE.MeshLambertMaterial({ color: 0x888899 }));
-    base.position.y = 0.065; base.castShadow = true; g.add(base);
-    const stripeMat = new THREE.MeshLambertMaterial({ color: 0xffcc00, emissive: 0x886600, emissiveIntensity: 0.4 });
-    for (const xi of [-1.4, -0.4, 0.4, 1.4]) {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.15, 0.92), stripeMat);
-      s.position.set(xi, 0.075, 0); g.add(s);
-    }
-    const coneMat = new THREE.MeshLambertMaterial({ color: 0xff6600, emissive: 0x882200, emissiveIntensity: 0.3 });
-    for (const xi of [-2.4, 2.4]) {
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.65, 6), coneMat);
-      cone.position.set(xi, 0.325, 0); g.add(cone);
-    }
-    g.add(Object.assign(new THREE.PointLight(0xff8800, 3.5, 9), { position: new THREE.Vector3(0, 1.8, 0) }));
-  } else if (type === 'oil_slick') {
-    const poolMat = new THREE.MeshLambertMaterial({ color: 0x110011, emissive: 0x550055, emissiveIntensity: 0.7, transparent: true, opacity: 0.92, depthWrite: false });
-    const pool = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.055, 16), poolMat);
-    pool.position.y = 0.028; g.add(pool);
-    const shimMat = new THREE.MeshBasicMaterial({ color: 0xcc44ff, transparent: true, opacity: 0.50, depthWrite: false });
-    const shim = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.04, 14), shimMat);
-    shim.position.y = 0.04; g.add(shim);
-    g.add(Object.assign(new THREE.PointLight(0x9900cc, 3, 7), { position: new THREE.Vector3(0, 1.2, 0) }));
-  } else if (type === 'concrete_barrier') {
-    const blockMat = new THREE.MeshLambertMaterial({ color: 0xb8b8b8 });
-    const block = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.65, 0.95), blockMat);
-    block.position.y = 0.825; block.castShadow = true; g.add(block);
-    const stripeMat = new THREE.MeshLambertMaterial({ color: 0xdd1111, emissive: 0x880000, emissiveIntensity: 0.35 });
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(3.85, 0.30, 0.98), stripeMat);
-    stripe.position.y = 0.72; g.add(stripe);
-    const top = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.12, 0.95), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
-    top.position.y = 1.71; g.add(top);
-    g.add(Object.assign(new THREE.PointLight(0xff3300, 4, 10), { position: new THREE.Vector3(0, 2.6, 0) }));
-  }
-  return g;
-}
-
-const hazardObjects = [];
-let hazardSpawnIdx  = 0;
-
-function prepareHazards() {
-  for (const h of hazardObjects) scene.remove(h.group);
-  hazardObjects.length = 0;
-  hazardSpawnIdx = 0;
-  if (!beatMap?.hazards?.length) return;
-  for (let i = 0; i < beatMap.hazards.length; i++) {
-    const h  = beatMap.hazards[i];
-    const nz = -CRUISE_SPD * h.time;
-    const nx = curveX(nz) + LANE_OFFSETS[h.lane - 1];
-    const mesh = buildHazardMesh(h.type);
-    mesh.position.set(nx, 0, nz);
-    mesh.rotation.y = Math.atan2(-curveDX(nz), 1);
-    mesh.visible = false;
-    scene.add(mesh);
-    hazardObjects.push({ group: mesh, hazardIdx: i, active: false, judged: false, stateTimer: 0 });
-  }
-}
-
-function clearAllHazards() {
-  for (const h of hazardObjects) { h.group.visible = false; h.active = false; h.judged = false; h.stateTimer = 0; }
-  hazardSpawnIdx = 0;
-}
-
-function updateHazards(dt) {
-  if (!beatMap?.hazards?.length) return;
-  const hazards = beatMap.hazards;
-  while (hazardSpawnIdx < hazards.length) {
-    const h = hazards[hazardSpawnIdx];
-    if (h.time - songTime > HAZARD_SPAWN_AHEAD) break;
-    if (h.time - songTime > -HAZARD_HIT_WINDOW) {
-      hazardObjects[hazardSpawnIdx].active  = true;
-      hazardObjects[hazardSpawnIdx].group.visible = true;
-    }
-    hazardSpawnIdx++;
-  }
-  for (const hobj of hazardObjects) {
-    if (!hobj.active) continue;
-    const h         = hazards[hobj.hazardIdx];
-    const timeDelta = songTime - h.time;
-    if (!hobj.judged && Math.abs(timeDelta) <= HAZARD_HIT_WINDOW && car.lane === h.lane - 1) {
-      hobj.judged     = true;
-      hobj.stateTimer = 0;
-      takeDamage();
-    }
-    if (timeDelta > HAZARD_HIT_WINDOW + 0.25) {
-      hobj.judged = true;
-      hobj.stateTimer += dt;
-      if (hobj.stateTimer > 0.4) { hobj.active = false; hobj.group.visible = false; }
-    }
-    if (h.type === 'oil_slick' && hobj.group.children[1]) {
-      const t = performance.now() / 1000;
-      hobj.group.children[1].scale.setScalar(0.85 + Math.sin(t * 2.8 + hobj.hazardIdx) * 0.18);
-    }
+    flowMeter = Math.max(0, flowMeter - FLOW_DRAIN_RATE * dt);
+    if (flowMeter >= 1.0) triggerFlowBurst();
+    if (_flowFill) _flowFill.style.width = (flowMeter * 100).toFixed(1) + '%';
   }
 }
 
@@ -686,8 +633,9 @@ const damageFlash = document.getElementById('damage-flash');
 let damageFlashTimer = 0;
 
 function takeDamage() {
-  if (gameOverPending) return;
+  if (gameOverPending || flowBurstActive) return; // invincible during burst
   hp = Math.max(0, hp - 0.5);
+  collisionCount++;
   updateHearts();
   damageFlash.style.background = 'rgba(220,20,20,0.50)';
   damageFlashTimer = 0.40;
@@ -772,13 +720,16 @@ const STATE = {
   PLAYING:    'playing',
   GAME_OVER:  'game-over',
 };
-let gameState   = STATE.MENU;
-let selectedCar = 0;
-let hp = 3.0, score = 0, combo = 0, maxCombo = 0;
-let notesHit = 0, notesMissed = 0;
+let gameState      = STATE.MENU;
+let selectedCar    = 0;
+let hp             = 3.0;
+let score          = 0;   // = distance in metres
+let nearMissCount  = 0;
+let flowBurstCount = 0;
+let collisionCount = 0;
 let menuTime = 0, redirecting = false;
 
-// ── DOM references (all structure is in index.html) ───────────────────────────
+// ── DOM references ────────────────────────────────────────────────────────────
 const hud             = document.getElementById('hud');
 const beatBar         = document.getElementById('beat-bar');
 const hitFlash        = document.getElementById('hit-flash');
@@ -803,14 +754,16 @@ function updateHearts() {
     el.textContent = i<full+half ? '♥' : '♡';
   });
 }
+
 function updateScore() {
-  document.getElementById('hud-score').textContent = score.toLocaleString();
-  document.getElementById('hud-combo').textContent = combo > 1 ? `× ${combo} COMBO` : '';
+  score = Math.max(0, -car.z);
+  document.getElementById('hud-score').textContent = (score | 0).toLocaleString() + ' m';
 }
+
 function showHitFeedback(type, text) {
   hitFlash.textContent = text;
   hitFlash.className   = `show ${type}`;
-  hitFlashTimer        = 0.62;
+  hitFlashTimer        = type === 'burst' ? 1.2 : 0.62;
 }
 
 // ── State machine ──────────────────────────────────────────────────────────────
@@ -827,7 +780,6 @@ function setState(s) {
   const prev = gameState;
   gameState  = s;
 
-  // ── Render quality: high for gameplay, lightweight for menus ──────────────
   if (s === STATE.PLAYING && prev !== STATE.PLAYING) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -836,32 +788,35 @@ function setState(s) {
     renderer.shadowMap.enabled = false;
   }
 
-  // Show the correct screen, hide all others
   Object.values(SCREEN_MAP).forEach(el => el.classList.add('hidden'));
   if (SCREEN_MAP[s]) SCREEN_MAP[s].classList.remove('hidden');
   hud.classList.toggle('hidden', s !== STATE.PLAYING);
 
-  // Entering car select: load/refresh preview
   if (s === STATE.CAR_SELECT) {
     previewAngle = 0;
     setPreviewCar(previewCarIdx);
   }
 
-  // Clean up when leaving gameplay
   if (prev === STATE.PLAYING && s !== STATE.PLAYING) {
-    stopSong(); clearAllOrbs(); clearAllHazards();
+    stopSong();
+    clearAllTraffic();
     damageFlash.style.background = 'rgba(220,20,20,0)';
+    if (_flowWrap) _flowWrap.classList.remove('burst');
     skyLerpTop.set(0xf5a060); skyLerpBot.set(0x5c8de0);
     skyLerpFog.set(0xf0a060); skyLerpAmb.set(0xffd8a0); skyLerpAmbInt = 2.2;
   }
 
-  // Initialise gameplay
   if (s === STATE.PLAYING) {
-    hp=3.0; score=0; combo=0; maxCombo=0; notesHit=0; notesMissed=0;
+    // ── Reset run stats ──────────────────────────────────────────────────────
+    hp = 3.0; score = 0;
+    nearMissCount = 0; flowBurstCount = 0; collisionCount = 0;
+    flowMeter = 0; flowBurstActive = false; flowBurstTimer = 0;
+    if (_flowWrap) _flowWrap.classList.remove('burst');
     updateHearts(); updateScore(); updateLanePips();
     resetCar(); redirecting = false;
+    trafficSpawnTimer = 1.2;  // first car after 1.2 s
 
-    // Apply the selected car model (cached from car select preview)
+    // ── Apply player car model ───────────────────────────────────────────────
     while (carGroup.children.length) carGroup.remove(carGroup.children[0]);
     carWheelInfo = { back: null, frontLeft: null, frontRight: null };
 
@@ -872,12 +827,10 @@ function setState(s) {
       carGroup.add(group);
       carWheelInfo = wheels;
     };
-
     const cachedCar = modelCache.get(CARS[selectedCar].file);
     if (cachedCar) {
       applyCarModel(cachedCar);
     } else {
-      // Fallback box while model loads (shouldn't happen after car select)
       const placeholder = new THREE.Mesh(
         new THREE.BoxGeometry(2.2, 0.85, 4.2),
         new THREE.MeshLambertMaterial({ color: parseInt(CARS[selectedCar].accent.replace('#',''), 16) })
@@ -887,22 +840,20 @@ function setState(s) {
       loadCarModel(CARS[selectedCar]).then(applyCarModel).catch(() => {});
     }
 
+    // ── Sky theme + music ────────────────────────────────────────────────────
     if (beatMap?.theme) {
       const t = beatMap.theme;
       skyLerpTop.set(t.skyTop); skyLerpBot.set(t.skyBot);
       skyLerpFog.set(t.fog);   skyLerpAmb.set(t.accent); skyLerpAmbInt = 1.8;
     }
-    prepareNotes(); clearAllOrbs();
-    prepareHazards();
     startSong();
   }
 
-  // Populate game over stats
   if (s === STATE.GAME_OVER) {
-    document.getElementById('go-score').textContent = score.toLocaleString();
-    document.getElementById('go-combo').textContent = `×${maxCombo}`;
-    document.getElementById('go-hits' ).textContent = notesHit;
-    document.getElementById('go-miss' ).textContent = notesMissed;
+    document.getElementById('go-score').textContent = (Math.max(0,-car.z)|0).toLocaleString() + ' m';
+    document.getElementById('go-combo').textContent = nearMissCount;
+    document.getElementById('go-hits' ).textContent = flowBurstCount;
+    document.getElementById('go-miss' ).textContent = collisionCount;
   }
 }
 
@@ -970,13 +921,12 @@ function lerpSky(dt) {
 function updatePlaying(dt) {
   if (gameOverPending) return;
 
+  // ── Audio beat tracking (drives visual ambiance) ─────────────────────────
   if (audioCtx && audioSource) songTime = audioCtx.currentTime - songStartTime;
-
   if (beatMap) {
     const beats = beatMap.beats;
     while (nextBeatIdx < beats.length && beats[nextBeatIdx] <= songTime) onBeat(nextBeatIdx++);
   }
-
   beatPulse *= Math.pow(0.001, dt);
 
   if (beatPulse > 0.05) {
@@ -991,15 +941,25 @@ function updatePlaying(dt) {
   beatLight.intensity = beatPulse * 5.5;
   if (beatMap?.theme?.accent) beatLight.color.set(beatMap.theme.accent);
 
-  updateOrbs(dt);
-  updateHazards(dt);
-
   if (damageFlashTimer > 0) {
     damageFlashTimer -= dt;
     if (damageFlashTimer <= 0) damageFlash.style.background = 'rgba(220,20,20,0)';
   }
 
+  // ── Traffic ──────────────────────────────────────────────────────────────
+  trafficSpawnTimer -= dt;
+  if (trafficSpawnTimer <= 0) {
+    spawnTraffic();
+    trafficSpawnTimer = 1.6 + Math.random() * 1.4; // 1.6–3.0 s between spawns
+  }
+  updateTraffic(dt);
+
+  // ── Flow meter ────────────────────────────────────────────────────────────
+  updateFlowMeter(dt);
+
+  // ── Car movement ─────────────────────────────────────────────────────────
   car.z -= CRUISE_SPD * dt;
+  updateScore();
 
   const targetLaneX = LANE_OFFSETS[car.lane];
   const prevLaneX   = car.laneX;
@@ -1025,22 +985,14 @@ function updatePlaying(dt) {
   car.wheelRot += CRUISE_SPD * dt * 2.2;
   const steerVis = Math.max(-0.38, Math.min(0.38, lateralVel * 0.038));
 
-  // Animate OBJ wheel meshes
-  if (carWheelInfo.back) {
-    carWheelInfo.back.rotation.x = car.wheelRot;
-  }
-  if (carWheelInfo.frontLeft) {
-    carWheelInfo.frontLeft.rotation.y = steerVis;
-    carWheelInfo.frontLeft.rotation.x = car.wheelRot;
-  }
-  if (carWheelInfo.frontRight) {
-    carWheelInfo.frontRight.rotation.y = steerVis;
-    carWheelInfo.frontRight.rotation.x = car.wheelRot;
-  }
+  if (carWheelInfo.back)       carWheelInfo.back.rotation.x       = car.wheelRot;
+  if (carWheelInfo.frontLeft)  { carWheelInfo.frontLeft.rotation.y  = steerVis; carWheelInfo.frontLeft.rotation.x  = car.wheelRot; }
+  if (carWheelInfo.frontRight) { carWheelInfo.frontRight.rotation.y = steerVis; carWheelInfo.frontRight.rotation.x = car.wheelRot; }
 
   carGroup.position.set(car.x, car.suspY, car.z);
   carGroup.rotation.y = car.heading; carGroup.rotation.x = car.pitch; carGroup.rotation.z = car.lean;
 
+  // ── Camera ───────────────────────────────────────────────────────────────
   camera.fov = 72; camera.updateProjectionMatrix();
   const pb = 9.2;
   let cx = car.x - Math.sin(car.heading)*pb;
@@ -1054,7 +1006,9 @@ function updatePlaying(dt) {
   camera.position.set(cx, cy, car.z + Math.cos(car.heading)*pb);
   camera.lookAt(car.x + Math.sin(car.heading)*8, 1.4, car.z - Math.cos(car.heading)*8);
 
-  drawSpeedLines(0.28 + beatPulse * 0.50);
+  // ── Speed lines — intensify during flow burst ─────────────────────────────
+  const slIntensity = flowBurstActive ? 0.65 + beatPulse*0.3 : 0.28 + beatPulse*0.50;
+  drawSpeedLines(slIntensity);
 
   if (hitFlashTimer > 0) { hitFlashTimer -= dt; if (hitFlashTimer <= 0) hitFlash.className = ''; }
 
@@ -1079,7 +1033,6 @@ function loop(now) {
   if (gameState === STATE.CAR_SELECT) {
     previewAngle += dt * 0.7;
     prevCarGroup.rotation.y = previewAngle;
-    // Spin preview wheels
     const wSpin = dt * 2.5;
     if (prevCarWheelInfo.back)       prevCarWheelInfo.back.rotation.x      += wSpin;
     if (prevCarWheelInfo.frontLeft)  prevCarWheelInfo.frontLeft.rotation.x  += wSpin;
@@ -1087,7 +1040,6 @@ function loop(now) {
     prevRenderer.render(prevScene, prevCamera);
   }
 
-  // Gameplay runs uncapped; menus are capped at ~30 fps
   if (gameState === STATE.PLAYING) {
     requestAnimationFrame(loop);
   } else {

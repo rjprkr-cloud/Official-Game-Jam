@@ -533,6 +533,8 @@ body {
 #hit-flash.perfect { color: var(--gold);   text-shadow: 0 0 16px var(--gold); }
 #hit-flash.good    { color: var(--accent3); text-shadow: 0 0 14px var(--accent3); }
 #hit-flash.miss    { color: #ff5555;        text-shadow: 0 0 12px #ff2222; }
+#hit-flash.close   { color: var(--accent3); text-shadow: 0 0 18px var(--accent3), 0 0 32px rgba(79,240,255,0.5); }
+#hit-flash.burst   { color: var(--gold);    text-shadow: 0 0 22px var(--gold), 0 0 44px rgba(255,204,0,0.6); font-size: 2rem; }
 
 /* ── Game over screen ────────────────────────────────────────────────────── */
 .go-title {
@@ -646,6 +648,59 @@ body {
   background: rgba(255,255,255,0.12);
   border: 1px solid rgba(255,255,255,0.18);
   transition: background 0.1s, box-shadow 0.1s, border-color 0.1s;
+}
+
+/* ── Flow meter ──────────────────────────────────────────────────────────── */
+#hud-flow-wrap {
+  position: absolute;
+  bottom: 2.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  pointer-events: none;
+}
+
+#hud-flow-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent3);
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+
+#hud-flow-track {
+  width: 130px;
+  height: 5px;
+  background: rgba(79,240,255,0.09);
+  border: 1px solid rgba(79,240,255,0.18);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#hud-flow-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent3);
+  border-radius: 3px;
+  transition: width 0.08s ease;
+  box-shadow: 0 0 7px var(--accent3);
+}
+
+/* Burst state — gold glow + pulse */
+#hud-flow-wrap.burst #hud-flow-label { color: var(--gold); opacity: 1; }
+#hud-flow-wrap.burst #hud-flow-track { border-color: rgba(255,204,0,0.45); }
+#hud-flow-wrap.burst #hud-flow-fill  {
+  background: var(--gold);
+  box-shadow: 0 0 12px var(--gold);
+  animation: flowPulse 0.35s ease-in-out infinite alternate;
+}
+
+@keyframes flowPulse {
+  from { box-shadow: 0 0 7px var(--gold); }
+  to   { box-shadow: 0 0 22px var(--gold), 0 0 36px rgba(255,204,0,0.4); }
 }
 
 .lane-pip.active {

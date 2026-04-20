@@ -24,18 +24,24 @@
       <span class="heart full" id="h3">♥</span>
     </div>
     <div id="hud-score-wrap">
-      <div id="hud-score">0</div>
+      <div id="hud-score">0 m</div>
       <div id="hud-combo"></div>
     </div>
     <div id="hud-username"></div>
     <div id="hud-speedo">62 MPH</div>
+    <div id="hud-flow-wrap">
+      <span id="hud-flow-label">FLOW</span>
+      <div id="hud-flow-track">
+        <div id="hud-flow-fill"></div>
+      </div>
+    </div>
     <div id="hud-lanes">
       <div class="lane-pip"        id="lp0"></div>
       <div class="lane-pip active" id="lp1"></div>
       <div class="lane-pip"        id="lp2"></div>
       <div class="lane-pip"        id="lp3"></div>
     </div>
-    <div id="hud-hint">← → switch lanes</div>
+    <div id="hud-hint">← → dodge traffic</div>
   </div>
 
   <!-- ── Main Menu ─────────────────────────────────────────────────── -->
@@ -50,7 +56,7 @@
       <button class="menu-btn" id="btn-settings">Settings</button>
       <button class="menu-btn" id="btn-exit">Exit</button>
     </nav>
-    <p class="menu-footer">← → switch lanes &nbsp;·&nbsp; rhythm race</p>
+    <p class="menu-footer">← → dodge traffic &nbsp;·&nbsp; build flow &nbsp;·&nbsp; survive</p>
   </div>
 
   <!-- ── Settings Screen ───────────────────────────────────────────── -->
@@ -128,10 +134,10 @@
   <div id="screen-game-over" class="screen hidden">
     <div class="go-title">Game Over</div>
     <ul class="go-stats">
-      <li>Score        <span id="go-score">0</span></li>
-      <li>Max Combo    <span id="go-combo">×0</span></li>
-      <li>Notes Hit    <span id="go-hits">0</span></li>
-      <li>Notes Missed <span id="go-miss">0</span></li>
+      <li>Distance     <span id="go-score">0 m</span></li>
+      <li>Near Misses  <span id="go-combo">0</span></li>
+      <li>Flow Bursts  <span id="go-hits">0</span></li>
+      <li>Hits Taken   <span id="go-miss">0</span></li>
     </ul>
     <button class="menu-btn" id="go-menu">Back to Menu</button>
   </div>
