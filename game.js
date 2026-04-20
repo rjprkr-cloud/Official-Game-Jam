@@ -6,8 +6,8 @@
 
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
-canvas.width  = 480;
-canvas.height = 320;
+canvas.width  = 270;
+canvas.height = 480;
 const W = canvas.width, H = canvas.height;
 ctx.imageSmoothingEnabled = false;
 
@@ -25,8 +25,8 @@ if (typeof Portal !== 'undefined') {
 }
 
 // ── Layout ─────────────────────────────────────────────────────────
-const STATUS_H  = 18;
-const NAV_H     = 26;
+const STATUS_H  = 20;
+const NAV_H     = 30;
 const CONTENT_Y = STATUS_H;
 
 // ── Screens ────────────────────────────────────────────────────────
@@ -540,7 +540,7 @@ function refreshTone(key) {
 }
 
 // ── App grid ───────────────────────────────────────────────────────
-const APP_SZ = 54;
+const APP_SZ = 52;
 const APP_GRID = (function(){
   const list = [
     { id:'messages', label:'Messages', col:'#3c8c4a', icon:'💬' },
@@ -549,11 +549,19 @@ const APP_GRID = (function(){
     { id:'calls',    label:'Calls',    col:'#2878c0', icon:'📞'  },
     { id:'settings', label:'Settings', col:'#607080', icon:'⚙️'  },
   ];
-  const cols=4, gX=14;
+  const cols=4, gX=10, gY=22, labelH=14;
+  const rowH = APP_SZ + gY;
+  const rows = Math.ceil(list.length / cols);
   const totalW = cols*APP_SZ+(cols-1)*gX;
+  const totalH = rows*(APP_SZ+labelH)+(rows-1)*(gY-labelH);
   const sX = Math.round((W-totalW)/2);
-  const sY = STATUS_H+24;
-  return list.map((a,i)=>({ ...a, x:sX+(i%cols)*(APP_SZ+gX), y:sY+Math.floor(i/cols)*(APP_SZ+20) }));
+  // Vertically centre the grid in content area
+  const contentH = H - STATUS_H - NAV_H;
+  const sY = STATUS_H + Math.round((contentH - totalH) / 2);
+  return list.map((a,i)=>({ ...a,
+    x: sX+(i%cols)*(APP_SZ+gX),
+    y: sY+Math.floor(i/cols)*rowH,
+  }));
 })();
 
 const SETTING_ROWS = [
@@ -591,7 +599,7 @@ function onClickLock() { screen=SCR.HOME; }
 
 function onClickHome(mx,my) {
   for (const app of APP_GRID) {
-    if (mx>=app.x && mx<=app.x+APP_SZ && my>=app.y && my<=app.y+APP_SZ+20) {
+    if (mx>=app.x && mx<=app.x+APP_SZ && my>=app.y && my<=app.y+APP_SZ+14) {
       switch(app.id) {
         case 'messages': screen=SCR.MESSAGES; break;
         case 'notes':    screen=SCR.NOTES;    break;
@@ -626,19 +634,17 @@ function onClickThread(mx,my) {
 
 function onClickCalls(mx,my) {
   // Voicemail section tap
+  const vmRowY = STATUS_H+36+callLog.length*43+18;
   if (!callsVoicemailOpen) {
-    const vmY = STATUS_H+36+callLog.length*44+12;
-    if (my>=vmY && my<vmY+36) { callsVoicemailOpen=true; return; }
+    if (my>=vmRowY && my<vmRowY+36) { callsVoicemailOpen=true; return; }
   } else {
-    // Tap within voicemail detail to listen
-    const vmY = STATUS_H+36+callLog.length*44+12;
+    const vmY = vmRowY;
     const vm = voicemails[0];
     if (!vm.listened && my>=vmY && my<vmY+60) {
       vm.listened=true;
       flags.add('voicemail_listened');
     }
-    // Tap outside to close
-    if (my<vmY) callsVoicemailOpen=false;
+    if (my<vmRowY) callsVoicemailOpen=false;
   }
 }
 
@@ -744,19 +750,23 @@ function drawLock() {
   g.addColorStop(0,'#0c1520'); g.addColorStop(1,'#17082a');
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
   const now=new Date();
-  ctx.font='bold 56px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-  ctx.fillText(`${now.getHours()%12||12}:${String(now.getMinutes()).padStart(2,'0')}`,W/2,108);
+  // Notch pill
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  roundRect(W/2-18,6,36,8,4); ctx.fill();
+
+  ctx.font='bold 52px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.fillText(`${now.getHours()%12||12}:${String(now.getMinutes()).padStart(2,'0')}`,W/2,130);
   const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  ctx.font='10px monospace'; ctx.fillStyle='rgba(255,255,255,0.5)';
-  ctx.fillText(`${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`,W/2,126);
-  let cy=148;
-  for (const t of Object.values(threads).filter(t=>t.unread>0).slice(0,2)) {
+  ctx.font='9px monospace'; ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.fillText(`${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`,W/2,148);
+  let cy=170;
+  for (const t of Object.values(threads).filter(t=>t.unread>0).slice(0,3)) {
     const msg=t.messages.findLast(m=>!m.read)||t.messages[t.messages.length-1];
-    drawLockCard(W/2-140,cy,280,rel[t.contact]?.name||t.contact,msg?.text||''); cy+=58;
+    drawLockCard(8,cy,W-16,rel[t.contact]?.name||t.contact,msg?.text||''); cy+=62;
   }
-  ctx.font='8px monospace'; ctx.fillStyle='rgba(255,255,255,0.25)';
-  ctx.fillText('tap to unlock',W/2,H-16);
+  ctx.font='8px monospace'; ctx.fillStyle='rgba(255,255,255,0.22)';
+  ctx.fillText('tap to unlock',W/2,H-14);
 }
 
 function drawLockCard(x,y,w,sender,preview) {
@@ -767,7 +777,7 @@ function drawLockCard(x,y,w,sender,preview) {
   ctx.textAlign='left';
   ctx.font='bold 8px monospace'; ctx.fillStyle='#fff'; ctx.fillText(sender,x+44,y+20);
   ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.58)';
-  ctx.fillText(preview.length>38?preview.slice(0,37)+'…':preview,x+44,y+34);
+  ctx.fillText(preview.length>28?preview.slice(0,27)+'…':preview,x+44,y+34);
   ctx.font='6px monospace'; ctx.fillStyle='rgba(255,255,255,0.28)';
   ctx.textAlign='right'; ctx.fillText('now',x+w-8,y+20); ctx.textAlign='left';
 }
@@ -783,6 +793,9 @@ function drawHome() {
     g.addColorStop(0,'#0c1520'); g.addColorStop(1,'#17082a');
   }
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // Notch pill
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  roundRect(W/2-18,5,36,8,4); ctx.fill();
   for (const app of APP_GRID) drawAppIcon(app);
 }
 
@@ -828,7 +841,7 @@ function drawThreadRow(key,t,y) {
   ctx.font='8px monospace';
   ctx.fillStyle=t.unread>0?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.38)';
   const prev=last?(last.from==='me'?'You: '+last.text:last.text):'';
-  ctx.fillText(prev.length>42?prev.slice(0,41)+'…':prev,54,y+34);
+  ctx.fillText(prev.length>26?prev.slice(0,25)+'…':prev,54,y+34);
   if (last) {
     ctx.textAlign='right'; ctx.font='6px monospace';
     ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillText(last.time,W-10,y+18); ctx.textAlign='left';
@@ -864,7 +877,7 @@ function drawBubbles(t,top,bottom) {
   let y=bottom-2;
   for (let i=t.messages.length-1;i>=0;i--) {
     const msg=t.messages[i], isMe=msg.from==='me';
-    const maxBW=230,padX=9,padY=7;
+    const maxBW=190,padX=9,padY=7;
     const lines=wrapText(msg.text,maxBW-padX*2,'8px monospace');
     const bH=lines.length*12+padY*2;
     const bW=Math.min(maxBW,Math.ceil(longestLine(lines,'8px monospace'))+padX*2+4);

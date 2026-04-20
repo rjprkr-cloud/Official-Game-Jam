@@ -2,24 +2,43 @@
 
 html, body {
   width: 100%; height: 100%;
-  background: #150c22;
+  background: #0a0710;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
 
-canvas {
-  /* Logical size: 480×320 — displayed at 2× */
-  width: 960px;
-  height: 640px;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-  border: 2px solid #5a3880;
-  box-shadow: 0 0 40px #a070ff33, 0 0 80px #6030c011;
-  cursor: pointer;
+/* Phone body glow behind the canvas */
+body::before {
+  content: '';
+  position: fixed;
+  width: 300px; height: 560px;
+  background: #1e0e36;
+  border-radius: 44px;
+  box-shadow:
+    0 0 0 6px #2a1448,
+    0 0 0 8px #3a1a60,
+    0 0 60px #7040c044,
+    0 0 120px #4020a022;
+  pointer-events: none;
 }
 
-@media (max-height: 660px), (max-width: 980px) {
-  canvas { width: 480px; height: 320px; }
+canvas {
+  /* Logical size: 270×480 — portrait phone — displayed at 2× */
+  width: 540px;
+  height: 960px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border-radius: 36px;
+  border: 2px solid #4a2878;
+  box-shadow: 0 0 0 4px #1e0e36, 0 0 40px #8050cc33;
+  cursor: pointer;
+  position: relative;
+}
+
+@media (max-height: 1000px), (max-width: 560px) {
+  canvas        { width: 270px; height: 480px; border-radius: 18px; }
+  body::before  { width: 150px; height: 280px; border-radius: 22px;
+                  box-shadow: 0 0 0 3px #2a1448, 0 0 0 4px #3a1a60, 0 0 30px #7040c044; }
 }
