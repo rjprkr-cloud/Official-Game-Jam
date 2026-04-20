@@ -22,7 +22,9 @@ scene.fog    = new THREE.Fog(0x0d0d22, 55, 160);
 const camera = new THREE.PerspectiveCamera(72, W / H, 0.1, 220);
 
 // ── Portal Protocol ────────────────────────────────────────────────────────────
-const incoming = Portal.readPortalParams();
+const incoming = (typeof Portal !== 'undefined')
+  ? Portal.readPortalParams()
+  : { fromPortal:false, username:`guest-${Math.floor(Math.random()*9999)}`, color:'4ff0ff', speed:5, ref:null };
 let nextTarget = null;
 try {
   nextTarget = await Promise.race([
@@ -141,15 +143,12 @@ wireBtn('btn-exit',      () => setState(STATE.EXIT));
 wireBtn('settings-back', () => setState(STATE.MENU));
 wireBtn('exit-back',     () => setState(STATE.MENU));
 wireBtn('exit-go', () => {
-  if (nextTarget?.url) {
-    Portal.sendPlayerThroughPortal(nextTarget.url, {
+  const dest = nextTarget?.url ?? 'https://callumhyoung.github.io/gamejam/';
+  try {
+    Portal.sendPlayerThroughPortal(dest, {
       username: incoming.username, color: incoming.color, speed: incoming.speed,
     });
-  } else {
-    Portal.sendPlayerThroughPortal('https://callumhyoung.github.io/gamejam/', {
-      username: incoming.username, color: incoming.color, speed: incoming.speed,
-    });
-  }
+  } catch(_) { window.location.href = dest; }
 });
 
 document.getElementById('sl-master')?.addEventListener('input', e => {
@@ -950,8 +949,12 @@ let flowMeter      = 0;
 let flowBurstActive = false;
 let flowBurstTimer  = 0;
 
-const _flowFill = document.getElementById('hud-flow-fill');
-const _flowWrap = document.getElementById('hud-flow-wrap');
+const _flowFill  = document.getElementById('hud-flow-fill');
+const _flowWrap  = document.getElementById('hud-flow-wrap');
+const _speedo    = document.getElementById('hud-speedo');
+const _keyUp     = document.getElementById('key-up');
+const _keyLeft   = document.getElementById('key-left');
+const _keyRight  = document.getElementById('key-right');
 
 // ── Burst vignette overlay ─────────────────────────────────────────────────────
 const burstVignette = document.createElement('div');
@@ -1212,6 +1215,7 @@ function setState(s) {
   }
 
   if (s === STATE.GAME_OVER) {
+    nearMissStreak = 0;
     document.getElementById('go-score').textContent = (Math.max(0,-car.z)|0).toLocaleString() + ' m';
     document.getElementById('go-combo').textContent = nearMissCount;
     document.getElementById('go-hits' ).textContent = flowBurstCount;
@@ -1303,20 +1307,17 @@ function updatePlaying(dt) {
   const accelInput = keys['ArrowUp'] || keys['w'] || keys['W'];
   const leftInput  = keys['ArrowLeft']  || keys['a'] || keys['A'];
   const rightInput = keys['ArrowRight'] || keys['d'] || keys['D'];
-  const _ku = document.getElementById('key-up'),
-        _kl = document.getElementById('key-left'),
-        _kr = document.getElementById('key-right');
-  if (_ku) {
-    _ku.src = accelInput ? 'assets/keys/arrowup_pressed_paper.png'    : 'assets/keys/arrowup_paper.png';
-    _ku.classList.toggle('pressed', accelInput);
+  if (_keyUp) {
+    _keyUp.src = accelInput ? 'assets/keys/arrowup_pressed_paper.png'    : 'assets/keys/arrowup_paper.png';
+    _keyUp.classList.toggle('pressed', accelInput);
   }
-  if (_kl) {
-    _kl.src = leftInput  ? 'assets/keys/arrowleft_pressed_paper.png'  : 'assets/keys/arrowleft_paper.png';
-    _kl.classList.toggle('pressed', leftInput);
+  if (_keyLeft) {
+    _keyLeft.src = leftInput  ? 'assets/keys/arrowleft_pressed_paper.png'  : 'assets/keys/arrowleft_paper.png';
+    _keyLeft.classList.toggle('pressed', leftInput);
   }
-  if (_kr) {
-    _kr.src = rightInput ? 'assets/keys/arrowright_pressed_paper.png' : 'assets/keys/arrowright_paper.png';
-    _kr.classList.toggle('pressed', rightInput);
+  if (_keyRight) {
+    _keyRight.src = rightInput ? 'assets/keys/arrowright_pressed_paper.png' : 'assets/keys/arrowright_paper.png';
+    _keyRight.classList.toggle('pressed', rightInput);
   }
 
   const effectiveMaxSpd = MAX_SPD + upgradeVars.maxSpd;
@@ -1331,15 +1332,16 @@ function updatePlaying(dt) {
   updateScore();
 
   // Update speedo + colour ramp (blue → green → yellow → red)
-  const speedoEl  = document.getElementById('hud-speedo');
   const speedPct  = car.speed / (MAX_SPD + upgradeVars.maxSpd);
   const speedoCol = speedPct < 0.4 ? '#4ff0ff'
                   : speedPct < 0.7 ? '#88ff44'
                   : speedPct < 0.9 ? '#ffcc00'
                   :                  '#ff4444';
-  speedoEl.textContent  = `${(car.speed * 2.237) | 0} MPH`;
-  speedoEl.style.color  = speedoCol;
-  speedoEl.style.textShadow = `0 0 12px ${speedoCol}`;
+  if (_speedo) {
+    _speedo.textContent      = `${(car.speed * 2.237) | 0} MPH`;
+    _speedo.style.color      = speedoCol;
+    _speedo.style.textShadow = `0 0 12px ${speedoCol}`;
+  }
 
   // ── Checkpoint detection ──────────────────────────────────────────────────
   if (score >= nextCheckpoint) {
@@ -1414,14 +1416,13 @@ function loop(now) {
   if (gameState === STATE.PLAYING) {
     updatePlaying(dt);
   } else if (gameState === STATE.UPGRADE) {
-    // World frozen — only tick beat visuals so the scene stays alive
+    // World frozen — only tick beat pulse so lights stay alive
     beatPulse *= Math.pow(0.001, dt);
-    lerpSky(dt);
   } else {
     updateMenuCamera(dt);
   }
 
-  if (gameState !== STATE.UPGRADE) lerpSky(dt);
+  lerpSky(dt); // always run once per frame
   renderer.render(scene, camera);
 
   if (gameState === STATE.CAR_SELECT) {
