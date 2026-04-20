@@ -248,7 +248,7 @@ const ROAD_END     = -(ROAD_LEN - 25);
 const MAX_SPD      = 48;    // top speed (units/s)
 const ACCEL_RATE   = 30;    // units/s² when ↑ held
 const DECEL_RATE   = 20;    // units/s² when ↑ released
-const LANE_OFFSETS = [-6.75, -2.25, 2.25, 6.75];
+const LANE_OFFSETS = [-5.5, -1.84, 1.84, 5.5];   // tightened so cars clear the edge lines
 
 // ── Traffic constants ──────────────────────────────────────────────────────────
 const TRAFFIC_SPAWN_DIST   = 140;   // units ahead to spawn (reaction window)
@@ -343,7 +343,7 @@ function makeRoadTex() {
   cx.fillRect(8, 0, 4, ch); cx.fillRect(cw-12, 0, 4, ch);
   // Dashed center dividers (purple)
   cx.fillStyle = 'rgba(198,75,255,0.60)';
-  for (const tx of [64, 128, 192]) {
+  for (const tx of [76, 128, 180]) {  // match new lane boundaries at ±3.67 units
     for (let y=0; y<ch; y+=32) cx.fillRect(tx-2, y, 4, 20);
   }
   const tex = new THREE.CanvasTexture(cv);
