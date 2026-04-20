@@ -15,11 +15,12 @@ ctx.imageSmoothingEnabled = false;
 // ── Asset loading ──────────────────────────────────────────────────
 const IMG  = {};
 const SRCS = {
-  mochi:     'assets/Idle.png',         // 320×32  — 10 frames @ 32×32  (Mochi walk)
-  pochi:     'assets/FreeSprites.png',  // 256×435 — Pochi: sit/sad/sleep + items
-  box:       'assets/Box3.png',         // 128×32  — 4 frames @ 32×32  (cat in box)
-  furniture: 'assets/Furnitures.png',   // 512×512 — room furniture atlas
-  ui:        'assets/free.png',         // 256×128 — UI sheet (unused for now)
+  mochi:     'assets/Idle.png',            // 320×32  — 10 frames @ 32×32  (Mochi walk)
+  pochi:     'assets/FreeSprites.png',     // 256×435 — bowl sprite row (kept for bowl)
+  retro:     'assets/RetroCatsFree.png',   // 256×435 — primary cat art (sit/sad/sleep)
+  box:       'assets/Box3.png',            // 128×32  — 4 frames @ 32×32  (cat in box)
+  furniture: 'assets/Furnitures.png',      // 512×512 — room furniture atlas
+  ui:        'assets/free.png',            // 256×128 — CatUIFree: portrait, faces, buttons
 };
 let loadedCount = 0;
 for (const [key, src] of Object.entries(SRCS)) {
@@ -32,8 +33,8 @@ const TOTAL_ASSETS = Object.keys(SRCS).length;
 const allLoaded = () => loadedCount >= TOTAL_ASSETS;
 
 // ── Sprite sheet constants ─────────────────────────────────────────
-// FreeSprites.png (Pochi, 256×435)
-// Frame width = 256/4 = 64 px.  Row heights derived: 3 cat rows×64 + bowl 48 + items 195.
+// RetroCatsFree.png / FreeSprites.png share the same 256×435 layout:
+// Frame width = 256/4 = 64 px.  Row heights: 3 cat rows×64 + bowl 48 + items 195.
 const P = {
   FW:     64,
   SIT_Y:   0, SIT_H:  64,   // row 0  – sitting / idle   (4 frames)
@@ -41,6 +42,23 @@ const P = {
   SLP_Y: 128, SLP_H:  64,   // row 2  – sleeping         (4 frames)
   BWL_Y: 192, BWL_H:  48,   // row 3  – food bowls       (4 variants)
 };
+
+// ── free.png (CatUIFree, 256×128) sprite positions ─────────────────
+// Left section (x 0–90): cat portrait + mood faces + sleeping cat
+// Right section (x 92–256): button grid — 14×14 buttons, 16px pitch
+const UI_SRC = {
+  portrait:   { x:  2, y:  2, w: 36, h: 36 },   // large cat face
+  face_happy: { x:  2, y: 40, w: 28, h: 28 },   // small happy face
+  face_meh:   { x: 32, y: 40, w: 28, h: 28 },   // small neutral face
+  face_sad:   { x:  2, y: 70, w: 28, h: 28 },   // small sad face
+  sleep_cat:  { x: 34, y: 70, w: 54, h: 36 },   // sleeping white cat
+  // btn(col, row): x = 92 + col*16,  y = row*16,  w=14, h=14
+};
+function uiBtn(col, row) {
+  return { x: 92 + col * 16, y: row * 16, w: 14, h: 14 };
+}
+// Map each action to a button column (row 0 = normal, row 1 = active/lit)
+const BTN_ICON = { feed: 4, play: 0, pet: 5, sleep: 2 };
 
 // Furnitures.png atlas crops  (x, y, w, h) — tweak if visually off
 const FURN = {
@@ -107,11 +125,11 @@ const OBJ = {
 // sheet: key into IMG.  sy: source row Y.  sw/sh: source frame size.
 // dw/dh: draw size (logical px).  fps: frames per second.
 const ANIM = {
-  walk:  { sheet:'mochi', sy:   0, sw: 32, sh: 32, frames: 10, fps: 10, dw: 48, dh: 48 },
-  sit:   { sheet:'pochi', sy:   P.SIT_Y, sw: P.FW, sh: P.SIT_H, frames: 4, fps:  4, dw: 56, dh: 56 },
-  sad:   { sheet:'pochi', sy:   P.SAD_Y, sw: P.FW, sh: P.SAD_H, frames: 4, fps:  3, dw: 56, dh: 56 },
-  sleep: { sheet:'pochi', sy:   P.SLP_Y, sw: P.FW, sh: P.SLP_H, frames: 4, fps:  2, dw: 72, dh: 56 },
-  box:   { sheet:'box',   sy:   0,       sw: 32,   sh: 32,       frames: 4, fps:  4, dw: 64, dh: 44 },
+  walk:  { sheet:'mochi', sy:   0,        sw: 32,   sh: 32,       frames: 10, fps: 10, dw: 48, dh: 48 },
+  sit:   { sheet:'retro', sy:   P.SIT_Y,  sw: P.FW, sh: P.SIT_H,  frames:  4, fps:  4, dw: 56, dh: 56 },
+  sad:   { sheet:'retro', sy:   P.SAD_Y,  sw: P.FW, sh: P.SAD_H,  frames:  4, fps:  3, dw: 56, dh: 56 },
+  sleep: { sheet:'retro', sy:   P.SLP_Y,  sw: P.FW, sh: P.SLP_H,  frames:  4, fps:  2, dw: 72, dh: 56 },
+  box:   { sheet:'box',   sy:   0,        sw: 32,   sh: 32,        frames:  4, fps:  4, dw: 64, dh: 44 },
 };
 
 // ── Cat object ─────────────────────────────────────────────────────
@@ -501,8 +519,10 @@ function drawFurniture() {
 }
 
 function drawBowl() {
-  if (IMG.pochi) {
-    ctx.drawImage(IMG.pochi,
+  // Use retro sheet if loaded (same bowl row as pochi), fall back to pochi, then procedural
+  const bowlImg = IMG.retro || IMG.pochi;
+  if (bowlImg) {
+    ctx.drawImage(bowlImg,
       0, P.BWL_Y, P.FW, P.BWL_H,
       OBJ.bowl.x - 24, OBJ.bowl.y - 28, 48, 30);
   } else {
@@ -556,97 +576,163 @@ function drawCat() {
 
 // ── Draw HUD ───────────────────────────────────────────────────────
 function drawHUD() {
-  // Stat bars
+  const ui = IMG.ui;
+
+  // ── HUD panel background (top-left) ──
+  ctx.fillStyle = 'rgba(18,8,34,0.72)';
+  roundRect(4, 4, 158, 50, 5);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(180,130,255,0.35)';
+  ctx.lineWidth = 1;
+  roundRect(4, 4, 158, 50, 5);
+  ctx.stroke();
+
+  // ── Cat portrait (from free.png) ──
+  if (ui) {
+    const p = UI_SRC.portrait;
+    ctx.drawImage(ui, p.x, p.y, p.w, p.h, 8, 8, 40, 40);
+  } else {
+    ctx.fillStyle = '#cc88aa';
+    ctx.fillRect(8, 8, 40, 40);
+  }
+
+  // ── Stat bars ──
   const bars = [
-    { icon: '🍖', val: stat.hunger, y: 8  },
-    { icon: '😺', val: stat.happy,  y: 22 },
+    { icon: '🍖', val: stat.hunger, y: 10 },
+    { icon: '😸', val: stat.happy,  y: 23 },
     { icon: '⚡', val: stat.energy, y: 36 },
   ];
-  const BX = 8, BW = 100, BH = 9;
+  const BX = 53, BW = 102, BH = 8;
 
   for (const b of bars) {
-    // Background
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(BX + 14, b.y, BW, BH);
-    // Fill
     const frac = Math.max(0, Math.min(1, b.val / 100));
+    // Track
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(BX, b.y, BW, BH);
+    // Fill
     ctx.fillStyle = statBarColor(b.val);
-    ctx.fillRect(BX + 14, b.y, Math.round(BW * frac), BH);
+    ctx.fillRect(BX, b.y, Math.round(BW * frac), BH);
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(BX, b.y, Math.round(BW * frac), 3);
     // Border
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(BX + 14, b.y, BW, BH);
+    ctx.strokeRect(BX, b.y, BW, BH);
     // Icon
     ctx.font = '9px serif';
-    ctx.fillText(b.icon, BX, b.y + BH - 1);
-    // Low-stat warning pulse
+    ctx.textAlign = 'left';
+    ctx.fillText(b.icon, BX - 14, b.y + BH - 1);
+    // Critical pulse overlay
     if (b.val < 20) {
-      ctx.fillStyle = `rgba(255,60,60,${0.4 + 0.4 * Math.sin(totalTime * 6)})`;
-      ctx.fillRect(BX + 14, b.y, Math.round(BW * frac), BH);
+      ctx.fillStyle = `rgba(255,50,50,${0.35 + 0.35 * Math.sin(totalTime * 7)})`;
+      ctx.fillRect(BX, b.y, Math.round(BW * frac), BH);
     }
   }
 
-  // Cat name tag (top-centre)
+  // ── Mood face (from free.png) — shown under portrait ──
+  if (ui) {
+    const avgStat = (stat.hunger + stat.happy + stat.energy) / 3;
+    const face = avgStat > 60
+      ? UI_SRC.face_happy
+      : avgStat > 30
+        ? UI_SRC.face_meh
+        : UI_SRC.face_sad;
+    // tiny mood face in portrait corner
+    ctx.drawImage(ui, face.x, face.y, face.w, face.h, 32, 36, 16, 16);
+  }
+
+  // ── Cat name tag (top-centre) ──
   ctx.font = 'bold 9px monospace';
   ctx.textAlign = 'center';
-  const tw = ctx.measureText(catName).width + 10;
-  ctx.fillStyle = 'rgba(60,20,90,0.7)';
-  roundRect(W/2 - tw/2, 5, tw, 13, 3);
+  const tw = ctx.measureText(catName).width + 12;
+  ctx.fillStyle = 'rgba(40,12,72,0.82)';
+  roundRect(W/2 - tw/2, 5, tw, 14, 4);
   ctx.fill();
+  ctx.strokeStyle = 'rgba(200,150,255,0.4)';
+  ctx.lineWidth = 1;
+  roundRect(W/2 - tw/2, 5, tw, 14, 4);
+  ctx.stroke();
   ctx.fillStyle = '#ffe8ff';
   ctx.fillText(catName, W/2, 15);
 
-  // Care timer (top-right)
+  // ── Care timer (top-right) ──
   const mins = Math.floor(careTime / 60);
   const secs = Math.floor(careTime % 60);
   ctx.font = '8px monospace';
   ctx.textAlign = 'right';
+
+  // Pill background
+  ctx.fillStyle = 'rgba(18,8,34,0.72)';
+  roundRect(W - 68, 4, 64, 14, 4);
+  ctx.fill();
   ctx.fillStyle = '#cc99ff';
   ctx.fillText(`♥ ${mins}:${String(secs).padStart(2,'0')}`, W - 6, 14);
 
-  // Portal button — unlocks after 90 s of good care
+  // ── Portal button ──
   if (careTime >= 90 && portalTarget) {
-    const px = W - 82, py = 20, pw = 78, ph = 20;
+    const px = W - 82, py = 20, pw = 78, ph = 22;
     ctx.fillStyle = '#5020a0';
-    roundRect(px, py, pw, ph, 4);
+    roundRect(px, py, pw, ph, 5);
     ctx.fill();
     ctx.strokeStyle = '#aa77ff';
     ctx.lineWidth = 1;
-    roundRect(px, py, pw, ph, 4);
+    roundRect(px, py, pw, ph, 5);
     ctx.stroke();
+    // shimmer
+    ctx.fillStyle = `rgba(180,120,255,${0.15 + 0.1 * Math.sin(totalTime * 4)})`;
+    roundRect(px, py, pw, ph, 5);
+    ctx.fill();
     ctx.fillStyle = '#ddc0ff';
     ctx.font = 'bold 8px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('🌀 Portal', px + pw/2, py + 13);
+    ctx.fillText('🌀 Portal', px + pw/2, py + 14);
   }
 
-  ctx.textAlign = 'left'; // reset
+  ctx.textAlign = 'left';
 }
 
 // ── Draw buttons ───────────────────────────────────────────────────
 function drawButtons() {
+  const ui = IMG.ui;
+
   for (const b of BTNS) {
     const active = cat.state === b.id;
 
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(b.x + 2, b.y + 2, b.w, b.h);
+    // ── Drop shadow ──
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    roundRect(b.x + 2, b.y + 2, b.w, b.h, 4);
+    ctx.fill();
 
-    // Body
-    ctx.fillStyle = active ? lighten(b.col, 50) : b.col;
-    ctx.fillRect(b.x, b.y, b.w, b.h);
+    // ── Button body ──
+    ctx.fillStyle = active ? lighten(b.col, 55) : b.col;
+    roundRect(b.x, b.y, b.w, b.h, 4);
+    ctx.fill();
 
-    // Top highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillRect(b.x, b.y, b.w, 4);
+    // ── Top-edge bevel ──
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    roundRect(b.x, b.y, b.w, 4, 4);
+    ctx.fill();
 
-    // Label shadow + label
+    // ── Sprite icon from free.png (left side of button) ──
+    if (ui) {
+      const col  = BTN_ICON[b.id];
+      const row  = active ? 1 : 0;
+      const src  = uiBtn(col, row);
+      // Draw icon at 2× scale (28×28) centred vertically on the button
+      const iconSz = 22;
+      const ix = b.x + 4;
+      const iy = b.y + Math.round((b.h - iconSz) / 2);
+      ctx.drawImage(ui, src.x, src.y, src.w, src.h, ix, iy, iconSz, iconSz);
+    }
+
+    // ── Label text (right of icon) ──
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillText(b.label, b.x + b.w/2 + 1, b.y + b.h/2 + 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillText(b.label, b.x + b.w/2 + (ui ? 8 : 0) + 1, b.y + b.h/2 + 4);
     ctx.fillStyle = '#fff';
-    ctx.fillText(b.label, b.x + b.w/2, b.y + b.h/2 + 3);
+    ctx.fillText(b.label, b.x + b.w/2 + (ui ? 8 : 0),     b.y + b.h/2 + 3);
   }
   ctx.textAlign = 'left';
 }
