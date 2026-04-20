@@ -48,6 +48,7 @@ const STATE = {
 let gameState      = STATE.MENU;
 let selectedCar    = 0;
 let hp             = 3.0;
+let maxHp          = 3;    // tracks highest hp reached this run (for heart display)
 let score          = 0;
 let nearMissCount  = 0;
 let flowBurstCount = 0;
@@ -91,7 +92,7 @@ const UPGRADE_POOL = [
   {
     id: 'plating', icon: '🛡️', name: 'Reactive Plating',
     desc: 'Restore 1 heart\n(max 5)',
-    apply() { hp = Math.min(5, hp + 1); updateHearts(); },
+    apply() { hp = Math.min(5, hp + 1); maxHp = Math.max(maxHp, hp); updateHearts(); },
   },
   {
     id: 'slipstream', icon: '💨', name: 'Slipstream',
@@ -195,6 +196,7 @@ function showUpgradeScreen() {
     upgradeCardsEl.appendChild(card);
   });
 
+  slCtx.clearRect(0, 0, W, H);
   sfxPlay('checkpoint', 0.7);
   setState(STATE.UPGRADE);
 }
@@ -579,7 +581,8 @@ function cloneForScene(cached) {
 const carGroup = new THREE.Group();
 carGroup.rotation.order = 'YXZ';
 scene.add(carGroup);
-let carWheelInfo = { back: null, frontLeft: null, frontRight: null };
+let carWheelInfo    = { back: null, frontLeft: null, frontRight: null };
+let carModelGroup   = null;   // the cloned OBJ mesh inside carGroup; lights live separately
 
 // ── Flow burst car glow light ──────────────────────────────────────────────────
 const carGlowLight = new THREE.PointLight(0x4ff0ff, 0, 14);
@@ -810,6 +813,7 @@ function updateTraffic(dt) {
         const streakSuffix = nearMissStreak > 1 ? ` ×${nearMissStreak}` : '';
         showHitFeedback('close', razor ? `RAZOR!${streakSuffix}` : `CLOSE!${streakSuffix}`);
         sfxPlay('nearMiss', 0.55);
+        if (_combo) _combo.textContent = nearMissStreak > 1 ? `×${nearMissStreak}` : '';
       }
     }
   }
@@ -932,6 +936,7 @@ function startSong() {
   stopSong();
   audioSource = audioCtx.createBufferSource();
   audioSource.buffer = audioBuffer; audioSource.connect(musicGain);
+  audioSource.loop = true;
   songStartTime = audioCtx.currentTime; songTime = 0;
   nextBeatIdx = 0; beatPulse = 0;
   audioSource.onended = () => { audioSource = null; };
@@ -952,6 +957,7 @@ let flowBurstTimer  = 0;
 const _flowFill  = document.getElementById('hud-flow-fill');
 const _flowWrap  = document.getElementById('hud-flow-wrap');
 const _speedo    = document.getElementById('hud-speedo');
+const _combo     = document.getElementById('hud-combo');
 const _keyUp     = document.getElementById('key-up');
 const _keyLeft   = document.getElementById('key-left');
 const _keyRight  = document.getElementById('key-right');
@@ -1035,6 +1041,7 @@ function takeDamage() {
   hp = Math.max(0, hp - dmg);
   collisionCount++;
   nearMissStreak = 0;
+  if (_combo) _combo.textContent = '';
   if (upgradeVars.ghostHits > 0) ghostTimer = 1.5;
   updateHearts();
   damageFlash.style.background = 'rgba(220,20,20,0.50)';
@@ -1096,11 +1103,14 @@ document.getElementById('hud-username').textContent = incoming.username || '';
 document.getElementById('hud-speedo').textContent   = '0 MPH';
 // ── HUD helpers ────────────────────────────────────────────────────────────────
 function updateHearts() {
-  const full=Math.floor(hp), half=(hp%1)>=0.5?1:0;
-  ['h1','h2','h3'].forEach((id,i) => {
+  const full = Math.floor(hp), half = (hp % 1) >= 0.5 ? 1 : 0;
+  const totalHearts = Math.min(5, Math.max(3, Math.ceil(maxHp)));
+  ['h1','h2','h3','h4','h5'].forEach((id, i) => {
     const el = document.getElementById(id);
-    el.className = 'heart ' + (i<full ? 'full' : i<full+half ? 'half' : 'empty');
-    el.textContent = i<full+half ? '♥' : '♡';
+    if (!el) return;
+    el.style.display  = i < totalHearts ? '' : 'none';
+    el.className      = 'heart ' + (i < full ? 'full' : i < full + half ? 'half' : 'empty');
+    el.textContent    = i < full + half ? '♥' : '♡';
   });
 }
 
@@ -1142,7 +1152,7 @@ function setState(s) {
     setPreviewCar(previewCarIdx);
   }
 
-  if (prev === STATE.PLAYING && s !== STATE.PLAYING && s !== STATE.UPGRADE) {
+  if ((prev === STATE.PLAYING || prev === STATE.UPGRADE) && s !== STATE.PLAYING && s !== STATE.UPGRADE) {
     stopSong();
     clearAllTraffic();
     damageFlash.style.background = 'rgba(220,20,20,0)';
@@ -1152,6 +1162,7 @@ function setState(s) {
     renderer.domElement.style.filter = '';
     carGlowLight.intensity           = 0;
     headL.intensity = headR.intensity = 0;
+    if (carModelGroup) carModelGroup.visible = true;
     skyLerpTop.set(0x080818); skyLerpBot.set(0x0f1a3a);
     skyLerpFog.set(0x0d0d22); skyLerpAmb.set(0x334466); skyLerpAmbInt = 1.4;
   }
@@ -1163,8 +1174,9 @@ function setState(s) {
       headL.intensity = headR.intensity = 3.5;
     } else {
     // ── Fresh run — reset everything ──────────────────────────────────────
-    hp = 3.0; score = 0;
+    hp = 3.0; maxHp = 3; score = 0;
     nearMissCount = 0; flowBurstCount = 0; collisionCount = 0; nearMissStreak = 0;
+    if (_combo) _combo.textContent = '';
     flowMeter = 0; flowBurstActive = false; flowBurstTimer = 0;
     if (_flowWrap) _flowWrap.classList.remove('burst');
     nextCheckpoint = CHECKPOINT_INTERVAL;
@@ -1180,16 +1192,18 @@ function setState(s) {
     trafficSpawnTimer = 1.2;  // first car after 1.2 s
 
     // ── Apply player car model ───────────────────────────────────────────────
-    while (carGroup.children.length) carGroup.remove(carGroup.children[0]);
+    // Remove only the mesh, leaving headlights & glow light attached to carGroup
+    if (carModelGroup) { carGroup.remove(carModelGroup); carModelGroup = null; }
     carWheelInfo = { back: null, frontLeft: null, frontRight: null };
 
     const applyCarModel = cached => {
-      while (carGroup.children.length) carGroup.remove(carGroup.children[0]);
+      if (carModelGroup) { carGroup.remove(carModelGroup); carModelGroup = null; }
       const { group, wheels } = cloneForScene(cached);
       group.scale.setScalar(CARS[selectedCar].scale);
       group.rotation.y = Math.PI;   // front faces -Z so camera behind sees the rear
       carGroup.add(group);
-      carWheelInfo = wheels;
+      carModelGroup = group;
+      carWheelInfo  = wheels;
     };
     const cachedCar = modelCache.get(CARS[selectedCar].file);
     if (cachedCar) {
@@ -1201,6 +1215,7 @@ function setState(s) {
       );
       placeholder.position.y = 0.43; placeholder.castShadow = true;
       carGroup.add(placeholder);
+      carModelGroup = placeholder;   // tracked so applyCarModel removes it when ready
       loadCarModel(CARS[selectedCar]).then(applyCarModel).catch(() => {});
     }
 
@@ -1401,8 +1416,21 @@ function updatePlaying(dt) {
   const slColor     = flowBurstActive ? _burstAccent() : '#ffffff';
   drawSpeedLines(slIntensity, slColor);
 
-  // ── Car glow — pulse with beats during burst ──────────────────────────────
-  carGlowLight.intensity = flowBurstActive ? 7.0 + beatPulse * 6.0 : 0;
+  // ── Car glow — burst accent, ghost white pulse, or off ───────────────────
+  if (flowBurstActive) {
+    carGlowLight.color.set(_burstAccent());
+    carGlowLight.intensity = 7.0 + beatPulse * 6.0;
+  } else if (ghostTimer > 0) {
+    carGlowLight.color.set(0xffffff);
+    carGlowLight.intensity = 3.5 + Math.sin(performance.now() * 0.012) * 2.0;
+  } else {
+    carGlowLight.intensity = 0;
+  }
+
+  // Ghost Drive blink — flash the car mesh while invincible
+  if (carModelGroup) {
+    carModelGroup.visible = ghostTimer <= 0 || Math.floor(performance.now() / 100) % 2 === 0;
+  }
 
   if (hitFlashTimer > 0) { hitFlashTimer -= dt; if (hitFlashTimer <= 0) hitFlash.className = ''; }
 

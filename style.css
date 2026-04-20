@@ -491,7 +491,7 @@ body {
 
 #hud-speedo {
   position: absolute;
-  bottom: 1.2rem;
+  bottom: 1.5rem;
   right: 1.8rem;
   font-family: ui-monospace, monospace;
   font-size: 1.6rem;
@@ -503,7 +503,7 @@ body {
 
 #hud-hint {
   position: absolute;
-  bottom: 1.1rem;
+  bottom: 0.3rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -641,19 +641,10 @@ body {
   width: 130px;
 }
 
-/* ── Load game — no saves message ────────────────────────────────────────── */
-.no-saves {
-  color: var(--muted);
-  font-size: 0.88rem;
-  letter-spacing: 0.06em;
-  margin-bottom: 1.2rem;
-  line-height: 1.6;
-}
-
 /* ── Lane pip indicator ──────────────────────────────────────────────────── */
 #hud-lanes {
   position: absolute;
-  bottom: 1.2rem;
+  bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
