@@ -18,7 +18,7 @@ container.appendChild(renderer.domElement);
 
 // ── Scene & Camera ─────────────────────────────────────────────────────────────
 const scene  = new THREE.Scene();
-scene.fog    = new THREE.Fog(0xf0a060, 60, 155);
+scene.fog    = new THREE.Fog(0x0d0d22, 55, 160);
 const camera = new THREE.PerspectiveCamera(72, W / H, 0.1, 220);
 
 // ── Portal Protocol ────────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ console.log('[PulseDrive] ✓ buttons wired early');
 console.log('[PulseDrive] building world...');
 
 // ── Lighting ───────────────────────────────────────────────────────────────────
-const ambLight = new THREE.AmbientLight(0xffd8a0, 2.2);
+const ambLight = new THREE.AmbientLight(0x334466, 1.6);
 scene.add(ambLight);
 const sun = new THREE.DirectionalLight(0xffe8b0, 2.8);
 sun.position.set(18, 35, 25);
@@ -216,8 +216,8 @@ scene.add(beatLight);
 const skyMat = new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false,
   uniforms: {
-    uTop: { value: new THREE.Color(0xf5a060) },
-    uBot: { value: new THREE.Color(0x5c8de0) },
+    uTop: { value: new THREE.Color(0x080818) },
+    uBot: { value: new THREE.Color(0x0f1a3a) },
   },
   vertexShader:   `varying float vY; void main(){ vY=normalize(position).y; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: `uniform vec3 uTop,uBot; varying float vY; void main(){ gl_FragColor=vec4(mix(uTop,uBot,clamp(vY*1.9,0.0,1.0)),1.0); }`,
@@ -279,22 +279,43 @@ function buildRibbon(halfWL, halfWR, yOff, tex, tileLen) {
   m.position.y = yOff; m.receiveShadow = true; scene.add(m);
 }
 
+// Variant that emits solid colour — used for neon road stripes
+function buildEmissiveRibbon(halfWL, halfWR, yOff, color) {
+  const step = 4, n = Math.ceil((ROAD_START - ROAD_END) / step) + 1;
+  const pos = new Float32Array(n*2*3), idx = [];
+  for (let i = 0; i < n; i++) {
+    const z = ROAD_START - i*step, cx = curveX(z), dx = curveDX(z);
+    const len = Math.sqrt(1+dx*dx), nx = 1/len, b = i*6;
+    pos[b  ] = cx+nx*halfWL; pos[b+1] = 0; pos[b+2] = z;
+    pos[b+3] = cx+nx*halfWR; pos[b+4] = 0; pos[b+5] = z;
+    if (i < n-1) { const a=i*2; idx.push(a,a+1,a+2,a+1,a+3,a+2); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setIndex(idx);
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color }));
+  m.position.y = yOff; scene.add(m);
+}
+
 function makeRoadTex() {
   const cw=256, ch=512;
   const cv = Object.assign(document.createElement('canvas'), { width:cw, height:ch });
   const cx = cv.getContext('2d');
-  cx.fillStyle = '#3b3d42'; cx.fillRect(0, 0, cw, ch);
-  for (let i=0; i<2500; i++) {
-    const v = 55+(Math.random()*22|0);
-    cx.fillStyle = `rgba(${v},${v},${v},0.22)`;
-    cx.fillRect(Math.random()*cw, Math.random()*ch, 1, 1);
+  // Dark asphalt base
+  cx.fillStyle = '#0d0d18'; cx.fillRect(0, 0, cw, ch);
+  // Subtle surface noise
+  for (let i=0; i<1800; i++) {
+    const v = 18+(Math.random()*14|0);
+    cx.fillStyle = `rgba(${v},${v},${v+4},0.28)`;
+    cx.fillRect(Math.random()*cw, Math.random()*ch, 1+(Math.random()*1.5|0), 1);
   }
-  cx.fillStyle = '#d8d8d6';
-  cx.fillRect(8, 0, 7, ch); cx.fillRect(cw-15, 0, 7, ch);
-  cx.fillStyle = '#bbbbba';
+  // Neon edge lines (cyan)
+  cx.fillStyle = 'rgba(79,240,255,0.72)';
+  cx.fillRect(8, 0, 4, ch); cx.fillRect(cw-12, 0, 4, ch);
+  // Dashed center dividers (purple)
+  cx.fillStyle = 'rgba(198,75,255,0.60)';
   for (const tx of [64, 128, 192]) {
-    cx.fillRect(tx-3, 0,   5, 160);
-    cx.fillRect(tx-3, 512, 5, 160);
+    for (let y=0; y<ch; y+=32) cx.fillRect(tx-2, y, 4, 20);
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -314,73 +335,143 @@ function makeCurbTex() {
 buildRibbon(-ROAD_W/2, ROAD_W/2, 0.006, makeRoadTex(), 20);
 buildRibbon(-ROAD_W/2-CURB_W, -ROAD_W/2, 0.010, makeCurbTex(), 6);
 buildRibbon(ROAD_W/2, ROAD_W/2+CURB_W, 0.010, makeCurbTex(), 6);
+// Neon road glow strips (emissive, sit just above road surface)
+buildEmissiveRibbon(-0.18, 0.18,          0.015, 0x2a88bb); // centre line glow
+buildEmissiveRibbon(-ROAD_W/2-0.05, -ROAD_W/2+0.10, 0.015, 0x6622bb); // left kerb glow
+buildEmissiveRibbon( ROAD_W/2-0.10,  ROAD_W/2+0.05, 0.015, 0x6622bb); // right kerb glow
 
-// ── Grass ──────────────────────────────────────────────────────────────────────
+// ── Urban ground (dark concrete) ───────────────────────────────────────────────
 {
   const cv = Object.assign(document.createElement('canvas'), { width:64, height:64 });
   const cx = cv.getContext('2d');
-  cx.fillStyle = '#50b044'; cx.fillRect(0,0,64,64);
-  for (let i=0; i<180; i++) {
-    const v = Math.random()*28|0;
-    cx.fillStyle = `rgb(${58+v},${152+v},${44+v})`;
-    cx.fillRect(Math.random()*64, Math.random()*64, 2, 3);
+  cx.fillStyle = '#0c0c14'; cx.fillRect(0,0,64,64);
+  for (let i=0; i<220; i++) {
+    const v = Math.random()*10|0;
+    cx.fillStyle = `rgba(${14+v},${14+v},${20+v},0.55)`;
+    cx.fillRect(Math.random()*64, Math.random()*64, 2+(Math.random()*2|0), 1);
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(50, 500);
-  const grass = new THREE.Mesh(
+  const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(600, ROAD_LEN+50),
     new THREE.MeshLambertMaterial({ map:tex })
   );
-  grass.rotation.x = -Math.PI/2;
-  grass.position.set(0, 0, ROAD_START - ROAD_LEN/2);
-  grass.receiveShadow = true;
-  scene.add(grass);
+  ground.rotation.x = -Math.PI/2;
+  ground.position.set(0, -0.01, ROAD_START - ROAD_LEN/2);
+  ground.receiveShadow = true;
+  scene.add(ground);
 }
 
-// ── Trees ──────────────────────────────────────────────────────────────────────
-const trunkMat = new THREE.MeshLambertMaterial({ color: 0x7a5228 });
-function makePine(x,z,sc=1) {
-  const g = new THREE.Group();
-  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.13*sc,0.20*sc,1.3*sc,6), trunkMat);
-  t.position.y = 0.65*sc; t.castShadow = true; g.add(t);
-  const col = new THREE.MeshLambertMaterial({ color:[0x2d7535,0x358040,0x3d8b45,0x256f30][Math.random()*4|0] });
-  for (const [r,y] of [[1.55,2.55],[1.2,2.05],[0.85,1.55]]) {
-    const c = new THREE.Mesh(new THREE.ConeGeometry(r*sc,r*1.7*sc,7), col);
-    c.position.y = y*sc; c.castShadow = true; g.add(c);
+// ── Neon city props ────────────────────────────────────────────────────────────
+
+// Shared building window textures (3 accent variants)
+function makeBuildingTex(accentHex) {
+  const cw=64, ch=128;
+  const cv = Object.assign(document.createElement('canvas'), {width:cw, height:ch});
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#07070f'; ctx.fillRect(0,0,cw,ch);
+  for (let r=0; r<8; r++) for (let c=0; c<4; c++) {
+    if (Math.random() > 0.36) {
+      const col = Math.random() > 0.70 ? accentHex
+                : Math.random() > 0.50 ? '#ffe890' : '#cc88ff';
+      ctx.fillStyle = col;
+      ctx.fillRect(c*14+3, r*15+3, 9, 9);
+    }
   }
-  g.position.set(x,0,z); scene.add(g);
+  return new THREE.CanvasTexture(cv);
 }
-function makeRoundTree(x,z,sc=1) {
-  const g = new THREE.Group();
-  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.15*sc,0.22*sc,1.6*sc,6), trunkMat);
-  t.position.y = 0.8*sc; t.castShadow = true; g.add(t);
-  const col = new THREE.MeshLambertMaterial({ color:[0x3d9e38,0x44b040,0x55c050,0x2e8232][Math.random()*4|0] });
-  const f = new THREE.Mesh(new THREE.SphereGeometry((0.9+Math.random()*0.55)*sc,6,5), col);
-  f.position.y = (2.1+Math.random()*0.4)*sc; f.castShadow = true; g.add(f);
-  g.position.set(x,0,z); scene.add(g);
-}
-for (let z=ROAD_START; z>ROAD_END; z -= 10+Math.random()*8) {
-  const cx = curveX(z), edge = ROAD_W/2+CURB_W+0.8, sc = 0.8+Math.random()*0.65;
-  const fn = Math.random()>0.45 ? makePine : makeRoundTree;
-  fn(cx - edge - 1 - Math.random()*9, z, sc);
-  fn(cx + edge + 1 + Math.random()*9, z, sc);
-  if (Math.random() > 0.6) {
-    fn(cx - edge - 11 - Math.random()*14, z+Math.random()*4-2, 0.7+Math.random()*0.5);
-    fn(cx + edge + 11 + Math.random()*14, z+Math.random()*4-2, 0.7+Math.random()*0.5);
+const bldMatA = new THREE.MeshBasicMaterial({ map: makeBuildingTex('#4ff0ff') });
+const bldMatB = new THREE.MeshBasicMaterial({ map: makeBuildingTex('#c64bff') });
+const bldMatC = new THREE.MeshBasicMaterial({ map: makeBuildingTex('#ff44cc') });
+const bldMats = [bldMatA, bldMatB, bldMatC];
+
+const NEON_ACCENT_COLORS = [0x4ff0ff, 0xc64bff, 0xff44cc, 0xffcc00, 0xff3366];
+
+function makeBuilding(x, z) {
+  const w = 4+Math.random()*10, d = 3+Math.random()*8, h = 5+Math.random()*22;
+  const mat = bldMats[Math.random()*bldMats.length|0];
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  mesh.position.set(x, h/2, z);
+  scene.add(mesh);
+  // Neon rooftop accent strip
+  if (Math.random() > 0.42) {
+    const ac = NEON_ACCENT_COLORS[Math.random()*NEON_ACCENT_COLORS.length|0];
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(w+0.2, 0.35, d+0.2),
+      new THREE.MeshBasicMaterial({ color: ac })
+    );
+    strip.position.set(x, h+0.18, z);
+    scene.add(strip);
+  }
+  // Occasional vertical neon sign bar
+  if (Math.random() > 0.72) {
+    const ac = NEON_ACCENT_COLORS[Math.random()*NEON_ACCENT_COLORS.length|0];
+    const sh = 3+Math.random()*4;
+    const sign = new THREE.Mesh(
+      new THREE.BoxGeometry(0.25, sh, 0.25),
+      new THREE.MeshBasicMaterial({ color: ac })
+    );
+    sign.position.set(x + (Math.random()-0.5)*w*0.6, h*0.55, z + d/2 + 0.15);
+    scene.add(sign);
   }
 }
 
-// ── Mountains ──────────────────────────────────────────────────────────────────
-for (let i=0; i<55; i++) {
-  const side = Math.random()>0.5 ? 1:-1, z = -(Math.random()*(ROAD_LEN-100));
-  const cx = curveX(z), w = 18+Math.random()*28, h = 14+Math.random()*24;
-  const m = new THREE.Mesh(
-    new THREE.ConeGeometry(w,h,4+(Math.random()*3|0)),
-    new THREE.MeshLambertMaterial({ color:[0xb05890,0xc060a0,0xa04880,0x904898][Math.random()*4|0] })
+// Streetlights every ~40 m
+const poleMat = new THREE.MeshLambertMaterial({ color: 0x1a2233 });
+function makeStreetlight(x, z, side) {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,8,5), poleMat);
+  pole.position.y = 4; g.add(pole);
+  // Horizontal arm
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2.2,4), poleMat);
+  arm.rotation.z = Math.PI/2; arm.position.set(side*1.1, 8.1, 0); g.add(arm);
+  // Lamp head (emissive — no real light cost)
+  const lamp = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55,0.28,0.55),
+    new THREE.MeshBasicMaterial({ color: 0x88eeff })
   );
-  m.position.set(cx+side*(48+Math.random()*65), h/2-2, z);
-  m.rotation.y = Math.random()*Math.PI; scene.add(m);
+  lamp.position.set(side*2.25, 8.0, 0); g.add(lamp);
+  g.position.set(x, 0, z);
+  scene.add(g);
+}
+
+// Spawn buildings + streetlights along road
+for (let z=ROAD_START; z>ROAD_END; z -= 16+Math.random()*12) {
+  const cx = curveX(z), edge = ROAD_W/2+CURB_W+1.2;
+  // Close-row buildings
+  makeBuilding(cx - edge - 2  - Math.random()*6, z);
+  makeBuilding(cx + edge + 2  + Math.random()*6, z);
+  // Mid-row buildings (denser city feel)
+  if (Math.random() > 0.44) {
+    makeBuilding(cx - edge - 10 - Math.random()*10, z + (Math.random()-0.5)*8);
+    makeBuilding(cx + edge + 10 + Math.random()*10, z + (Math.random()-0.5)*8);
+  }
+}
+
+for (let z=ROAD_START-5; z>ROAD_END; z -= 38+Math.random()*18) {
+  const cx = curveX(z), edge = ROAD_W/2+CURB_W+1.5;
+  makeStreetlight(cx - edge, z, -1);
+  makeStreetlight(cx + edge, z,  1);
+}
+
+// ── Distant city skyline ───────────────────────────────────────────────────────
+for (let i=0; i<70; i++) {
+  const side = Math.random()>0.5 ? 1:-1, z = -(Math.random()*(ROAD_LEN-100));
+  const cx = curveX(z);
+  const w = 10+Math.random()*24, d = 10+Math.random()*18, h = 22+Math.random()*55;
+  const dist = 90+Math.random()*90;
+  const mat = bldMats[Math.random()*bldMats.length|0];
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(cx + side*dist, h/2-2, z);
+  scene.add(m);
+  // Skyline rooftop accent
+  if (Math.random() > 0.5) {
+    const ac = NEON_ACCENT_COLORS[Math.random()*NEON_ACCENT_COLORS.length|0];
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(w+0.3,0.5,d+0.3), new THREE.MeshBasicMaterial({ color: ac }));
+    cap.position.set(cx + side*dist, h-1.5, z);
+    scene.add(cap);
+  }
 }
 
 // ── Car definitions ────────────────────────────────────────────────────────────
@@ -724,9 +815,9 @@ let songStartTime = 0,  songTime    = 0;
 let nextBeatIdx = 0,    beatPulse   = 0;
 let volMaster = 0.8,    volMusic    = 0.9;
 
-const skyLerpTop = new THREE.Color(0xf5a060), skyLerpBot = new THREE.Color(0x5c8de0);
-const skyLerpFog = new THREE.Color(0xf0a060), skyLerpAmb = new THREE.Color(0xffd8a0);
-let skyLerpAmbInt = 2.2;
+const skyLerpTop = new THREE.Color(0x080818), skyLerpBot = new THREE.Color(0x0f1a3a);
+const skyLerpFog = new THREE.Color(0x0d0d22), skyLerpAmb = new THREE.Color(0x334466);
+let skyLerpAmbInt = 1.6;
 
 async function initAudio() {
   try {
@@ -1009,8 +1100,8 @@ function setState(s) {
     burstVignette.style.opacity      = '0';
     renderer.domElement.style.filter = '';
     carGlowLight.intensity           = 0;
-    skyLerpTop.set(0xf5a060); skyLerpBot.set(0x5c8de0);
-    skyLerpFog.set(0xf0a060); skyLerpAmb.set(0xffd8a0); skyLerpAmbInt = 2.2;
+    skyLerpTop.set(0x080818); skyLerpBot.set(0x0f1a3a);
+    skyLerpFog.set(0x0d0d22); skyLerpAmb.set(0x334466); skyLerpAmbInt = 1.4;
   }
 
   if (s === STATE.PLAYING) {
