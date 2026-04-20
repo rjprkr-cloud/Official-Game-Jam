@@ -142,6 +142,26 @@
     <button class="menu-btn" id="go-menu">Back to Menu</button>
   </div>
 
+  <!-- ── Runtime error display (remove after debugging) ───────────────────── -->
+  <div id="js-error-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.96);color:#ff3355;font-family:monospace;font-size:13px;padding:2rem;white-space:pre-wrap;overflow:auto;"></div>
+  <script>
+    (function(){
+      function showErr(msg){
+        var el=document.getElementById('js-error-overlay');
+        el.style.display='block';
+        el.textContent+=(el.textContent?'\n---\n':'')+msg;
+      }
+      window.onerror=function(msg,src,line,col,err){
+        showErr('JS Error: '+msg+'\n  at '+src+':'+line+':'+col+(err&&err.stack?'\n'+err.stack:''));
+        return false;
+      };
+      window.addEventListener('unhandledrejection',function(e){
+        var r=e.reason;
+        showErr('Unhandled Rejection: '+(r&&r.stack?r.stack:r));
+      });
+    })();
+  </script>
+
   <script src="portal.js"></script>
   <script type="module" src="game.js"></script>
 </body>

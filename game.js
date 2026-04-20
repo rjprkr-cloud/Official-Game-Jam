@@ -30,6 +30,7 @@ try {
     new Promise(r => setTimeout(() => r(null), 800))
   ]);
 } catch (e) { nextTarget = null; }
+console.log('[PulseDrive] portal ready, building world...');
 
 // ── Lighting ───────────────────────────────────────────────────────────────────
 const ambLight = new THREE.AmbientLight(0xffd8a0, 2.2);
@@ -56,7 +57,9 @@ const skyMat = new THREE.ShaderMaterial({
   vertexShader:   `varying float vY; void main(){ vY=normalize(position).y; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: `uniform vec3 uTop,uBot; varying float vY; void main(){ gl_FragColor=vec4(mix(uTop,uBot,clamp(vY*1.9,0.0,1.0)),1.0); }`,
 });
-scene.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(190,16,8), skyMat), { renderOrder:-1 }));
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(190,16,8), skyMat);
+skyDome.renderOrder = -1;
+scene.add(skyDome);
 
 // ── Road curve ─────────────────────────────────────────────────────────────────
 function curveX(z)  { return 14*Math.sin(z*0.013) + 5*Math.sin(z*0.034+1.5); }
@@ -305,8 +308,10 @@ prevCamera.position.set(5.5, 3.2, 7.5); prevCamera.lookAt(0, 0.8, 0);
 prevScene.add(new THREE.AmbientLight(0xffeedd, 3.0));
 const prevSun = new THREE.DirectionalLight(0xffffff, 4.5);
 prevSun.position.set(5,10,8); prevScene.add(prevSun);
-prevScene.add(Object.assign(new THREE.PointLight(0x4ff0ff, 5, 18), { position: new THREE.Vector3(-4,2,-3) }));
-prevScene.add(Object.assign(new THREE.PointLight(0xc64bff, 3, 14), { position: new THREE.Vector3(3,-1,3) }));
+const prevFillA = new THREE.PointLight(0x4ff0ff, 5, 18);
+prevFillA.position.set(-4, 2, -3); prevScene.add(prevFillA);
+const prevFillB = new THREE.PointLight(0xc64bff, 3, 14);
+prevFillB.position.set(3, -1, 3); prevScene.add(prevFillB);
 const prevCarGroup = new THREE.Group();
 prevScene.add(prevCarGroup);
 let previewCarIdx = 0, previewAngle = 0;
@@ -690,10 +695,12 @@ function makeGate(colorHex, zPos, label, target) {
     const p = new THREE.Mesh(new THREE.BoxGeometry(1.1,10,1.1), mat);
     p.position.set(x,5,0); p.castShadow=true; grp.add(p);
   }
-  grp.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(ROAD_W+8.6,1.3,1.1), mat), { position: new THREE.Vector3(0,10.3,0) }));
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(ROAD_W+8.6,1.3,1.1), mat);
+  bar.position.set(0,10.3,0); grp.add(bar);
   const face = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W+6,9.2), new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:0.07, side:THREE.DoubleSide }));
   face.position.set(0,5,0); grp.add(face);
-  grp.add(Object.assign(new THREE.PointLight(col,6,20), { position: new THREE.Vector3(0,5.5,0) }));
+  const gatePt = new THREE.PointLight(col,6,20);
+  gatePt.position.set(0,5.5,0); grp.add(gatePt);
   if (label) {
     const cv = Object.assign(document.createElement('canvas'), { width:320, height:64 });
     const lx = cv.getContext('2d');
@@ -741,9 +748,15 @@ const screenCarSelect = document.getElementById('screen-car-select');
 const screenGameOver  = document.getElementById('screen-game-over');
 let hitFlashTimer = 0;
 
-document.getElementById('cs-preview-wrap').appendChild(prevRenderer.domElement);
+const csPreviewWrap = document.getElementById('cs-preview-wrap');
+if (csPreviewWrap) {
+  csPreviewWrap.appendChild(prevRenderer.domElement);
+} else {
+  console.error('[PulseDrive] #cs-preview-wrap not found — preview renderer not mounted');
+}
 document.getElementById('hud-username').textContent = incoming.username || '';
 document.getElementById('hud-speedo').textContent   = `${(CRUISE_SPD*2.237)|0} MPH`;
+console.log('[PulseDrive] DOM refs ready, wiring buttons...');
 
 // ── HUD helpers ────────────────────────────────────────────────────────────────
 function updateHearts() {
@@ -858,14 +871,20 @@ function setState(s) {
 }
 
 // ── Button wiring ──────────────────────────────────────────────────────────────
-document.getElementById('btn-new-game').addEventListener('click', () => setState(STATE.CAR_SELECT));
-document.getElementById('btn-load-game').addEventListener('click', () => setState(STATE.LOAD));
-document.getElementById('btn-settings').addEventListener('click', () => setState(STATE.SETTINGS));
-document.getElementById('btn-exit').addEventListener('click', () => setState(STATE.EXIT));
+function wireBtn(id, fn) {
+  const el = document.getElementById(id);
+  if (el) { el.addEventListener('click', fn); }
+  else { console.error('[PulseDrive] button not found: #' + id); }
+}
 
-document.getElementById('settings-back').addEventListener('click', () => setState(STATE.MENU));
-document.getElementById('load-back').addEventListener('click', () => setState(STATE.MENU));
-document.getElementById('exit-back').addEventListener('click', () => setState(STATE.MENU));
+wireBtn('btn-new-game',  () => setState(STATE.CAR_SELECT));
+wireBtn('btn-load-game', () => setState(STATE.LOAD));
+wireBtn('btn-settings',  () => setState(STATE.SETTINGS));
+wireBtn('btn-exit',      () => setState(STATE.EXIT));
+
+wireBtn('settings-back', () => setState(STATE.MENU));
+wireBtn('load-back',     () => setState(STATE.MENU));
+wireBtn('exit-back',     () => setState(STATE.MENU));
 
 document.getElementById('sl-master').addEventListener('input', e => {
   volMaster = e.target.value / 100;
@@ -876,14 +895,13 @@ document.getElementById('sl-music').addEventListener('input', e => {
   if (musicGain) musicGain.gain.value = volMusic;
 });
 
-document.getElementById('cs-prev').addEventListener('click', () => setPreviewCar(previewCarIdx - 1));
-document.getElementById('cs-next').addEventListener('click', () => setPreviewCar(previewCarIdx + 1));
-document.getElementById('cs-select').addEventListener('click', () => {
-  selectedCar = previewCarIdx;
-  setState(STATE.PLAYING);
-});
-document.getElementById('cs-back').addEventListener('click', () => setState(STATE.MENU));
-document.getElementById('go-menu').addEventListener('click', () => setState(STATE.MENU));
+wireBtn('cs-prev',   () => setPreviewCar(previewCarIdx - 1));
+wireBtn('cs-next',   () => setPreviewCar(previewCarIdx + 1));
+wireBtn('cs-select', () => { selectedCar = previewCarIdx; setState(STATE.PLAYING); });
+wireBtn('cs-back',   () => setState(STATE.MENU));
+wireBtn('go-menu',   () => setState(STATE.MENU));
+
+console.log('[PulseDrive] ✓ all buttons wired, game ready');
 
 // ── Portal collision ───────────────────────────────────────────────────────────
 function checkPortals() {
