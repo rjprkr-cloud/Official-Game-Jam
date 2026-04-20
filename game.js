@@ -69,19 +69,16 @@ const SCRIPT = {
     choices: [
       {
         text: 'Yeah all good 👍',
-        sub:  'Casual, unbothered',
         next: 'morgan_1a',
         fx:   () => { rel.morgan.trust += 5; profile.trusting++; },
       },
       {
         text: 'why are you asking',
-        sub:  'Guarded',
         next: 'morgan_1b',
         fx:   () => { rel.morgan.tension += 10; profile.defensive++; },
       },
       {
         text: '(leave on read)',
-        sub:  'Say nothing',
         next: 'morgan_1c',
         fx:   () => { rel.morgan.tension += 15; profile.avoidant++; },
         silent: true,
@@ -94,13 +91,11 @@ const SCRIPT = {
     choices: [
       {
         text: 'I was just tired',
-        sub:  'Honest but closed',
         next: 'morgan_2a',
         fx:   () => { profile.trusting++; },
       },
       {
         text: 'what do you mean "off"',
-        sub:  'Pressing it',
         next: 'morgan_2b',
         fx:   () => { profile.defensive++; rel.morgan.tension += 5; },
       },
@@ -112,13 +107,11 @@ const SCRIPT = {
     choices: [
       {
         text: 'oh ok. yeah I\'m fine',
-        sub:  'Downplay it',
         next: 'morgan_2a',
         fx:   () => {},
       },
       {
         text: 'you don\'t have to do that',
-        sub:  'Push away',
         next: 'morgan_2c',
         fx:   () => { profile.defensive++; rel.morgan.tension += 10; },
       },
@@ -130,13 +123,11 @@ const SCRIPT = {
     choices: [
       {
         text: 'sorry fell asleep',
-        sub:  'Cover it',
         next: 'morgan_2a',
         fx:   () => { profile.trusting++; },
       },
       {
         text: '(still nothing)',
-        sub:  'Let it sit',
         next: 'morgan_2d',
         fx:   () => { profile.avoidant += 2; rel.morgan.tension += 20; },
         silent: true,
@@ -155,13 +146,11 @@ const SCRIPT = {
     choices: [
       {
         text: 'no tell me',
-        sub:  'Open up',
         next: 'morgan_2e',
         fx:   () => { profile.trusting++; },
       },
       {
         text: 'yeah nvm',
-        sub:  'Drop it',
         next: 'morgan_2f',
         fx:   () => { profile.avoidant++; },
       },
@@ -185,13 +174,11 @@ const SCRIPT = {
     choices: [
       {
         text: 'I\'m ok. thanks for noticing',
-        sub:  'Let someone in',
         next: 'morgan_end_warm',
         fx:   () => { rel.morgan.trust += 10; profile.trusting++; },
       },
       {
         text: 'I\'m fine',
-        sub:  'Shut it down',
         next: 'morgan_end_flat',
         fx:   () => { profile.defensive++; },
       },
@@ -404,7 +391,7 @@ function onClickThread(mx, my) {
   if (!node?.choices || choiceMade || typingActive) return;
 
   const choices = node.choices;
-  const bH = 28, gap = 4;
+  const bH = 22, gap = 4;
   const totalH = choices.length * (bH + gap) - gap;
   let by = H - NAV_H - totalH - 6;
 
@@ -736,7 +723,7 @@ function drawThread() {
 
   // Determine area for bubbles
   const hasChoices = node?.choices && !choiceMade && !typingActive;
-  const choiceH    = hasChoices ? node.choices.length * 32 + 10 : 0;
+  const choiceH    = hasChoices ? node.choices.length * 26 + 10 : 0;
   const typingH    = typingActive ? 28 : 0;
   const bubbleBot  = H - NAV_H - choiceH - typingH - 4;
   const bubbleTop  = STATUS_H + 36;
@@ -828,7 +815,7 @@ function drawTyping(y, r) {
 }
 
 function drawChoices(choices, startY) {
-  const bH = 28, gap = 4;
+  const bH = 22, gap = 4;
   ctx.globalAlpha = choiceAnim;
   let by = startY + 4;
 
@@ -836,28 +823,22 @@ function drawChoices(choices, startY) {
     const isSilent = !!c.silent;
     // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    roundRect(9, by + 2, W - 18, bH, 7);
+    roundRect(9, by + 2, W - 18, bH, 6);
     ctx.fill();
     // Body
     ctx.fillStyle = isSilent ? 'rgba(45,45,55,0.92)' : 'rgba(22,70,140,0.92)';
-    roundRect(8, by, W - 16, bH, 7);
+    roundRect(8, by, W - 16, bH, 6);
     ctx.fill();
     // Border
     ctx.strokeStyle = isSilent ? 'rgba(130,130,150,0.35)' : 'rgba(80,140,255,0.45)';
     ctx.lineWidth = 1;
-    roundRect(8, by, W - 16, bH, 7);
+    roundRect(8, by, W - 16, bH, 6);
     ctx.stroke();
-    // Label
-    ctx.font = 'bold 8px monospace';
-    ctx.fillStyle = isSilent ? 'rgba(255,255,255,0.55)' : '#fff';
+    // Label — centred vertically, no subtext
+    ctx.font = '8px monospace';
+    ctx.fillStyle = isSilent ? 'rgba(255,255,255,0.5)' : '#fff';
     ctx.textAlign = 'left';
-    ctx.fillText(c.text, 18, by + 11);
-    // Subtext (interpretation hint)
-    if (c.sub) {
-      ctx.font = '7px monospace';
-      ctx.fillStyle = 'rgba(255,255,255,0.38)';
-      ctx.fillText(c.sub, 18, by + 22);
-    }
+    ctx.fillText(c.text, 16, by + bH/2 + 3);
     by += bH + gap;
   }
   ctx.globalAlpha = 1;
