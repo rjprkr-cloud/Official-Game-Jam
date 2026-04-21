@@ -46,6 +46,7 @@ let phaseTimer     = -1;
 let afternoonTimer = -1;
 let eveningTimer   = -1;
 let lateTimer      = -1;
+let phaseStartTime = 0;
 
 // ── Interpretation profile ─────────────────────────────────────────
 const profile = { defensive:0, trusting:0, avoidant:0 };
@@ -483,6 +484,223 @@ const SCRIPT = {
   unk_end_late:  { incoming:{ text:"it's late. let's just figure out the swap.", time:'2:51 AM' }, choices:null,
     onEnd:()=>flags.add('phone_swap_arranged') },
 
+  // ── Morgan — ambient morning ──────────────────────────────────
+  morgan_mc: {
+    incoming: { text:'lol sorry for the late texts btw. I was in my head', time:'9:14 AM' },
+    choices: [
+      { text:'it\'s fine. I was up anyway',   next:'mmc_1a', fx:()=>{ profile.trusting++; rel.morgan.trust+=4; } },
+      { text:'don\'t worry about it',         next:'mmc_1b', fx:()=>{} },
+      { text:'(seen)',        silent:true,     next:'mmc_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  mmc_1a:      { incoming:{ text:'same honestly', time:'9:14 AM' }, choices:null, onEnd:()=>flags.add('morgan_mc_warm') },
+  mmc_1b:      { incoming:{ text:'ok :)', time:'9:15 AM' }, choices:null, onEnd:()=>{} },
+  mmc_silence: { incoming:null, choices:null, onEnd:()=>flags.add('morgan_mc_ignored') },
+
+  morgan_coffee: {
+    incoming: { text:'are you going to be around today? I might go to that place on 5th if you want', time:'10:08 AM' },
+    choices: [
+      { text:'yeah what time',            next:'mco_1a', fx:()=>{ rel.morgan.trust+=6; profile.trusting++; } },
+      { text:'I can\'t today',            next:'mco_1b', fx:()=>{} },
+      { text:'(leave it)', silent:true,   next:'mco_silence', fx:()=>{ profile.avoidant++; rel.morgan.tension+=5; } },
+    ],
+  },
+  mco_1a:      { incoming:{ text:'like 2? no pressure at all', time:'10:09 AM' }, choices:null, onEnd:()=>flags.add('morgan_coffee_yes') },
+  mco_1b:      { incoming:{ text:'ok. another time', time:'10:09 AM' }, choices:null, onEnd:()=>{} },
+  mco_silence: { incoming:null, choices:null, onEnd:()=>flags.add('morgan_coffee_ignored') },
+
+  // ── Morgan — ambient afternoon ────────────────────────────────
+  morgan_mundane: {
+    incoming: { text:'have you seen yellowjackets. I\'ve been watching it for three days straight', time:'3:11 PM' },
+    choices: [
+      { text:'yes oh my god',               next:'mmun_1a', fx:()=>{ rel.morgan.trust+=5; profile.trusting++; } },
+      { text:'no what is it',               next:'mmun_1b', fx:()=>{} },
+      { text:'(don\'t reply)', silent:true, next:'mmun_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  mmun_1a:      { incoming:{ text:'I KNEW you\'d like it', time:'3:12 PM' }, choices:null, onEnd:()=>flags.add('morgan_mundane_bonded') },
+  mmun_1b:      { incoming:{ text:'survival drama but make it unhinged. you\'d love it', time:'3:12 PM' }, choices:null, onEnd:()=>{} },
+  mmun_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Morgan — ambient evening ──────────────────────────────────
+  morgan_eve_song: {
+    incoming: { text:'this song keeps making me think of last year for some reason', time:'7:04 PM' },
+    choices: [
+      { text:'which song',                    next:'mes_1a', fx:()=>{ rel.morgan.trust+=4; profile.trusting++; } },
+      { text:'what was last year like for you',next:'mes_1b', fx:()=>{ rel.morgan.trust+=8; profile.trusting+=2; } },
+      { text:'(don\'t reply)', silent:true,   next:'mes_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  mes_1a: { incoming:{ text:'you\'d know it. anyway. just a thing.', time:'7:05 PM' }, choices:null, onEnd:()=>{} },
+  mes_1b: { incoming:{ text:'complicated. like every year lol', time:'7:05 PM' }, choices:null, onEnd:()=>flags.add('morgan_opened_up') },
+  mes_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  morgan_eve_stars: {
+    incoming: { text:'do you ever just sit outside at night', time:'8:32 PM' },
+    choices: [
+      { text:'sometimes yeah',               next:'mst_1a', fx:()=>{ rel.morgan.trust+=5; profile.trusting++; } },
+      { text:'not usually',                  next:'mst_1b', fx:()=>{} },
+      { text:'(seen)', silent:true,          next:'mst_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  mst_1a:      { incoming:{ text:'there\'s something about 2am that feels honest', time:'8:33 PM' }, choices:null, onEnd:()=>flags.add('morgan_2am_honest') },
+  mst_1b:      { incoming:{ text:'you should try it. it\'s weird in a good way', time:'8:33 PM' }, choices:null, onEnd:()=>{} },
+  mst_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Alex — ambient morning ────────────────────────────────────
+  alex_mutual: {
+    incoming: { text:'btw did you talk to cam at all last night? they seemed off', time:'9:22 AM' },
+    choices: [
+      { text:'not really no',                next:'am_1a', fx:()=>{} },
+      { text:'yeah briefly. why',            next:'am_1b', fx:()=>{ profile.trusting++; } },
+      { text:'(shrug)', silent:true,         next:'am_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  am_1a:      { incoming:{ text:'I think they\'re going through something. idk', time:'9:23 AM' }, choices:null, onEnd:()=>{} },
+  am_1b:      { incoming:{ text:'they just broke up with someone I think. don\'t say anything', time:'9:23 AM' }, choices:null, onEnd:()=>flags.add('alex_gossip') },
+  am_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  alex_recap: {
+    incoming: { text:'honestly that party was a lot. like in a fun way but also', time:'10:44 AM' },
+    choices: [
+      { text:'yeah it was a lot',             next:'ar_1a', fx:()=>{ rel.alex.trust+=3; } },
+      { text:'I had fun actually',            next:'ar_1b', fx:()=>{ profile.trusting++; } },
+      { text:'(seen)', silent:true,           next:'ar_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  ar_1a:      { incoming:{ text:'right? I love riley but they need to learn what a guest list is', time:'10:45 AM' }, choices:null, onEnd:()=>{} },
+  ar_1b:      { incoming:{ text:'good!! me too mostly', time:'10:45 AM' }, choices:null, onEnd:()=>flags.add('alex_fun_confirmed') },
+  ar_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Alex — ambient afternoon ──────────────────────────────────
+  alex_hangout: {
+    incoming: { text:'do you want to come over later? we could watch something. I have snacks', time:'2:48 PM' },
+    choices: [
+      { text:'yeah that sounds good',        next:'ah_1a', fx:()=>{ rel.alex.trust+=8; profile.trusting++; flags.add('alex_hangout_yes'); } },
+      { text:'maybe. I\'ll see how I feel',  next:'ah_1b', fx:()=>{} },
+      { text:'I think I need to be home',    next:'ah_1c', fx:()=>{} },
+      { text:'(leave it)', silent:true,      next:'ah_silence', fx:()=>{ profile.avoidant++; rel.alex.tension+=5; } },
+    ],
+  },
+  ah_1a:      { incoming:{ text:'ok!! like 8? I\'ll put something on', time:'2:49 PM' }, choices:null, onEnd:()=>{} },
+  ah_1b:      { incoming:{ text:'ok no pressure. door\'s open', time:'2:49 PM' }, choices:null, onEnd:()=>{} },
+  ah_1c:      { incoming:{ text:'totally fair. rain check', time:'2:49 PM' }, choices:null, onEnd:()=>{} },
+  ah_silence: { incoming:null, choices:null, onEnd:()=>flags.add('alex_hangout_ignored') },
+
+  alex_drama: {
+    incoming: { text:'ok wait I have to tell you something about riley but you cannot make it weird', time:'4:02 PM' },
+    choices: [
+      { text:'ok what',                      next:'ad_1a', fx:()=>{ profile.trusting++; } },
+      { text:'I don\'t think I want to know',next:'ad_1b', fx:()=>{ profile.defensive++; } },
+      { text:'(seen)', silent:true,          next:'ad_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  ad_1a:      { incoming:{ text:'they\'ve been talking about you. like in a nice way. just. a lot.', time:'4:03 PM' }, choices:null, onEnd:()=>flags.add('riley_talks_about_you') },
+  ad_1b:      { incoming:{ text:'fair. probably smart.', time:'4:03 PM' }, choices:null, onEnd:()=>{} },
+  ad_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Alex — ambient evening ────────────────────────────────────
+  alex_eve_check: {
+    incoming: { text:'hey. you\'ve been quiet today. everything ok?', time:'7:38 PM' },
+    choices: [
+      { text:'yeah just tired',              next:'aec_1a', fx:()=>{} },
+      { text:'not really',                   next:'aec_1b', fx:()=>{ profile.trusting++; rel.alex.trust+=8; } },
+      { text:'(seen)', silent:true,          next:'aec_silence', fx:()=>{ profile.avoidant++; rel.alex.tension+=5; } },
+    ],
+  },
+  aec_1a:      { incoming:{ text:'ok. get some sleep', time:'7:39 PM' }, choices:null, onEnd:()=>{} },
+  aec_1b:      { incoming:{ text:'yeah I figured. I\'m here if you want to talk', time:'7:39 PM' }, choices:null, onEnd:()=>flags.add('alex_available') },
+  aec_silence: { incoming:null, choices:null, onEnd:()=>flags.add('alex_eve_ignored') },
+
+  // ── Riley — ambient morning ───────────────────────────────────
+  riley_photo: {
+    incoming: { text:'also I found a photo from last night if you want it lol', time:'9:41 AM' },
+    choices: [
+      { text:'yes send it',                  next:'rp_1a', fx:()=>{ profile.trusting++;  rel.riley.trust+=4; } },
+      { text:'nah I\'m good',                next:'rp_1b', fx:()=>{ profile.defensive++; } },
+      { text:'(seen)', silent:true,          next:'rp_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  rp_1a:      { incoming:{ text:'ok I\'ll send it to your email. it\'s a good one', time:'9:42 AM' }, choices:null, onEnd:()=>flags.add('riley_photo_sent') },
+  rp_1b:      { incoming:{ text:'ok lol. just thought it was cute', time:'9:42 AM' }, choices:null, onEnd:()=>{} },
+  rp_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Riley — ambient afternoon ─────────────────────────────────
+  riley_jacket: {
+    incoming: { text:'I think I found your jacket btw. brown? or like. burnt orange?', time:'1:33 PM' },
+    choices: [
+      { text:'yeah that\'s it',              next:'rj_1a', fx:()=>{ rel.riley.trust+=4; profile.trusting++; } },
+      { text:'maybe? I think it\'s brown',   next:'rj_1b', fx:()=>{} },
+      { text:'(seen)', silent:true,          next:'rj_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  rj_1a:      { incoming:{ text:'ok it\'s safe. come get it whenever', time:'1:34 PM' }, choices:null, onEnd:()=>flags.add('jacket_located') },
+  rj_1b:      { incoming:{ text:'I\'ll check. there\'s actually two here lol', time:'1:34 PM' }, choices:null, onEnd:()=>{} },
+  rj_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  riley_aft_check: {
+    incoming: { text:'random question but are you doing ok in general? like not just last night', time:'3:47 PM' },
+    choices: [
+      { text:'yeah I\'m ok. why',            next:'rac_1a', fx:()=>{} },
+      { text:'honestly not great',           next:'rac_1b', fx:()=>{ profile.trusting+=2; rel.riley.trust+=10; } },
+      { text:'(don\'t answer)', silent:true, next:'rac_silence', fx:()=>{ profile.avoidant++; rel.riley.tension+=5; } },
+    ],
+  },
+  rac_1a: { incoming:{ text:'idk. just checking. you seem like you\'ve got a lot going on', time:'3:48 PM' }, choices:null, onEnd:()=>{} },
+  rac_1b: {
+    incoming: { text:'yeah I thought so. same honestly.', time:'3:48 PM' },
+    choices: [
+      { text:'we should actually talk sometime', next:'rac_2', fx:()=>{ rel.riley.trust+=8; flags.add('riley_wants_to_talk'); } },
+      { text:'yeah.',                            next:'rac_3', fx:()=>{} },
+    ],
+  },
+  rac_2:      { incoming:{ text:'yeah. I\'d like that.', time:'3:49 PM' }, choices:null, onEnd:()=>{} },
+  rac_3:      { incoming:{ text:'...yeah.', time:'3:49 PM' }, choices:null, onEnd:()=>{} },
+  rac_silence:{ incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Riley — ambient evening ───────────────────────────────────
+  riley_eve: {
+    incoming: { text:'can I tell you something kind of embarrassing', time:'7:14 PM' },
+    choices: [
+      { text:'yeah of course',               next:'rev_1a', fx:()=>{ profile.trusting++;  rel.riley.trust+=5; } },
+      { text:'maybe not tonight',            next:'rev_1b', fx:()=>{ profile.defensive++; } },
+      { text:'(seen)', silent:true,          next:'rev_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  rev_1a: {
+    incoming: { text:'I was kind of hoping you\'d stay longer last night. I don\'t know why I\'m telling you that.', time:'7:15 PM' },
+    choices: [
+      { text:'I\'m glad you told me',         next:'rev_2a', fx:()=>{ rel.riley.trust+=8; profile.trusting++; } },
+      { text:'I didn\'t want to overstay',    next:'rev_2b', fx:()=>{ rel.riley.trust+=5; } },
+      { text:'(say nothing)', silent:true,    next:'rev_2c', fx:()=>{ profile.avoidant++;  } },
+    ],
+  },
+  rev_1b:      { incoming:{ text:'ok. another time maybe.', time:'7:15 PM' }, choices:null, onEnd:()=>{} },
+  rev_silence: { incoming:null, choices:null, onEnd:()=>{} },
+  rev_2a:      { incoming:{ text:'ok. good.', time:'7:16 PM' }, choices:null, onEnd:()=>flags.add('riley_honest_eve') },
+  rev_2b:      { incoming:{ text:'you wouldn\'t have.', time:'7:16 PM' }, choices:null, onEnd:()=>{ flags.add('riley_honest_eve'); rel.riley.trust+=3; } },
+  rev_2c:      { incoming:null, choices:null, onEnd:()=>flags.add('riley_eve_silence') },
+
+  riley_music: {
+    incoming: { text:'ok I\'ve been listening to the same album for 3 hours. I think I\'m spiraling lol', time:'8:58 PM' },
+    choices: [
+      { text:'which album',                  next:'rm_1a', fx:()=>{ rel.riley.trust+=3; } },
+      { text:'same honestly',                next:'rm_1b', fx:()=>{ rel.riley.trust+=6; profile.trusting++; } },
+      { text:'you ok?',                      next:'rm_1c', fx:()=>{ rel.riley.trust+=4; profile.trusting++; } },
+      { text:'(don\'t reply)', silent:true,  next:'rm_silence', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  rm_1a: { incoming:{ text:'it\'s one of those ones. you\'d know it.', time:'8:59 PM' }, choices:null, onEnd:()=>{} },
+  rm_1b: {
+    incoming: { text:'ok wait which one', time:'8:59 PM' },
+    choices: [
+      { text:'[send album]', next:'rm_1b2', fx:()=>{ flags.add('shared_taste'); rel.riley.trust+=5; } },
+    ],
+  },
+  rm_1b2:     { incoming:{ text:'wait. same one. that\'s kind of insane.', time:'9:00 PM' }, choices:null, onEnd:()=>flags.add('riley_music_moment') },
+  rm_1c:      { incoming:{ text:'I think so. just one of those nights.', time:'8:59 PM' }, choices:null, onEnd:()=>{} },
+  rm_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
 };
 
 // ── Threads ────────────────────────────────────────────────────────
@@ -498,6 +716,56 @@ const threads = {
   }
 })();
 
+// ── Ambient interactions ───────────────────────────────────────────
+// Each fires once when: correct phase, delay elapsed, condition met, thread free.
+const ambientSeeds = [
+  // — Morning —
+  { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_mc',       delay:5,  fired:false, cond:()=>true },
+  { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_coffee',   delay:18, fired:false, cond:()=>!flags.has('morgan_silence')&&!flags.has('morgan_mc_ignored') },
+  { phase:PHASE.MORNING,   thread:'alex',   node:'alex_mutual',     delay:8,  fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.MORNING,   thread:'alex',   node:'alex_recap',      delay:25, fired:false, cond:()=>true },
+  { phase:PHASE.MORNING,   thread:'riley',  node:'riley_photo',     delay:12, fired:false, cond:()=>!flags.has('riley_ignored') },
+  // — Afternoon —
+  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_jacket',    delay:6,  fired:false, cond:()=>!flags.has('riley_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_mundane',  delay:14, fired:false, cond:()=>!flags.has('morgan_final_silence') },
+  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_hangout',    delay:20, fired:false, cond:()=>!flags.has('alex_ignored')&&!flags.has('alex_left_hanging') },
+  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_aft_check', delay:28, fired:false, cond:()=>true },
+  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_drama',      delay:38, fired:false, cond:()=>!flags.has('alex_ignored') },
+  // — Evening —
+  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_jacket',    delay:0,  fired:false, cond:()=>!flags.has('jacket_located')&&!flags.has('riley_ignored') },
+  { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_song', delay:8,  fired:false, cond:()=>rel.morgan.trust>=35&&!flags.has('morgan_final_silence') },
+  { phase:PHASE.EVENING,   thread:'alex',   node:'alex_eve_check',  delay:12, fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_eve',       delay:18, fired:false, cond:()=>rel.riley.trust>=45 },
+  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_music',     delay:30, fired:false, cond:()=>!flags.has('riley_ignored') },
+  { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_stars',delay:38, fired:false, cond:()=>!flags.has('morgan_final_silence') },
+];
+
+function tickAmbientSeeds() {
+  const elapsed = totalTime - phaseStartTime;
+  for (const seed of ambientSeeds) {
+    if (seed.fired) continue;
+    if (seed.phase !== timePhase) continue;
+    if (elapsed < seed.delay) continue;
+    if (seed.cond && !seed.cond()) { seed.fired = true; continue; } // condition failed — skip
+    const t = threads[seed.thread];
+    if (!t) { seed.fired = true; continue; }
+    if (t.scriptNode !== null) continue; // thread busy — wait
+    seed.fired = true;
+    const node = SCRIPT[seed.node];
+    if (!node) continue;
+    t.scriptNode = seed.node;
+    if (node.incoming) {
+      t.messages.push({ from:'them', text:node.incoming.text, time:node.incoming.time||clockStr(), read:false });
+      t.unread++;
+      if (seed.thread !== activeThreadKey) pushNotif(rel[seed.thread]?.name||seed.thread, node.incoming.text);
+    }
+    if (!node.choices) {
+      if (node.onEnd) node.onEnd();
+      t.scriptNode = null;
+    }
+  }
+}
+
 // ── Phase transitions ──────────────────────────────────────────────
 function queueMorning() {
   if (timePhase >= PHASE.MORNING || phaseTimer >= 0) return;
@@ -507,6 +775,7 @@ function queueMorning() {
 function seedMorning() {
   if (timePhase >= PHASE.MORNING) return;
   timePhase = PHASE.MORNING;
+  phaseStartTime = totalTime;
 
   threads.alex = { contact:'alex', messages:[], unread:0, scriptNode:'alex_0' };
   const aNode = SCRIPT['alex_0'];
@@ -533,6 +802,7 @@ function queueAfternoon() {
 function seedAfternoon() {
   if (timePhase >= PHASE.AFTERNOON) return;
   timePhase = PHASE.AFTERNOON;
+  phaseStartTime = totalTime;
 
   // Riley thread
   threads.riley = { contact:'riley', messages:[], unread:0, scriptNode:'riley_0' };
@@ -574,6 +844,7 @@ function queueEvening() {
 function seedEvening() {
   if (timePhase >= PHASE.EVENING) return;
   timePhase = PHASE.EVENING;
+  phaseStartTime = totalTime;
 
   notes.push({ time:'7:22 PM', body:eveningNoteBody() });
 
@@ -951,6 +1222,7 @@ function update(dt) {
   if (timePhase===PHASE.AFTERNOON && eveningTimer<0) {
     if (Object.values(threads).every(t=>!t.scriptNode)) queueEvening();
   }
+  tickAmbientSeeds();
   if (screen===SCR.THREAD&&!choiceMade&&!typingActive) choiceAnim=Math.min(1,choiceAnim+dt*2.8);
   if (typingActive) { typingTimer-=dt; if (typingTimer<=0) deliverPending(); }
   if (notifToast)   { notifToast.timer-=dt; if (notifToast.timer<=0) notifToast=null; }
