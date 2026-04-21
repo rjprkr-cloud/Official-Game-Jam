@@ -11,8 +11,6 @@ canvas.height = 480;
 const W = canvas.width, H = canvas.height;
 ctx.imageSmoothingEnabled = false;
 
-// Pre-load Buzzer11 so canvas uses it from the first frame
-document.fonts.load('9px Buzzer11');
 
 // â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const portal = (typeof Portal !== 'undefined')
@@ -1329,9 +1327,9 @@ function draw() {
 // â”€â”€ Status bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawStatusBar() {
   ctx.fillStyle='rgba(5,5,12,0.78)'; ctx.fillRect(0,0,W,STATUS_H);
-  ctx.font='bold 9px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='#ddd';
+  ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#ddd';
   ctx.fillText(clockStr(),8,13);
-  ctx.textAlign='right'; ctx.font='8px Buzzer11, monospace'; ctx.fillStyle='#aaa';
+  ctx.textAlign='right'; ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#aaa';
   let rx=W-6; ctx.fillText('â–®â–®â–®â–¯',rx,13); rx-=34;
   if (settings.doNotDisturb) ctx.fillText('ðŸŒ™',rx,13);
   // Missed call indicator
@@ -1347,7 +1345,7 @@ function drawBottomNav() {
   ctx.fillStyle='rgba(8,8,16,0.93)'; ctx.fillRect(0,y,W,NAV_H);
   ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,y,W,1);
   if (screen!==SCR.HOME) {
-    ctx.font='10px Buzzer11, monospace'; ctx.textAlign='left';
+    ctx.font='10px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left';
     ctx.fillStyle='#6aacff'; ctx.fillText('â€¹  back',12,y+17);
   }
   ctx.fillStyle='rgba(255,255,255,0.3)';
@@ -1365,8 +1363,8 @@ function drawNotifToast() {
   ctx.fillStyle='#3c8c4a'; roundRect(tx+6,ty+6,22,22,5); ctx.fill();
   ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.fillText('ðŸ’¬',tx+17,ty+22);
   ctx.textAlign='left';
-  ctx.font='bold 7px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.fillText(notifToast.sender,tx+34,ty+13);
-  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.6)';
+  ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.fillText(notifToast.sender,tx+34,ty+13);
+  ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.6)';
   const pv=notifToast.text.length>46?notifToast.text.slice(0,45)+'â€¦':notifToast.text;
   ctx.fillText(pv,tx+34,ty+25);
   ctx.restore();
@@ -1474,7 +1472,7 @@ function drawLock() {
   ctx.textAlign='center';
   ctx.lineJoin='round';
   ctx.miterLimit=2;
-  ctx.font='22px Buzzer11, monospace';
+  ctx.font='22px Arial Narrow, Arial, sans-serif';
   // Outer glow
   ctx.shadowColor='#7040c0';
   ctx.shadowBlur=10;
@@ -1494,11 +1492,11 @@ function drawLock() {
   ctx.fillText('Receipts',W/2,68);
   ctx.restore();
 
-  ctx.font='bold 52px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 52px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText(`${now.getHours()%12||12}:${String(now.getMinutes()).padStart(2,'0')}`,W/2,130);
   const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  ctx.font='9px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.font='9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.5)';
   ctx.fillText(`${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`,W/2,148);
   let cy=170;
   for (const t of Object.values(threads).filter(t=>t.unread>0).slice(0,3)) {
@@ -1532,7 +1530,7 @@ function drawLockSlider() {
 
   // Label â€” fades as thumb moves right
   ctx.globalAlpha = Math.max(0, 1 - lockSlide.progress * 2.5);
-  ctx.font = '8px Buzzer11, monospace'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.38)';
+  ctx.font = '8px Arial Narrow, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.38)';
   ctx.fillText('slide to unlock  â€º', SLIDE_X + SLIDE_W / 2 + SLIDE_TR, cy + 3);
   ctx.globalAlpha = 1;
 
@@ -1541,7 +1539,7 @@ function drawLockSlider() {
   ctx.beginPath(); ctx.arc(tx, cy, SLIDE_TR, 0, Math.PI * 2); ctx.fill();
   // Arrow chevron on thumb
   ctx.fillStyle = 'rgba(30,30,50,0.6)';
-  ctx.font = 'bold 11px Buzzer11, monospace'; ctx.textAlign = 'center';
+  ctx.font = 'bold 11px Arial Narrow, Arial, sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('â€º', tx + 1, cy + 4);
   ctx.textAlign = 'left';
 }
@@ -1552,10 +1550,10 @@ function drawLockCard(x,y,w,sender,preview) {
   ctx.fillStyle='#3c8c4a'; roundRect(x+8,y+9,28,28,6); ctx.fill();
   ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('ðŸ’¬',x+22,y+28);
   ctx.textAlign='left';
-  ctx.font='bold 8px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.fillText(sender,x+44,y+20);
-  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.58)';
+  ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.fillText(sender,x+44,y+20);
+  ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.58)';
   ctx.fillText(preview.length>28?preview.slice(0,27)+'â€¦':preview,x+44,y+34);
-  ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.28)';
+  ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.28)';
   ctx.textAlign='right'; ctx.fillText('now',x+w-8,y+20); ctx.textAlign='left';
 }
 
@@ -1570,7 +1568,7 @@ function drawHome() {
   if (timePhase>=PHASE.EVENING && Object.values(threads).every(t=>!t.scriptNode)) {
     const qy=H-NAV_H-30;
     ctx.fillStyle='rgba(255,255,255,0.05)'; roundRect(8,qy,W-16,22,6); ctx.fill();
-    ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.28)';
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.28)';
     ctx.fillText('the phone goes quiet  Â·  tap to reflect',W/2,qy+14);
     ctx.textAlign='left';
   }
@@ -1620,21 +1618,21 @@ function drawAppIcon(app) {
   if (app.id==='music'&&musicState.playing) {
     ctx.fillStyle=TRACKS[musicState.idx]?.col||'#8030a0';
     ctx.beginPath(); ctx.arc(x+APP_SZ-5,y+5,7,0,Math.PI*2); ctx.fill();
-    ctx.font='bold 8px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+    ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.textAlign='center';
     ctx.fillText('\u266b',x+APP_SZ-5,y+9);
     badge=-1;
   }
   if (badge>0) {
     ctx.fillStyle='#e53935'; ctx.beginPath();
     ctx.arc(x+APP_SZ-5,y+5,7,0,Math.PI*2); ctx.fill();
-    ctx.font='bold 7px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+    ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.textAlign='center';
     ctx.fillText(String(badge),x+APP_SZ-5,y+8);
   }
 
   // 8 — Label with shadow so it reads over wallpaper
   ctx.save();
   ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=5;
-  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.textAlign='center';
   ctx.fillText(app.label,x+APP_SZ/2,y+APP_SZ+13);
   ctx.restore();
   ctx.textAlign='left';
@@ -1654,17 +1652,17 @@ function drawThreadRow(key,t,y) {
   ctx.fillRect(0,y,W,55);
   ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(52,y+54,W-52,1);
   ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(28,y+27,18,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 11px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText((r?.name||key)[0].toUpperCase(),28,y+32);
   ctx.textAlign='left';
-  ctx.font=t.unread>0?'bold 9px Buzzer11, monospace':'9px Buzzer11, monospace'; ctx.fillStyle='#fff';
+  ctx.font=t.unread>0?'bold 9px Arial Narrow, Arial, sans-serif':'9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
   ctx.fillText(r?.name||key,54,y+18);
-  ctx.font='8px Buzzer11, monospace';
+  ctx.font='8px Arial Narrow, Arial, sans-serif';
   ctx.fillStyle=t.unread>0?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.38)';
   const prev=last?(last.from==='me'?'You: '+last.text:last.text):'';
   ctx.fillText(prev.length>26?prev.slice(0,25)+'â€¦':prev,54,y+34);
   if (last) {
-    ctx.textAlign='right'; ctx.font='6px Buzzer11, monospace';
+    ctx.textAlign='right'; ctx.font='6px Arial Narrow, Arial, sans-serif';
     ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillText(last.time,W-10,y+18); ctx.textAlign='left';
   }
   if (t.unread>0) { ctx.fillStyle='#3c8c4a'; ctx.beginPath(); ctx.arc(W-13,y+33,5,0,Math.PI*2); ctx.fill(); }
@@ -1678,11 +1676,11 @@ function drawThread() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,34);
   ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(0,STATUS_H+33,W,1);
-  ctx.font='11px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('â€¹',8,STATUS_H+22);
+  ctx.font='11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('â€¹',8,STATUS_H+22);
   ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(W/2,STATUS_H+11,9,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText((r?.name||activeThreadKey)[0].toUpperCase(),W/2,STATUS_H+14);
-  ctx.font='bold 9px Buzzer11, monospace'; ctx.fillStyle='#fff';
+  ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
   ctx.fillText(r?.name||activeThreadKey,W/2,STATUS_H+30);
   ctx.textAlign='left';
   const hasChoices=node?.choices&&!choiceMade&&!typingActive;
@@ -1699,9 +1697,9 @@ function drawBubbles(t,top,bottom) {
   for (let i=t.messages.length-1;i>=0;i--) {
     const msg=t.messages[i], isMe=msg.from==='me';
     const maxBW=190,padX=9,padY=7;
-    const lines=wrapText(msg.text,maxBW-padX*2,'8px Buzzer11, monospace');
+    const lines=wrapText(msg.text,maxBW-padX*2,'8px Arial Narrow, Arial, sans-serif');
     const bH=lines.length*12+padY*2;
-    const bW=Math.min(maxBW,Math.ceil(longestLine(lines,'8px Buzzer11, monospace'))+padX*2+4);
+    const bW=Math.min(maxBW,Math.ceil(longestLine(lines,'8px Arial Narrow, Arial, sans-serif'))+padX*2+4);
     y-=bH+7;
     if (y+bH<top) break;
     const bX=isMe?W-bW-10:10;
@@ -1711,14 +1709,14 @@ function drawBubbles(t,top,bottom) {
     else       { ctx.moveTo(bX,y+bH-10);    ctx.lineTo(bX-6,y+bH-4);    ctx.lineTo(bX+4,y+bH-4);    }
     ctx.fill();
     ctx.fillStyle=isMe?'#1d5fa8':'#252535'; roundRect(bX,y,bW,bH,10); ctx.fill();
-    ctx.font='8px Buzzer11, monospace'; ctx.fillStyle='#f0f0f0'; ctx.textAlign='left';
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#f0f0f0'; ctx.textAlign='left';
     for (let li=0;li<lines.length;li++) ctx.fillText(lines[li],bX+padX,y+padY+10+li*12);
     if (isMe&&i===t.messages.length-1) {
-      ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.textAlign='right';
+      ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.textAlign='right';
       ctx.fillText(settings.readReceipts?'Read':'Delivered',W-10,y+bH+8);
     }
     if (i===0||i%4===0) {
-      ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.2)';
+      ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.2)';
       ctx.textAlign='center'; ctx.fillText(msg.time,W/2,y-3);
     }
     ctx.textAlign='left';
@@ -1744,7 +1742,7 @@ function drawChoices(choices,startY) {
     ctx.fillStyle=silent?'rgba(45,45,55,0.92)':'rgba(22,70,140,0.92)'; roundRect(8,by,W-16,bH,6); ctx.fill();
     ctx.strokeStyle=silent?'rgba(130,130,150,0.3)':'rgba(80,140,255,0.4)'; ctx.lineWidth=1;
     roundRect(8,by,W-16,bH,6); ctx.stroke();
-    ctx.font='8px Buzzer11, monospace'; ctx.fillStyle=silent?'rgba(255,255,255,0.45)':'#fff';
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle=silent?'rgba(255,255,255,0.45)':'#fff';
     ctx.textAlign='left'; ctx.fillText(c.text,16,by+bH/2+3);
     by+=bH+gap;
   }
@@ -1762,10 +1760,10 @@ function drawNotes() {
     if (ry>H-NAV_H-10) break;
     ctx.fillStyle='rgba(255,220,80,0.04)'; roundRect(8,ry,W-16,52,6); ctx.fill();
     ctx.strokeStyle='rgba(255,220,80,0.1)'; ctx.lineWidth=1; roundRect(8,ry,W-16,52,6); ctx.stroke();
-    ctx.font='6px Buzzer11, monospace'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.25)';
+    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.25)';
     ctx.fillText(note.time,W-16,ry+12);
-    ctx.textAlign='left'; ctx.font='8px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,220,0.85)';
-    const lines=wrapText(note.body,W-40,'8px Buzzer11, monospace');
+    ctx.textAlign='left'; ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,220,0.85)';
+    const lines=wrapText(note.body,W-40,'8px Arial Narrow, Arial, sans-serif');
     for (let li=0;li<Math.min(lines.length,3);li++) ctx.fillText(lines[li],16,ry+14+li*12);
     ry+=58;
   }
@@ -1777,7 +1775,7 @@ function drawPhotos() {
   appHeader('Photos');
   const py=STATUS_H+32, ph=H-NAV_H-py-24, pw=W-16;
   drawNightScene(8,py,pw,ph,photoZoom);
-  ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center';
+  ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center';
   ctx.fillStyle='rgba(255,255,255,0.28)';
   ctx.fillText(photoZoom?'tap to zoom out':'tap to zoom',W/2,H-NAV_H-6);
   ctx.textAlign='left';
@@ -1828,16 +1826,16 @@ function drawNightScene(x,y,w,h,zoomed) {
   }
   // Timestamp â€” the anomaly
   ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(x+w-66,y+h-18,62,14);
-  ctx.font='bold 7px Buzzer11, monospace'; ctx.textAlign='right';
+  ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right';
   ctx.fillStyle=zoomed?'#ffcc44':'rgba(255,255,255,0.6)';
   ctx.fillText('12:31 AM',x+w-6,y+h-6);
   // Location tag â€” only after timeline revealed
   if (flags.has('alex_timeline_revealed')) {
-    ctx.font='6px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
     ctx.fillText('near Riley St',x+8,y+h-6);
   }
   if (zoomed && flags.has('morgan_night_ok')) {
-    ctx.font='6px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,90,90,0.55)';
+    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,90,90,0.55)';
     ctx.fillText('Morgan texted at 11:42 PM',x+w/2,y+h-22);
   }
   ctx.restore();
@@ -1866,26 +1864,26 @@ function drawCalls() {
     // Avatar
     const r=rel[entry.key];
     ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(28,ry+21,14,0,Math.PI*2); ctx.fill();
-    ctx.font='bold 9px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+    ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
     ctx.fillText(entry.name[0],28,ry+25);
 
     // Type icon + name
     ctx.textAlign='left';
     const typeCol = entry.type==='missed'?'#e53935': entry.type==='outgoing'?'#6aacff':'rgba(255,255,255,0.5)';
     const typeIcon = entry.type==='missed'?'â†™':'â†—';
-    ctx.font='8px Buzzer11, monospace'; ctx.fillStyle=typeCol;
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle=typeCol;
     ctx.fillText(typeIcon,50,ry+16);
-    ctx.font=entry.type==='missed'?'bold 9px Buzzer11, monospace':'9px Buzzer11, monospace';
+    ctx.font=entry.type==='missed'?'bold 9px Arial Narrow, Arial, sans-serif':'9px Arial Narrow, Arial, sans-serif';
     ctx.fillStyle=entry.type==='missed'?'#e87070':'#fff';
     ctx.fillText(entry.name,62,ry+16);
-    ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
     ctx.fillText(entry.time,62,ry+30);
     ry+=43;
   }
 
   // Voicemail section
   ry+=8;
-  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.textAlign='left';
+  ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.textAlign='left';
   ctx.fillText('VOICEMAIL',14,ry);
   ry+=10;
 
@@ -1897,11 +1895,11 @@ function drawCalls() {
 
   // VM header row
   ctx.fillStyle=rel.morgan.color; ctx.beginPath(); ctx.arc(26,ry+17,10,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff'; ctx.fillText('M',26,ry+21);
+  ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff'; ctx.fillText('M',26,ry+21);
   ctx.textAlign='left';
-  ctx.font=vm.listened?'9px Buzzer11, monospace':'bold 9px Buzzer11, monospace';
+  ctx.font=vm.listened?'9px Arial Narrow, Arial, sans-serif':'bold 9px Arial Narrow, Arial, sans-serif';
   ctx.fillStyle=vm.listened?'#aaa':'#fff'; ctx.fillText('Morgan',44,ry+13);
-  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
   ctx.fillText(`${vm.time}  Â·  ${vm.duration}`,44,ry+26);
   if (!vm.listened) {
     ctx.fillStyle='#e53935'; ctx.beginPath(); ctx.arc(W-18,ry+17,5,0,Math.PI*2); ctx.fill();
@@ -1912,12 +1910,12 @@ function drawCalls() {
     ry+=36;
     ctx.fillStyle='rgba(0,0,0,0)';
     if (vm.listened) {
-      ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,220,0.75)';
-      const lines=wrapText(vm.transcript,W-44,'7px Buzzer11, monospace');
+      ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,220,0.75)';
+      const lines=wrapText(vm.transcript,W-44,'7px Arial Narrow, Arial, sans-serif');
       for (let li=0;li<Math.min(lines.length,4);li++) ctx.fillText(lines[li],18,ry+li*11);
     } else {
       ctx.fillStyle='rgba(100,160,255,0.8)'; roundRect(W/2-40,ry,80,22,5); ctx.fill();
-      ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+      ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
       ctx.fillText('â–¶  Listen',W/2,ry+14);
       ctx.textAlign='left';
     }
@@ -1928,7 +1926,7 @@ function drawCalls() {
     const cby=H-NAV_H-36;
     ctx.fillStyle='rgba(60,140,74,0.12)'; roundRect(8,cby,W-16,28,6); ctx.fill();
     ctx.strokeStyle='rgba(60,140,74,0.35)'; ctx.lineWidth=1; roundRect(8,cby,W-16,28,6); ctx.stroke();
-    ctx.font='8px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#7ed87f';
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#7ed87f';
     ctx.fillText('ðŸ“ž  Call Morgan back',W/2,cby+17);
     ctx.textAlign='left';
   }
@@ -1954,13 +1952,13 @@ function drawMusicList() {
     ctx.fillStyle=t.col+'28'; ctx.fillRect(0,ry,W,38);
     ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(0,ry+37,W,1);
     ctx.fillStyle=t.col; roundRect(10,ry+7,24,24,5); ctx.fill();
-    ctx.font='13px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+    ctx.font='13px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
     ctx.fillText(musicState.playing?'â¸':'â–¶',22,ry+25);
     ctx.textAlign='left';
-    ctx.font='bold 8px Buzzer11, monospace'; ctx.fillStyle='#fff';
+    ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
     const titleStr = t.title.length>22 ? t.title.slice(0,21)+'â€¦' : t.title;
     ctx.fillText(titleStr,42,ry+17);
-    ctx.font='7px Buzzer11, monospace'; ctx.fillStyle=t.col;
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle=t.col;
     ctx.fillText(musicState.playing?'â™« now playing':'paused',42,ry+30);
     ry+=42;
   }
@@ -1973,16 +1971,16 @@ function drawMusicList() {
     ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(44,ry+33,W-44,1);
     // Color swatch
     ctx.fillStyle=t.col; roundRect(10,ry+7,20,20,4); ctx.fill();
-    ctx.font='bold 8px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,0.5)';
     ctx.fillText(i+1,20,ry+21);
     ctx.textAlign='left';
-    ctx.font=active?'bold 8px Buzzer11, monospace':'8px Buzzer11, monospace';
+    ctx.font=active?'bold 8px Arial Narrow, Arial, sans-serif':'8px Arial Narrow, Arial, sans-serif';
     ctx.fillStyle=active?'#fff':'rgba(255,255,255,0.75)';
     ctx.fillText(t.title.length>26?t.title.slice(0,25)+'â€¦':t.title,40,ry+22);
     // Playing dots animation
     if (active&&musicState.playing) {
       const d='.'.repeat(Math.floor(totalTime*3)%4);
-      ctx.font='8px Buzzer11, monospace'; ctx.textAlign='right'; ctx.fillStyle=t.col;
+      ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right'; ctx.fillStyle=t.col;
       ctx.fillText('â™«'+d,W-10,ry+22); ctx.textAlign='left';
     }
     ry+=34;
@@ -2026,10 +2024,10 @@ function drawMusicPlayer() {
 
   // Track info
   const infoY=artY+artS+16;
-  ctx.font='bold 10px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 10px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   const displayTitle = t.title.length>24 ? t.title.slice(0,23)+'â€¦' : t.title;
   ctx.fillText(displayTitle,W/2,infoY);
-  ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.3)';
+  ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.3)';
   ctx.fillText(`${musicState.idx+1}  /  ${TRACKS.length}`,W/2,infoY+13);
 
   // Progress bar
@@ -2041,22 +2039,22 @@ function drawMusicPlayer() {
   // Scrubber thumb
   ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(progX+Math.round(progW*pct),progY+2,5,0,Math.PI*2); ctx.fill();
   // Times
-  ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.28)';
+  ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.28)';
   ctx.textAlign='left';  ctx.fillText(fmtTime(cur),progX,progY+14);
   ctx.textAlign='right'; ctx.fillText(fmtTime(dur),progX+progW,progY+14);
 
   // Controls
   const ctrlY=progY+28, cx=W/2;
   // Prev
-  ctx.font='20px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.65)';
+  ctx.font='20px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.65)';
   ctx.fillText('â®',cx-52,ctrlY+16);
   // Play/Pause button
   ctx.fillStyle=t.col; ctx.beginPath(); ctx.arc(cx,ctrlY+12,20,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(cx,ctrlY+12,20,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='18px Buzzer11, monospace';
+  ctx.fillStyle='#fff'; ctx.font='18px Arial Narrow, Arial, sans-serif';
   ctx.fillText(musicState.playing?'â¸':'â–¶',cx+(musicState.playing?0:1),ctrlY+18);
   // Next
-  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='20px Buzzer11, monospace';
+  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='20px Arial Narrow, Arial, sans-serif';
   ctx.fillText('â­',cx+52,ctrlY+16);
   ctx.textAlign='left';
 }
@@ -2111,15 +2109,15 @@ function drawSettings() {
   for (const row of SETTING_ROWS) {
     ctx.fillStyle='rgba(255,255,255,0.02)'; ctx.fillRect(0,ry,W,36);
     ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(0,ry+35,W,1);
-    ctx.font='9px Buzzer11, monospace'; ctx.fillStyle='#eee'; ctx.fillText(row.label,14,ry+14);
-    ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillText(row.sub,14,ry+27);
+    ctx.font='9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#eee'; ctx.fillText(row.label,14,ry+14);
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillText(row.sub,14,ry+27);
     const on=settings[row.key], tx=W-46, ty=ry+10;
     ctx.fillStyle=on?'#3c8c4a':'#2a2a3a'; roundRect(tx,ty,32,16,8); ctx.fill();
     ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(on?tx+24:tx+8,ty+8,6,0,Math.PI*2); ctx.fill();
     ry+=38;
   }
   if (flags.has('receipts_off')) {
-    ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,80,80,0.55)';
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,80,80,0.55)';
     ctx.fillText('Morgan noticed your read receipts are off',W/2,ry+14);
     ctx.textAlign='left';
   }
@@ -2131,9 +2129,9 @@ function drawCallOverlay() {
   ctx.fillStyle='rgba(10,8,20,0.96)'; ctx.fillRect(0,0,W,H);
   // Avatar
   ctx.fillStyle=rel.morgan.color; ctx.beginPath(); ctx.arc(W/2,100,28,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 18px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 18px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText('M',W/2,108);
-  ctx.font='bold 11px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.fillText('Morgan',W/2,148);
+  ctx.font='bold 11px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.fillText('Morgan',W/2,148);
 
   if (callBack.state==='calling') {
     // Pulsing ring
@@ -2141,11 +2139,11 @@ function drawCallOverlay() {
     ctx.strokeStyle=`rgba(${rel.morgan.color.slice(1).match(/../g).map(h=>parseInt(h,16)).join(',')},${0.2+0.3*pulse})`;
     ctx.lineWidth=2+pulse*3;
     ctx.beginPath(); ctx.arc(W/2,100,(30+pulse*8),0,Math.PI*2); ctx.stroke();
-    ctx.font='8px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.45)';
     ctx.fillText('callingâ€¦',W/2,170);
   } else {
     // Transcript lines
-    ctx.font='8px Buzzer11, monospace'; ctx.textAlign='left';
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left';
     let ly=185;
     for (let i=0;i<callBack.lineIdx;i++) {
       const line=callBack.lines[i];
@@ -2174,11 +2172,11 @@ function drawEnd() {
   ctx.fillStyle=ag; ctx.fillRect(0,0,W,H);
 
   // Title line
-  ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.2)';
+  ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.2)';
   ctx.fillText(timePhase>=PHASE.LATE?'end of day  Â·  2:47 AM':'end of day',W/2,42);
 
   // Closing line based on final state
-  ctx.font='bold 10px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.72)';
+  ctx.font='bold 10px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.72)';
   ctx.fillText(endingLine(),W/2,72);
 
   // Relationship bars
@@ -2190,13 +2188,13 @@ function drawEnd() {
   ];
   let ry=106;
   for (const {name,r} of rels) {
-    ctx.font='7px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
     ctx.fillText(name,14,ry);
     // Trust bar
     const bw=W-90, bx=60, trust=Math.max(0,Math.min(100,r.trust));
     ctx.fillStyle='rgba(255,255,255,0.06)'; roundRect(bx,ry-8,bw,6,3); ctx.fill();
     ctx.fillStyle=r.color||'#666'; roundRect(bx,ry-8,Math.round(bw*trust/100),6,3); ctx.fill();
-    ctx.font='6px Buzzer11, monospace'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.22)';
+    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.22)';
     ctx.fillText(r.tone,W-10,ry);
     ry+=22;
   }
@@ -2205,7 +2203,7 @@ function drawEnd() {
   ry+=8;
   ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(14,ry,W-28,1);
   ry+=12;
-  ctx.font='7px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.2)';
+  ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.2)';
   ctx.fillText('how you communicate',14,ry); ry+=14;
   const total=Math.max(1,profile.defensive+profile.trusting+profile.avoidant);
   const bars=[
@@ -2215,7 +2213,7 @@ function drawEnd() {
   ];
   for (const b of bars) {
     const pct=b.val/total, bw2=Math.round((W-70)*pct);
-    ctx.font='7px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.32)';
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.32)';
     ctx.fillText(b.label,14,ry);
     ctx.fillStyle=b.col+'44'; roundRect(58,ry-8,(W-70),6,3); ctx.fill();
     if (bw2>0) { ctx.fillStyle=b.col; roundRect(58,ry-8,bw2,6,3); ctx.fill(); }
@@ -2223,7 +2221,7 @@ function drawEnd() {
   }
 
   // Restart hint
-  ctx.font='6px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.12)';
   ctx.fillText('tap anywhere to go back',W/2,H-16);
 }
 
@@ -2251,7 +2249,7 @@ function onClickEnd(mx, my) {
 function appHeader(title) {
   ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,32);
   ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,STATUS_H+31,W,1);
-  ctx.font='bold 11px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText(title,W/2,STATUS_H+21); ctx.textAlign='left';
 }
 
@@ -2291,5 +2289,6 @@ function loop(ts) {
   update(dt); draw(); requestAnimationFrame(loop);
 }
 requestAnimationFrame(ts=>{ lastTs=ts; requestAnimationFrame(loop); });
+
 
 
