@@ -25,6 +25,17 @@ if (typeof Portal !== 'undefined') {
   ]).then(t => { portalTarget = t; }).catch(() => {});
 }
 
+const LOBBY_URL = 'https://callumhyoung.github.io/gamejam-lobby/';
+function returnToLobby() {
+  const target = portal.ref || LOBBY_URL;
+  if (typeof Portal !== 'undefined') Portal.sendPlayerThroughPortal(target, portal);
+  else window.location.href = target;
+}
+
+// ── Power button ───────────────────────────────────────────────────
+// Physical side button on the right edge of the phone — returns to lobby.
+const PWR = { x:265, y:160, w:5, h:26 };   // logical canvas coordinates
+
 // ── Layout ─────────────────────────────────────────────────────────
 const STATUS_H  = 20;
 const NAV_H     = 30;
@@ -1942,6 +1953,10 @@ canvas.addEventListener('click', e => {
 });
 
 function handleClick(mx, my) {
+  // Power button — right side of phone, works on every screen
+  if (mx >= PWR.x - 10 && my >= PWR.y - 10 && my <= PWR.y + PWR.h + 10) {
+    returnToLobby(); return;
+  }
   if (screen===SCR.END) { onClickEnd(mx,my); return; }
   if (screen!==SCR.LOCK && screen!==SCR.HOME && my>=H-NAV_H) { goBack(); return; }
   switch(screen) {
@@ -2121,6 +2136,23 @@ function draw() {
     drawBottomNav();
     if (notifToast&&screen===SCR.HOME) drawNotifToast();
   }
+  drawPowerButton();
+}
+
+function drawPowerButton() {
+  const {x,y,w,h} = PWR;
+  // Drop shadow (offset right+down)
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  roundRect(x+1,y+1,w,h,2); ctx.fill();
+  // Button body
+  ctx.fillStyle='#120820';
+  roundRect(x,y,w,h,2); ctx.fill();
+  // Left-edge highlight to look raised
+  ctx.fillStyle='rgba(255,255,255,0.09)';
+  ctx.fillRect(x,y+3,1,h-6);
+  // Border
+  ctx.strokeStyle='rgba(100,55,160,0.65)'; ctx.lineWidth=0.5;
+  roundRect(x,y,w,h,2); ctx.stroke();
 }
 
 // ── Status bar ─────────────────────────────────────────────────────
