@@ -1,8 +1,8 @@
-﻿'use strict';
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-//  READ RECEIPTS  â€”  Ordinary Game Jam #1
+'use strict';
+// ═══════════════════════════════════════════════════════════════════
+//  READ RECEIPTS  —  Ordinary Game Jam #1
 //  A narrative game played entirely on a simulated smartphone.
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
 
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
@@ -12,7 +12,7 @@ const W = canvas.width, H = canvas.height;
 ctx.imageSmoothingEnabled = false;
 
 
-// â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Portal ─────────────────────────────────────────────────────────
 const portal = (typeof Portal !== 'undefined')
   ? Portal.readPortalParams()
   : { fromPortal: false, username: 'Guest', color: 'ff88cc', speed: 5, ref: null };
@@ -25,12 +25,12 @@ if (typeof Portal !== 'undefined') {
   ]).then(t => { portalTarget = t; }).catch(() => {});
 }
 
-// â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Layout ─────────────────────────────────────────────────────────
 const STATUS_H  = 20;
 const NAV_H     = 30;
 const CONTENT_Y = STATUS_H;
 
-// â”€â”€ Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Screens ────────────────────────────────────────────────────────
 const SCR = Object.freeze({
   LOCK:'lock', HOME:'home',
   MESSAGES:'messages', THREAD:'thread',
@@ -40,7 +40,7 @@ const SCR = Object.freeze({
 });
 let screen = SCR.LOCK;
 
-// â”€â”€ Story phases â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Story phases ───────────────────────────────────────────────────
 const PHASE = Object.freeze({ NIGHT:0, MORNING:1, AFTERNOON:2, EVENING:3, LATE:4 });
 let timePhase      = PHASE.NIGHT;
 let phaseTimer     = -1;
@@ -49,10 +49,10 @@ let eveningTimer   = -1;
 let lateTimer      = -1;
 let phaseStartTime = 0;
 
-// â”€â”€ Interpretation profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Interpretation profile ─────────────────────────────────────────
 const profile = { defensive:0, trusting:0, avoidant:0 };
 
-// â”€â”€ Relationships â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Relationships ──────────────────────────────────────────────────
 const rel = {
   morgan:  { name:'Morgan',  trust:50, tension:0, tone:'neutral', color:'#7c6cd6' },
   alex:    { name:'Alex',    trust:60, tension:0, tone:'warm',    color:'#c07050' },
@@ -60,28 +60,28 @@ const rel = {
   unknown: { name:'???',     trust:0,  tension:0, tone:'unknown', color:'#505068' },
 };
 
-// â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Settings ───────────────────────────────────────────────────────
 const settings = { readReceipts:true, doNotDisturb:false, locationSharing:true };
 
-// â”€â”€ Flags â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Flags ──────────────────────────────────────────────────────────
 const flags = new Set();
 
-// â”€â”€ Notification toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Notification toast ─────────────────────────────────────────────
 let notifToast = null;
 function pushNotif(sender, text) {
   if (settings.doNotDisturb) return;
   notifToast = { sender, text, timer:3.5 };
 }
 
-// â”€â”€ Notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Notes ──────────────────────────────────────────────────────────
 const notes = [
   { time:'11:12 PM', body:"can't keep doing this. riley's was a mistake probably. but I stayed anyway." },
 ];
 
-// â”€â”€ Photos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Photos ─────────────────────────────────────────────────────────
 let photoZoom = false;
 
-// â”€â”€ Voicemail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Voicemail ──────────────────────────────────────────────────────
 const voicemails = [
   {
     from: 'morgan', name: 'Morgan', time: '1:07 AM', duration: '0:14',
@@ -91,7 +91,7 @@ const voicemails = [
 ];
 let callsVoicemailOpen = false;
 
-// â”€â”€ Music â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Music ──────────────────────────────────────────────────────────
 const TRACKS = [
   { title:'Sunlit Strum',            file:'music/Sunlit Strum.mp3',            col:'#c8a030' },
   { title:'Arcade Corsage',          file:'music/Arcade Corsage.mp3',          col:'#c040a0' },
@@ -133,7 +133,7 @@ function fmtTime(s) {
   return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 }
 
-// â”€â”€ Call-back overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Call-back overlay ──────────────────────────────────────────────
 let callBack = {
   active: false,
   state: 'idle',   // 'calling' | 'connected' | 'ended'
@@ -152,14 +152,14 @@ const callLog = [
   { type:'incoming', name:'Riley',  time:'10:18 AM', key:'riley'  },
 ];
 
-// â”€â”€ Conversation script â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Conversation script ────────────────────────────────────────────
 const SCRIPT = {
 
-  // â”€â”€ Morgan â€” night â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Morgan — night ────────────────────────────────────────────
   morgan_0: {
     incoming: { text:'hey did you get home ok last night', time:'11:42 PM' },
     choices: [
-      { text:'Yeah all good ðŸ‘',           next:'morgan_1a', fx:()=>{ rel.morgan.trust+=5;  profile.trusting++;  } },
+      { text:'Yeah all good 👍',           next:'morgan_1a', fx:()=>{ rel.morgan.trust+=5;  profile.trusting++;  } },
       { text:'why are you asking',          next:'morgan_1b', fx:()=>{ rel.morgan.tension+=10; profile.defensive++; } },
       { text:'(leave on read)',silent:true, next:'morgan_1c', fx:()=>{ rel.morgan.tension+=15; profile.avoidant++;  } },
     ],
@@ -207,12 +207,12 @@ const SCRIPT = {
   },
   morgan_2f: { incoming:{ text:'ok.', time:'11:46 PM' }, choices:null,
     onEnd:()=>{ flags.add('morgan_night_tense'); queueMorning(); } },
-  morgan_end_warm: { incoming:{ text:'â¤ï¸', time:'11:48 PM' }, choices:null,
+  morgan_end_warm: { incoming:{ text:'❤️', time:'11:48 PM' }, choices:null,
     onEnd:()=>{ flags.add('morgan_connected'); rel.morgan.trust+=5; queueMorning(); } },
   morgan_end_flat: { incoming:{ text:'ok. night', time:'11:48 PM' }, choices:null,
     onEnd:()=>{ flags.add('morgan_night_flat'); queueMorning(); } },
 
-  // â”€â”€ Morgan â€” afternoon (3 entry variants) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Morgan — afternoon (3 entry variants) ────────────────────
   morgan_aft_warm: {
     incoming: { text:'hey. sorry if I was weird last night', time:'2:14 PM' },
     choices: [
@@ -231,7 +231,7 @@ const SCRIPT = {
   maw_1b: {
     incoming: { text:'I don\'t know. I called you and... yeah. forget it.', time:'2:15 PM' },
     choices: [
-      { text:'wait â€” you called?',       next:'maw_call_reveal', fx:()=>{ profile.trusting++;  flags.add('morgan_call_mentioned'); } },
+      { text:'wait — you called?',       next:'maw_call_reveal', fx:()=>{ profile.trusting++;  flags.add('morgan_call_mentioned'); } },
       { text:'it\'s fine. really.',      next:'maw_2b',          fx:()=>{ profile.defensive++; } },
     ],
   },
@@ -350,7 +350,7 @@ const SCRIPT = {
   mad_silence: { incoming:null, choices:null,
     onEnd:()=>{ flags.add('morgan_final_silence'); rel.morgan.trust-=20; } },
 
-  // â”€â”€ Alex â€” morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Alex — morning ────────────────────────────────────────────
   alex_0: {
     incoming: { text:'hey you left your jacket at riley\'s last night lol', time:'9:03 AM' },
     choices: [
@@ -420,7 +420,7 @@ const SCRIPT = {
   alex_cross_2b: { incoming:{ text:'yeah. anyway. jacket\'s at mine whenever.', time:'9:10 AM' }, choices:null,
     onEnd:()=>{ flags.add('alex_end_neutral'); queueAfternoon(); } },
 
-  // â”€â”€ Riley â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Riley ─────────────────────────────────────────────────────
   riley_0: {
     incoming: { text:'hey fun last night :) you seemed a little out of it toward the end though', time:'10:22 AM' },
     choices: [
@@ -449,12 +449,12 @@ const SCRIPT = {
     onEnd:()=>flags.add('riley_end_ok') },
   riley_2b: { incoming:{ text:'lol valid. same honestly', time:'10:25 AM' }, choices:null,
     onEnd:()=>{ flags.add('riley_end_honest'); rel.riley.trust+=5; } },
-  riley_2c: { incoming:{ text:'ok. ðŸ™‚', time:'10:25 AM' }, choices:null,
+  riley_2c: { incoming:{ text:'ok. 🙂', time:'10:25 AM' }, choices:null,
     onEnd:()=>flags.add('riley_end_closed') },
   riley_2d: { incoming:{ text:'yeah. I figured.', time:'10:26 AM' }, choices:null,
     onEnd:()=>{ flags.add('riley_end_known'); rel.riley.trust+=8; } },
 
-  // â”€â”€ Morgan â€” evening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Morgan — evening ──────────────────────────────────────────
   morgan_eve: {
     incoming: { text:'you doing ok?', time:'6:48 PM' },
     choices: [
@@ -470,7 +470,7 @@ const SCRIPT = {
   meve_silence: { incoming:null, choices:null,
     onEnd:()=>flags.add('eve_silence') },
 
-  // â”€â”€ Unknown â€” the twist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Unknown — the twist ───────────────────────────────────────
   unknown_0: {
     incoming: { text:"hey. I think you have my phone", time:'2:47 AM' },
     choices: [
@@ -527,7 +527,7 @@ const SCRIPT = {
   unk_end_late:  { incoming:{ text:"it's late. let's just figure out the swap.", time:'2:51 AM' }, choices:null,
     onEnd:()=>flags.add('phone_swap_arranged') },
 
-  // â”€â”€ Morgan â€” ambient morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Morgan — ambient morning ──────────────────────────────────
   morgan_mc: {
     incoming: { text:'lol sorry for the late texts btw. I was in my head', time:'9:14 AM' },
     choices: [
@@ -552,7 +552,7 @@ const SCRIPT = {
   mco_1b:      { incoming:{ text:'ok. another time', time:'10:09 AM' }, choices:null, onEnd:()=>{} },
   mco_silence: { incoming:null, choices:null, onEnd:()=>flags.add('morgan_coffee_ignored') },
 
-  // â”€â”€ Morgan â€” ambient afternoon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Morgan — ambient afternoon ────────────────────────────────
   morgan_mundane: {
     incoming: { text:'have you seen yellowjackets. I\'ve been watching it for three days straight', time:'3:11 PM' },
     choices: [
@@ -565,7 +565,7 @@ const SCRIPT = {
   mmun_1b:      { incoming:{ text:'survival drama but make it unhinged. you\'d love it', time:'3:12 PM' }, choices:null, onEnd:()=>{} },
   mmun_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // â”€â”€ Morgan â€” ambient evening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Morgan — ambient evening ──────────────────────────────────
   morgan_eve_song: {
     incoming: { text:'this song keeps making me think of last year for some reason', time:'7:04 PM' },
     choices: [
@@ -590,7 +590,7 @@ const SCRIPT = {
   mst_1b:      { incoming:{ text:'you should try it. it\'s weird in a good way', time:'8:33 PM' }, choices:null, onEnd:()=>{} },
   mst_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // â”€â”€ Alex â€” ambient morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Alex — ambient morning ────────────────────────────────────
   alex_mutual: {
     incoming: { text:'btw did you talk to cam at all last night? they seemed off', time:'9:22 AM' },
     choices: [
@@ -615,7 +615,7 @@ const SCRIPT = {
   ar_1b:      { incoming:{ text:'good!! me too mostly', time:'10:45 AM' }, choices:null, onEnd:()=>flags.add('alex_fun_confirmed') },
   ar_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // â”€â”€ Alex â€” ambient afternoon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Alex — ambient afternoon ──────────────────────────────────
   alex_hangout: {
     incoming: { text:'do you want to come over later? we could watch something. I have snacks', time:'2:48 PM' },
     choices: [
@@ -642,7 +642,7 @@ const SCRIPT = {
   ad_1b:      { incoming:{ text:'fair. probably smart.', time:'4:03 PM' }, choices:null, onEnd:()=>{} },
   ad_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // â”€â”€ Alex â€” ambient evening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Alex — ambient evening ────────────────────────────────────
   alex_eve_check: {
     incoming: { text:'hey. you\'ve been quiet today. everything ok?', time:'7:38 PM' },
     choices: [
@@ -655,7 +655,7 @@ const SCRIPT = {
   aec_1b:      { incoming:{ text:'yeah I figured. I\'m here if you want to talk', time:'7:39 PM' }, choices:null, onEnd:()=>flags.add('alex_available') },
   aec_silence: { incoming:null, choices:null, onEnd:()=>flags.add('alex_eve_ignored') },
 
-  // â”€â”€ Riley â€” ambient morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Riley — ambient morning ───────────────────────────────────
   riley_photo: {
     incoming: { text:'also I found a photo from last night if you want it lol', time:'9:41 AM' },
     choices: [
@@ -668,7 +668,7 @@ const SCRIPT = {
   rp_1b:      { incoming:{ text:'ok lol. just thought it was cute', time:'9:42 AM' }, choices:null, onEnd:()=>{} },
   rp_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // â”€â”€ Riley â€” ambient afternoon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Riley — ambient afternoon ─────────────────────────────────
   riley_jacket: {
     incoming: { text:'I think I found your jacket btw. brown? or like. burnt orange?', time:'1:33 PM' },
     choices: [
@@ -701,7 +701,7 @@ const SCRIPT = {
   rac_3:      { incoming:{ text:'...yeah.', time:'3:49 PM' }, choices:null, onEnd:()=>{} },
   rac_silence:{ incoming:null, choices:null, onEnd:()=>{} },
 
-  // â”€â”€ Riley â€” ambient evening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Riley — ambient evening ───────────────────────────────────
   riley_eve: {
     incoming: { text:'can I tell you something kind of embarrassing', time:'7:14 PM' },
     choices: [
@@ -746,7 +746,7 @@ const SCRIPT = {
 
 };
 
-// â”€â”€ Threads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Threads ────────────────────────────────────────────────────────
 const threads = {
   morgan: { contact:'morgan', messages:[], unread:0, scriptNode:'morgan_0' },
 };
@@ -759,22 +759,22 @@ const threads = {
   }
 })();
 
-// â”€â”€ Ambient interactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Ambient interactions ───────────────────────────────────────────
 // Each fires once when: correct phase, delay elapsed, condition met, thread free.
 const ambientSeeds = [
-  // â€” Morning â€”
+  // — Morning —
   { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_mc',       delay:10,  fired:false, cond:()=>true },
   { phase:PHASE.MORNING,   thread:'alex',   node:'alex_mutual',     delay:30,  fired:false, cond:()=>!flags.has('alex_ignored') },
   { phase:PHASE.MORNING,   thread:'riley',  node:'riley_photo',     delay:55,  fired:false, cond:()=>!flags.has('riley_ignored') },
   { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_coffee',   delay:85,  fired:false, cond:()=>!flags.has('morgan_silence')&&!flags.has('morgan_mc_ignored') },
   { phase:PHASE.MORNING,   thread:'alex',   node:'alex_recap',      delay:120, fired:false, cond:()=>true },
-  // â€” Afternoon â€”
+  // — Afternoon —
   { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_jacket',    delay:15,  fired:false, cond:()=>!flags.has('riley_ignored') },
   { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_mundane',  delay:45,  fired:false, cond:()=>!flags.has('morgan_final_silence') },
   { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_hangout',    delay:80,  fired:false, cond:()=>!flags.has('alex_ignored')&&!flags.has('alex_left_hanging') },
   { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_aft_check', delay:120, fired:false, cond:()=>true },
   { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_drama',      delay:165, fired:false, cond:()=>!flags.has('alex_ignored') },
-  // â€” Evening â€”
+  // — Evening —
   { phase:PHASE.EVENING,   thread:'riley',  node:'riley_jacket',    delay:10,  fired:false, cond:()=>!flags.has('jacket_located')&&!flags.has('riley_ignored') },
   { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_song', delay:40,  fired:false, cond:()=>rel.morgan.trust>=35&&!flags.has('morgan_final_silence') },
   { phase:PHASE.EVENING,   thread:'alex',   node:'alex_eve_check',  delay:75,  fired:false, cond:()=>!flags.has('alex_ignored') },
@@ -789,10 +789,10 @@ function tickAmbientSeeds() {
     if (seed.fired) continue;
     if (seed.phase !== timePhase) continue;
     if (elapsed < seed.delay) continue;
-    if (seed.cond && !seed.cond()) { seed.fired = true; continue; } // condition failed â€” skip
+    if (seed.cond && !seed.cond()) { seed.fired = true; continue; } // condition failed — skip
     const t = threads[seed.thread];
     if (!t) { seed.fired = true; continue; }
-    if (t.scriptNode !== null) continue; // thread busy â€” wait
+    if (t.scriptNode !== null) continue; // thread busy — wait
     seed.fired = true;
     const node = SCRIPT[seed.node];
     if (!node) continue;
@@ -809,7 +809,7 @@ function tickAmbientSeeds() {
   }
 }
 
-// â”€â”€ Phase transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Phase transitions ──────────────────────────────────────────────
 function queueMorning() {
   if (timePhase >= PHASE.MORNING || phaseTimer >= 0) return;
   phaseTimer = 3.0;
@@ -864,7 +864,7 @@ function seedAfternoon() {
     threads.morgan.unread += 1;
   }
 
-  // 2:14 AM note â€” written after the photo, after leaving, after everything
+  // 2:14 AM note — written after the photo, after leaving, after everything
   notes.push({ time:'2:14 AM', body:"I should tell them. I keep not telling them and it keeps being the wrong call." });
 
   // Missed call badge notification
@@ -930,7 +930,7 @@ function seedLate() {
 }
 
 function lateNoteBody() {
-  // This note is written *before* the unknown thread resolves â€” it's the moment of realization
+  // This note is written *before* the unknown thread resolves — it's the moment of realization
   if (flags.has('phone_swap_confirmed'))   return "it wasn't my phone. all night, it wasn't my phone.";
   if (flags.has('called_morgan_back'))     return "I called morgan back on someone else's phone. I wonder if she knew.";
   if (flags.has('eve_honest'))             return "told a stranger I wasn't ok before I told anyone else. that's probably fine.";
@@ -981,7 +981,7 @@ function getCallBackLines() {
   ];
 }
 
-// â”€â”€ Active thread state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Active thread state ────────────────────────────────────────────
 let activeThreadKey = null;
 let choiceAnim      = 0;
 let choiceMade      = false;
@@ -1043,16 +1043,16 @@ function refreshTone(key) {
   else if (p.trusting >=3)                                                          r.tone='warm';
 }
 
-// â”€â”€ App grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── App grid ───────────────────────────────────────────────────────
 const APP_SZ = 52;
 const APP_GRID = (function(){
   const list = [
-    { id:'messages', label:'Messages', col:'#3c8c4a', icon:'ðŸ’¬' },
-    { id:'photos',   label:'Photos',   col:'#b87020', icon:'ðŸ–¼ï¸'  },
-    { id:'notes',    label:'Notes',    col:'#b8a020', icon:'ðŸ“'  },
-    { id:'calls',    label:'Calls',    col:'#2878c0', icon:'ðŸ“ž'  },
-    { id:'music',    label:'Music',    col:'#8030a0', icon:'ðŸŽµ'  },
-    { id:'settings', label:'Settings', col:'#607080', icon:'âš™ï¸'  },
+    { id:'messages', label:'Messages', col:'#3c8c4a', icon:'💬' },
+    { id:'photos',   label:'Photos',   col:'#b87020', icon:'🖼️'  },
+    { id:'notes',    label:'Notes',    col:'#b8a020', icon:'📝'  },
+    { id:'calls',    label:'Calls',    col:'#2878c0', icon:'📞'  },
+    { id:'music',    label:'Music',    col:'#8030a0', icon:'🎵'  },
+    { id:'settings', label:'Settings', col:'#607080', icon:'⚙️'  },
   ];
   const cols=4, gX=10, gY=22, labelH=14;
   const rowH = APP_SZ + gY;
@@ -1077,7 +1077,7 @@ const SETTING_ROWS = [
   { key:'locationSharing', label:'Location Sharing', sub:'Share your location with contacts'               },
 ];
 
-// â”€â”€ Slide-to-unlock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Slide-to-unlock ────────────────────────────────────────────────
 const SLIDE_W  = 200, SLIDE_H = 28, SLIDE_TR = 12;
 const SLIDE_X  = Math.round((W - SLIDE_W) / 2);
 const SLIDE_Y  = H - 52;
@@ -1138,7 +1138,7 @@ window.addEventListener('mouseup',    () => onSlideEnd());
 window.addEventListener('touchmove',  e => { onSlideMove(canvasCoords(e)[0]); e.preventDefault(); }, { passive: false });
 window.addEventListener('touchend',   () => onSlideEnd());
 
-// â”€â”€ Input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Input ──────────────────────────────────────────────────────────
 canvas.addEventListener('click', e => {
   const r = canvas.getBoundingClientRect();
   handleClick((e.clientX-r.left)*(W/r.width), (e.clientY-r.top)*(H/r.height));
@@ -1258,7 +1258,7 @@ function onClickSettings(mx,my) {
   }
 }
 
-// â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Update ─────────────────────────────────────────────────────────
 let totalTime=0, lastTs=0;
 
 function update(dt) {
@@ -1301,7 +1301,7 @@ function update(dt) {
   }
 }
 
-// â”€â”€ Draw â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Draw ───────────────────────────────────────────────────────────
 function draw() {
   ctx.clearRect(0,0,W,H);
   ctx.imageSmoothingEnabled=false;
@@ -1324,35 +1324,35 @@ function draw() {
   }
 }
 
-// â”€â”€ Status bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Status bar ─────────────────────────────────────────────────────
 function drawStatusBar() {
   ctx.fillStyle='rgba(5,5,12,0.78)'; ctx.fillRect(0,0,W,STATUS_H);
   ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#ddd';
   ctx.fillText(clockStr(),8,13);
   ctx.textAlign='right'; ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#aaa';
-  let rx=W-6; ctx.fillText('â–®â–®â–®â–¯',rx,13); rx-=34;
-  if (settings.doNotDisturb) ctx.fillText('ðŸŒ™',rx,13);
+  let rx=W-6; ctx.fillText('▮▮▮▯',rx,13); rx-=34;
+  if (settings.doNotDisturb) ctx.fillText('🌙',rx,13);
   // Missed call indicator
   if (timePhase>=PHASE.AFTERNOON && !voicemails[0].listened) {
-    rx-=20; ctx.fillStyle='#e53935'; ctx.fillText('ðŸ“µ',rx,13);
+    rx-=20; ctx.fillStyle='#e53935'; ctx.fillText('📵',rx,13);
   }
   ctx.textAlign='left';
 }
 
-// â”€â”€ Bottom nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Bottom nav ─────────────────────────────────────────────────────
 function drawBottomNav() {
   const y=H-NAV_H;
   ctx.fillStyle='rgba(8,8,16,0.93)'; ctx.fillRect(0,y,W,NAV_H);
   ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,y,W,1);
   if (screen!==SCR.HOME) {
     ctx.font='10px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left';
-    ctx.fillStyle='#6aacff'; ctx.fillText('â€¹  back',12,y+17);
+    ctx.fillStyle='#6aacff'; ctx.fillText('‹  back',12,y+17);
   }
   ctx.fillStyle='rgba(255,255,255,0.3)';
   roundRect(W/2-22,y+8,44,5,3); ctx.fill();
 }
 
-// â”€â”€ Notification toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Notification toast ─────────────────────────────────────────────
 function drawNotifToast() {
   if (!notifToast) return;
   const fade=Math.min(1,notifToast.timer/0.4);
@@ -1361,16 +1361,16 @@ function drawNotifToast() {
   ctx.fillStyle='rgba(30,30,45,0.97)'; roundRect(tx,ty,tw,th,8); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1; roundRect(tx,ty,tw,th,8); ctx.stroke();
   ctx.fillStyle='#3c8c4a'; roundRect(tx+6,ty+6,22,22,5); ctx.fill();
-  ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.fillText('ðŸ’¬',tx+17,ty+22);
+  ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.fillText('💬',tx+17,ty+22);
   ctx.textAlign='left';
   ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.fillText(notifToast.sender,tx+34,ty+13);
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.6)';
-  const pv=notifToast.text.length>46?notifToast.text.slice(0,45)+'â€¦':notifToast.text;
+  const pv=notifToast.text.length>46?notifToast.text.slice(0,45)+'…':notifToast.text;
   ctx.fillText(pv,tx+34,ty+25);
   ctx.restore();
 }
 
-// â”€â”€ Wallpaper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Wallpaper ──────────────────────────────────────────────────────
 // Pre-baked bokeh dots using a simple xorshift so positions are
 // identical every run (no asset loading required).
 const BOKEH = (function() {
@@ -1412,7 +1412,7 @@ function drawWallpaper(dimAmt) {
   bg.addColorStop(0,c0); bg.addColorStop(1,c1);
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
 
-  // Bokeh â€” alpha scaled by phase brightness
+  // Bokeh — alpha scaled by phase brightness
   const phMult = {[PHASE.NIGHT]:1,[PHASE.MORNING]:0.75,[PHASE.AFTERNOON]:0.65,[PHASE.EVENING]:0.9,[PHASE.LATE]:0.35}[timePhase]??1;
   for (const d of BOKEH) {
     const px = d.x*W, py = d.y*H;
@@ -1425,7 +1425,7 @@ function drawWallpaper(dimAmt) {
     ctx.beginPath(); ctx.arc(px,py,d.rad,0,Math.PI*2); ctx.fill();
   }
 
-  // Stars (night / late only) â€” tiny 1px dots above skyline
+  // Stars (night / late only) — tiny 1px dots above skyline
   if (timePhase === PHASE.NIGHT || timePhase === PHASE.LATE) {
     ctx.fillStyle = `rgba(255,255,255,${timePhase===PHASE.LATE?0.25:0.55})`;
     for (const d of BOKEH) {
@@ -1451,10 +1451,10 @@ function drawWallpaper(dimAmt) {
   }
 }
 
-// â”€â”€ Lock screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Lock screen ────────────────────────────────────────────────────
 function drawLock() {
-  drawWallpaper(0.10);   // light dim â€” wallpaper shows through behind clock
-  // Cracked screen overlay â€” appears in late phase (this isn't your phone)
+  drawWallpaper(0.10);   // light dim — wallpaper shows through behind clock
+  // Cracked screen overlay — appears in late phase (this isn't your phone)
   if (timePhase>=PHASE.LATE) {
     ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(W*0.55,0); ctx.lineTo(W*0.62,H*0.18);
@@ -1467,7 +1467,7 @@ function drawLock() {
   ctx.fillStyle='rgba(0,0,0,0.5)';
   roundRect(W/2-18,6,36,8,4); ctx.fill();
 
-  // ── Game title ───────────────────────────────────────────────
+  // -- Game title -----------------------------------------------
   ctx.save();
   ctx.textAlign='center';
   ctx.lineJoin='round';
@@ -1528,10 +1528,10 @@ function drawLockSlider() {
     ctx.restore();
   }
 
-  // Label â€” fades as thumb moves right
+  // Label — fades as thumb moves right
   ctx.globalAlpha = Math.max(0, 1 - lockSlide.progress * 2.5);
   ctx.font = '8px Arial Narrow, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.38)';
-  ctx.fillText('slide to unlock  â€º', SLIDE_X + SLIDE_W / 2 + SLIDE_TR, cy + 3);
+  ctx.fillText('slide to unlock  ›', SLIDE_X + SLIDE_W / 2 + SLIDE_TR, cy + 3);
   ctx.globalAlpha = 1;
 
   // Thumb
@@ -1540,7 +1540,7 @@ function drawLockSlider() {
   // Arrow chevron on thumb
   ctx.fillStyle = 'rgba(30,30,50,0.6)';
   ctx.font = 'bold 11px Arial Narrow, Arial, sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('â€º', tx + 1, cy + 4);
+  ctx.fillText('›', tx + 1, cy + 4);
   ctx.textAlign = 'left';
 }
 
@@ -1548,16 +1548,16 @@ function drawLockCard(x,y,w,sender,preview) {
   ctx.fillStyle='rgba(255,255,255,0.09)'; roundRect(x,y,w,50,10); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.13)'; ctx.lineWidth=1; roundRect(x,y,w,50,10); ctx.stroke();
   ctx.fillStyle='#3c8c4a'; roundRect(x+8,y+9,28,28,6); ctx.fill();
-  ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('ðŸ’¬',x+22,y+28);
+  ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('💬',x+22,y+28);
   ctx.textAlign='left';
   ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.fillText(sender,x+44,y+20);
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.58)';
-  ctx.fillText(preview.length>28?preview.slice(0,27)+'â€¦':preview,x+44,y+34);
+  ctx.fillText(preview.length>28?preview.slice(0,27)+'…':preview,x+44,y+34);
   ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.28)';
   ctx.textAlign='right'; ctx.fillText('now',x+w-8,y+20); ctx.textAlign='left';
 }
 
-// â”€â”€ Home screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Home screen ────────────────────────────────────────────────────
 function drawHome() {
   drawWallpaper(0.42);   // heavier dim so app icons stay readable
   // Notch pill
@@ -1569,7 +1569,7 @@ function drawHome() {
     const qy=H-NAV_H-30;
     ctx.fillStyle='rgba(255,255,255,0.05)'; roundRect(8,qy,W-16,22,6); ctx.fill();
     ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.28)';
-    ctx.fillText('the phone goes quiet  Â·  tap to reflect',W/2,qy+14);
+    ctx.fillText('the phone goes quiet  ·  tap to reflect',W/2,qy+14);
     ctx.textAlign='left';
   }
 }
@@ -1577,16 +1577,16 @@ function drawHome() {
 function drawAppIcon(app) {
   const {x,y} = app;
 
-  // 1 — Drop shadow
+  // 1 � Drop shadow
   ctx.save();
   ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=10; ctx.shadowOffsetY=4;
   ctx.fillStyle=app.col; roundRect(x,y,APP_SZ,APP_SZ,13); ctx.fill();
   ctx.restore();
 
-  // 2 — Base colour
+  // 2 � Base colour
   ctx.fillStyle=app.col; roundRect(x,y,APP_SZ,APP_SZ,13); ctx.fill();
 
-  // 3 — Gradient overlay: bright top, dark bottom
+  // 3 � Gradient overlay: bright top, dark bottom
   ctx.save(); roundRect(x,y,APP_SZ,APP_SZ,13); ctx.clip();
   const grad=ctx.createLinearGradient(x,y,x,y+APP_SZ);
   grad.addColorStop(0,'rgba(255,255,255,0.30)');
@@ -1595,23 +1595,23 @@ function drawAppIcon(app) {
   ctx.fillStyle=grad; ctx.fillRect(x,y,APP_SZ,APP_SZ);
   ctx.restore();
 
-  // 4 — Gloss pill at top
+  // 4 � Gloss pill at top
   ctx.save(); roundRect(x,y,APP_SZ,APP_SZ,13); ctx.clip();
   ctx.fillStyle='rgba(255,255,255,0.20)';
   roundRect(x+4,y+3,APP_SZ-8,APP_SZ*0.38,8); ctx.fill();
   ctx.restore();
 
-  // 5 — Outer highlight border + inner shadow line
+  // 5 � Outer highlight border + inner shadow line
   ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=1.5;
   roundRect(x,y,APP_SZ,APP_SZ,13); ctx.stroke();
   ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1;
   roundRect(x+1,y+1,APP_SZ-2,APP_SZ-2,12); ctx.stroke();
 
-  // 6 — Emoji
+  // 6 � Emoji
   ctx.font='24px sans-serif'; ctx.textAlign='center';
   ctx.fillText(app.icon,x+APP_SZ/2,y+APP_SZ/2+9);
 
-  // 7 — Badges
+  // 7 � Badges
   let badge=0;
   if (app.id==='messages') badge=Object.values(threads).reduce((s,t)=>s+(t.unread||0),0);
   if (app.id==='calls'&&timePhase>=PHASE.AFTERNOON&&!voicemails[0].listened) badge=1;
@@ -1629,7 +1629,7 @@ function drawAppIcon(app) {
     ctx.fillText(String(badge),x+APP_SZ-5,y+8);
   }
 
-  // 8 — Label with shadow so it reads over wallpaper
+  // 8 � Label with shadow so it reads over wallpaper
   ctx.save();
   ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=5;
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.textAlign='center';
@@ -1638,7 +1638,7 @@ function drawAppIcon(app) {
   ctx.textAlign='left';
 }
 
-// â”€â”€ Messages list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Messages list ──────────────────────────────────────────────────
 function drawMsgList() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Messages');
@@ -1660,7 +1660,7 @@ function drawThreadRow(key,t,y) {
   ctx.font='8px Arial Narrow, Arial, sans-serif';
   ctx.fillStyle=t.unread>0?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.38)';
   const prev=last?(last.from==='me'?'You: '+last.text:last.text):'';
-  ctx.fillText(prev.length>26?prev.slice(0,25)+'â€¦':prev,54,y+34);
+  ctx.fillText(prev.length>26?prev.slice(0,25)+'…':prev,54,y+34);
   if (last) {
     ctx.textAlign='right'; ctx.font='6px Arial Narrow, Arial, sans-serif';
     ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillText(last.time,W-10,y+18); ctx.textAlign='left';
@@ -1668,7 +1668,7 @@ function drawThreadRow(key,t,y) {
   if (t.unread>0) { ctx.fillStyle='#3c8c4a'; ctx.beginPath(); ctx.arc(W-13,y+33,5,0,Math.PI*2); ctx.fill(); }
 }
 
-// â”€â”€ Thread view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Thread view ────────────────────────────────────────────────────
 function drawThread() {
   if (!activeThreadKey) return;
   const t=threads[activeThreadKey], r=rel[activeThreadKey];
@@ -1676,7 +1676,7 @@ function drawThread() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,34);
   ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(0,STATUS_H+33,W,1);
-  ctx.font='11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('â€¹',8,STATUS_H+22);
+  ctx.font='11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('‹',8,STATUS_H+22);
   ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(W/2,STATUS_H+11,9,0,Math.PI*2); ctx.fill();
   ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText((r?.name||activeThreadKey)[0].toUpperCase(),W/2,STATUS_H+14);
@@ -1749,7 +1749,7 @@ function drawChoices(choices,startY) {
   ctx.globalAlpha=1; ctx.textAlign='left';
 }
 
-// â”€â”€ Notes app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Notes app ──────────────────────────────────────────────────────
 function drawNotes() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Notes');
@@ -1769,7 +1769,7 @@ function drawNotes() {
   }
 }
 
-// â”€â”€ Photos app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Photos app ─────────────────────────────────────────────────────
 function drawPhotos() {
   ctx.fillStyle='#080810'; ctx.fillRect(0,0,W,H);
   appHeader('Photos');
@@ -1824,12 +1824,12 @@ function drawNightScene(x,y,w,h,zoomed) {
     ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(f1X+6*fS,gY-14*fS); ctx.lineTo(f2X-2*fS,gY-12*fS); ctx.stroke();
   }
-  // Timestamp â€” the anomaly
+  // Timestamp — the anomaly
   ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(x+w-66,y+h-18,62,14);
   ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right';
   ctx.fillStyle=zoomed?'#ffcc44':'rgba(255,255,255,0.6)';
   ctx.fillText('12:31 AM',x+w-6,y+h-6);
-  // Location tag â€” only after timeline revealed
+  // Location tag — only after timeline revealed
   if (flags.has('alex_timeline_revealed')) {
     ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
     ctx.fillText('near Riley St',x+8,y+h-6);
@@ -1849,7 +1849,7 @@ function drawFigure(cx,gY,s,col) {
   ctx.fillRect(Math.round(cx+1*s),Math.round(gY-6*s),Math.round(2*s),Math.round(6*s));
 }
 
-// â”€â”€ Calls app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Calls app ──────────────────────────────────────────────────────
 function drawCalls() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Calls');
@@ -1870,7 +1870,7 @@ function drawCalls() {
     // Type icon + name
     ctx.textAlign='left';
     const typeCol = entry.type==='missed'?'#e53935': entry.type==='outgoing'?'#6aacff':'rgba(255,255,255,0.5)';
-    const typeIcon = entry.type==='missed'?'â†™':'â†—';
+    const typeIcon = entry.type==='missed'?'↙':'↗';
     ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle=typeCol;
     ctx.fillText(typeIcon,50,ry+16);
     ctx.font=entry.type==='missed'?'bold 9px Arial Narrow, Arial, sans-serif':'9px Arial Narrow, Arial, sans-serif';
@@ -1900,7 +1900,7 @@ function drawCalls() {
   ctx.font=vm.listened?'9px Arial Narrow, Arial, sans-serif':'bold 9px Arial Narrow, Arial, sans-serif';
   ctx.fillStyle=vm.listened?'#aaa':'#fff'; ctx.fillText('Morgan',44,ry+13);
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
-  ctx.fillText(`${vm.time}  Â·  ${vm.duration}`,44,ry+26);
+  ctx.fillText(`${vm.time}  ·  ${vm.duration}`,44,ry+26);
   if (!vm.listened) {
     ctx.fillStyle='#e53935'; ctx.beginPath(); ctx.arc(W-18,ry+17,5,0,Math.PI*2); ctx.fill();
   }
@@ -1916,18 +1916,18 @@ function drawCalls() {
     } else {
       ctx.fillStyle='rgba(100,160,255,0.8)'; roundRect(W/2-40,ry,80,22,5); ctx.fill();
       ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-      ctx.fillText('â–¶  Listen',W/2,ry+14);
+      ctx.fillText('▶  Listen',W/2,ry+14);
       ctx.textAlign='left';
     }
   }
 
-  // Call-back section â€” appears in evening phase if not already called
+  // Call-back section — appears in evening phase if not already called
   if (timePhase>=PHASE.EVENING && !flags.has('called_morgan_back')) {
     const cby=H-NAV_H-36;
     ctx.fillStyle='rgba(60,140,74,0.12)'; roundRect(8,cby,W-16,28,6); ctx.fill();
     ctx.strokeStyle='rgba(60,140,74,0.35)'; ctx.lineWidth=1; roundRect(8,cby,W-16,28,6); ctx.stroke();
     ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#7ed87f';
-    ctx.fillText('ðŸ“ž  Call Morgan back',W/2,cby+17);
+    ctx.fillText('📞  Call Morgan back',W/2,cby+17);
     ctx.textAlign='left';
   }
 
@@ -1935,7 +1935,7 @@ function drawCalls() {
   if (callBack.active) drawCallOverlay();
 }
 
-// â”€â”€ Music app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Music app ──────────────────────────────────────────────────────
 function drawMusic() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   if (musicState.view==='player' && musicState.idx>=0) drawMusicPlayer();
@@ -1953,13 +1953,13 @@ function drawMusicList() {
     ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(0,ry+37,W,1);
     ctx.fillStyle=t.col; roundRect(10,ry+7,24,24,5); ctx.fill();
     ctx.font='13px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-    ctx.fillText(musicState.playing?'â¸':'â–¶',22,ry+25);
+    ctx.fillText(musicState.playing?'⏸':'▶',22,ry+25);
     ctx.textAlign='left';
     ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
-    const titleStr = t.title.length>22 ? t.title.slice(0,21)+'â€¦' : t.title;
+    const titleStr = t.title.length>22 ? t.title.slice(0,21)+'…' : t.title;
     ctx.fillText(titleStr,42,ry+17);
     ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle=t.col;
-    ctx.fillText(musicState.playing?'â™« now playing':'paused',42,ry+30);
+    ctx.fillText(musicState.playing?'♫ now playing':'paused',42,ry+30);
     ry+=42;
   }
 
@@ -1976,12 +1976,12 @@ function drawMusicList() {
     ctx.textAlign='left';
     ctx.font=active?'bold 8px Arial Narrow, Arial, sans-serif':'8px Arial Narrow, Arial, sans-serif';
     ctx.fillStyle=active?'#fff':'rgba(255,255,255,0.75)';
-    ctx.fillText(t.title.length>26?t.title.slice(0,25)+'â€¦':t.title,40,ry+22);
+    ctx.fillText(t.title.length>26?t.title.slice(0,25)+'…':t.title,40,ry+22);
     // Playing dots animation
     if (active&&musicState.playing) {
       const d='.'.repeat(Math.floor(totalTime*3)%4);
       ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right'; ctx.fillStyle=t.col;
-      ctx.fillText('â™«'+d,W-10,ry+22); ctx.textAlign='left';
+      ctx.fillText('♫'+d,W-10,ry+22); ctx.textAlign='left';
     }
     ry+=34;
   }
@@ -2025,7 +2025,7 @@ function drawMusicPlayer() {
   // Track info
   const infoY=artY+artS+16;
   ctx.font='bold 10px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-  const displayTitle = t.title.length>24 ? t.title.slice(0,23)+'â€¦' : t.title;
+  const displayTitle = t.title.length>24 ? t.title.slice(0,23)+'…' : t.title;
   ctx.fillText(displayTitle,W/2,infoY);
   ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.3)';
   ctx.fillText(`${musicState.idx+1}  /  ${TRACKS.length}`,W/2,infoY+13);
@@ -2047,15 +2047,15 @@ function drawMusicPlayer() {
   const ctrlY=progY+28, cx=W/2;
   // Prev
   ctx.font='20px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.65)';
-  ctx.fillText('â®',cx-52,ctrlY+16);
+  ctx.fillText('⏮',cx-52,ctrlY+16);
   // Play/Pause button
   ctx.fillStyle=t.col; ctx.beginPath(); ctx.arc(cx,ctrlY+12,20,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(cx,ctrlY+12,20,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#fff'; ctx.font='18px Arial Narrow, Arial, sans-serif';
-  ctx.fillText(musicState.playing?'â¸':'â–¶',cx+(musicState.playing?0:1),ctrlY+18);
+  ctx.fillText(musicState.playing?'⏸':'▶',cx+(musicState.playing?0:1),ctrlY+18);
   // Next
   ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='20px Arial Narrow, Arial, sans-serif';
-  ctx.fillText('â­',cx+52,ctrlY+16);
+  ctx.fillText('⏭',cx+52,ctrlY+16);
   ctx.textAlign='left';
 }
 
@@ -2088,7 +2088,7 @@ function onClickMusicPlayer(mx,my) {
   const ctrlY=progY+28, cx=W/2;
   const audio=musicState.audio;
 
-  // Seek â€” tap on progress bar
+  // Seek — tap on progress bar
   if (my>=progY-6&&my<=progY+16&&audio?.duration) {
     const t=Math.max(0,Math.min(1,(mx-progX)/progW));
     audio.currentTime=t*audio.duration; return;
@@ -2101,7 +2101,7 @@ function onClickMusicPlayer(mx,my) {
   if (mx>=cx+32&&mx<=cx+68&&my>=ctrlY&&my<ctrlY+32) { musicSkip(1); return; }
 }
 
-// â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Settings ───────────────────────────────────────────────────────
 function drawSettings() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Settings');
@@ -2123,7 +2123,7 @@ function drawSettings() {
   }
 }
 
-// â”€â”€ Call overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Call overlay ───────────────────────────────────────────────────
 function drawCallOverlay() {
   // Full-screen dark overlay
   ctx.fillStyle='rgba(10,8,20,0.96)'; ctx.fillRect(0,0,W,H);
@@ -2140,7 +2140,7 @@ function drawCallOverlay() {
     ctx.lineWidth=2+pulse*3;
     ctx.beginPath(); ctx.arc(W/2,100,(30+pulse*8),0,Math.PI*2); ctx.stroke();
     ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.45)';
-    ctx.fillText('callingâ€¦',W/2,170);
+    ctx.fillText('calling…',W/2,170);
   } else {
     // Transcript lines
     ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left';
@@ -2154,13 +2154,13 @@ function drawCallOverlay() {
     // Hang up button once all lines shown
     if (callBack.lineIdx>=callBack.lines.length) {
       ctx.fillStyle='rgba(220,60,60,0.85)'; ctx.beginPath(); ctx.arc(W/2,H-NAV_H-30,16,0,Math.PI*2); ctx.fill();
-      ctx.font='13px sans-serif'; ctx.textAlign='center'; ctx.fillText('ðŸ“µ',W/2,H-NAV_H-23);
+      ctx.font='13px sans-serif'; ctx.textAlign='center'; ctx.fillText('📵',W/2,H-NAV_H-23);
     }
   }
   ctx.textAlign='left';
 }
 
-// â”€â”€ Epilogue screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Epilogue screen ────────────────────────────────────────────────
 function drawEnd() {
   const g=ctx.createLinearGradient(0,0,0,H);
   g.addColorStop(0,'#080612'); g.addColorStop(1,'#0e0820');
@@ -2173,7 +2173,7 @@ function drawEnd() {
 
   // Title line
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.2)';
-  ctx.fillText(timePhase>=PHASE.LATE?'end of day  Â·  2:47 AM':'end of day',W/2,42);
+  ctx.fillText(timePhase>=PHASE.LATE?'end of day  ·  2:47 AM':'end of day',W/2,42);
 
   // Closing line based on final state
   ctx.font='bold 10px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.72)';
@@ -2245,7 +2245,7 @@ function onClickEnd(mx, my) {
   screen = SCR.HOME;
 }
 
-// â”€â”€ Shared header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Shared header ──────────────────────────────────────────────────
 function appHeader(title) {
   ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,32);
   ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,STATUS_H+31,W,1);
@@ -2253,7 +2253,7 @@ function appHeader(title) {
   ctx.fillText(title,W/2,STATUS_H+21); ctx.textAlign='left';
 }
 
-// â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Utilities ──────────────────────────────────────────────────────
 function wrapText(text,maxW,font) {
   ctx.font=font;
   const words=text.split(' '), lines=[]; let line='';
@@ -2283,7 +2283,7 @@ function roundRect(x,y,w,h,r) {
   ctx.closePath();
 }
 
-// â”€â”€ Game loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Game loop ──────────────────────────────────────────────────────
 function loop(ts) {
   const dt=Math.min((ts-lastTs)/1000,0.1); lastTs=ts;
   update(dt); draw(); requestAnimationFrame(loop);
