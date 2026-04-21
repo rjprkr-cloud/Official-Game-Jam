@@ -54,10 +54,16 @@ const profile = { defensive:0, trusting:0, avoidant:0 };
 
 // ── Relationships ──────────────────────────────────────────────────
 const rel = {
-  morgan:  { name:'Morgan',  trust:50, tension:0, tone:'neutral', color:'#7c6cd6' },
-  alex:    { name:'Alex',    trust:60, tension:0, tone:'warm',    color:'#c07050' },
-  riley:   { name:'Riley',  trust:45, tension:0, tone:'neutral', color:'#4a9c7a' },
-  unknown: { name:'???',     trust:0,  tension:0, tone:'unknown', color:'#505068' },
+  morgan:  { name:'Morgan',  trust:50, tension:0,  tone:'worried',  color:'#7c6cd6' },
+  alex:    { name:'Alex',    trust:55, tension:0,  tone:'neutral',  color:'#c07050' },
+  riley:   { name:'Riley',   trust:45, tension:0,  tone:'guarded',  color:'#4a9c7a' },
+  jordan:  { name:'Jordan',  trust:40, tension:0,  tone:'breezy',   color:'#c08020' },
+  casey:   { name:'Casey',   trust:50, tension:5,  tone:'worried',  color:'#9060c8' },
+  sam:     { name:'Sam',     trust:35, tension:25, tone:'hostile',  color:'#c04040' },
+  taylor:  { name:'Taylor',  trust:60, tension:0,  tone:'neutral',  color:'#3a9aaa' },
+  drew:    { name:'Drew',    trust:55, tension:0,  tone:'careful',  color:'#4878b0' },
+  quinn:   { name:'Quinn',   trust:45, tension:0,  tone:'blunt',    color:'#b07848' },
+  unknown: { name:'???',     trust:30, tension:0,  tone:'unknown',  color:'#707080' },
 };
 
 // ── Settings ───────────────────────────────────────────────────────
@@ -74,8 +80,10 @@ function pushNotif(sender, text) {
 }
 
 // ── Notes ──────────────────────────────────────────────────────────
+// recovered = shown with corrupted styling
 const notes = [
-  { time:'11:12 PM', body:"can't keep doing this. riley's was a mistake probably. but I stayed anyway." },
+  { time:'11:59 PM', body:"jordan's being jordan. riley looks stressed. been here an hour.\n[47 chars deleted]" },
+  { time:'3:14 AM',  body:"ne ed to re mem ber to ap olo gize for\n[corrupted — partial recovery only]", recovered:true },
 ];
 
 // ── Photos ─────────────────────────────────────────────────────────
@@ -84,9 +92,14 @@ let photoZoom = false;
 // ── Voicemail ──────────────────────────────────────────────────────
 const voicemails = [
   {
-    from: 'morgan', name: 'Morgan', time: '1:07 AM', duration: '0:14',
-    listened: false,
-    transcript: "hey. I know it's late. I just... I drove past riley's on my way home and I think I saw you outside. I don't know. just wanted to make sure you were ok. call me when you can.",
+    from:'morgan', name:'Morgan', time:'1:22 AM', duration:'0:18',
+    listened:false,
+    transcript:"hey. it's me. I don't know where you went. you seemed like a lot and I just — I wanted to make sure you got home ok. call me back or text me when you wake up. please.",
+  },
+  {
+    from:'riley', name:'Riley', time:'2:47 AM', duration:'0:09',
+    listened:false,
+    transcript:"hey. just. tonight was a lot and yeah. we can talk about it later. hope you got home.",
   },
 ];
 let callsVoicemailOpen = false;
@@ -145,642 +158,1316 @@ let callBack = {
 const CALLOUT_DELAY = 1.6;   // seconds before answer
 const LINE_DELAY    = 1.4;   // seconds between transcript lines
 
-// Call log entries (fabricated history around the night)
+// Call log entries — evidence of last night
 const callLog = [
-  { type:'missed',   name:'Morgan', time:'1:07 AM',  key:'morgan' },
-  { type:'outgoing', name:'Alex',   time:'8:55 AM',  key:'alex'   },
-  { type:'incoming', name:'Riley',  time:'10:18 AM', key:'riley'  },
+  { type:'outgoing', name:'Casey',  time:'1:15 AM',  key:'casey',   note:'no answer' },
+  { type:'missed',   name:'Morgan', time:'1:22 AM',  key:'morgan' },
+  { type:'outgoing', name:'Jordan', time:'1:14 AM',  key:'jordan' },
+  { type:'outgoing', name:'Jordan', time:'1:17 AM',  key:'jordan',  note:'no answer' },
+  { type:'incoming', name:'Riley',  time:'2:47 AM',  key:'riley'  },
+  { type:'missed',   name:'Sam',    time:'2:33 AM',  key:'sam' },
+  { type:'outgoing', name:'???',    time:'3:22 AM',  key:'unknown' },
+  { type:'outgoing', name:'Alex',   time:'9:22 AM',  key:'alex'   },
 ];
 
 // ── Conversation script ────────────────────────────────────────────
+// Premise: you blacked out at Riley's party last night. You woke up and
+// you don't remember anything after about midnight. Your phone does though.
 const SCRIPT = {
 
-  // ── Morgan — night ────────────────────────────────────────────
+  // ── Morgan — morning opener ───────────────────────────────────
   morgan_0: {
-    incoming: { text:'hey did you get home ok last night', time:'11:42 PM' },
+    incoming: { text:'hey. how are you feeling this morning', time:'9:02 AM' },
     choices: [
-      { text:'Yeah all good 👍',           next:'morgan_1a', fx:()=>{ rel.morgan.trust+=5;  profile.trusting++;  } },
-      { text:'why are you asking',          next:'morgan_1b', fx:()=>{ rel.morgan.tension+=10; profile.defensive++; } },
-      { text:'(leave on read)',silent:true, next:'morgan_1c', fx:()=>{ rel.morgan.tension+=15; profile.avoidant++;  } },
+      { text:'rough. I don\'t remember much of last night', next:'mo_1a', fx:()=>{ profile.trusting++;  flags.add('admitted_blackout'); flags.add('admitted_to_morgan'); } },
+      { text:'I\'m fine. why',                              next:'mo_1b', fx:()=>{ profile.defensive++; } },
+      { text:'still processing honestly',                   next:'mo_1c', fx:()=>{ profile.trusting++;  } },
+      { text:'(leave on read)',       silent:true,           next:'mo_1d', fx:()=>{ profile.avoidant++;  rel.morgan.tension+=15; } },
     ],
   },
-  morgan_1a: {
-    incoming: { text:'ok good :) you seemed off', time:'11:44 PM' },
+  mo_1a: { // admitted blackout
+    incoming: { text:'yeah. I figured. there\'s some stuff we should probably talk about at some point', time:'9:04 AM' },
     choices: [
-      { text:'I was just tired',         next:'morgan_2a', fx:()=>{ profile.trusting++;  } },
-      { text:'what do you mean "off"',   next:'morgan_2b', fx:()=>{ profile.defensive++; rel.morgan.tension+=5; } },
+      { text:'what stuff',   next:'mo_2_truth', fx:()=>{ profile.trusting++; } },
+      { text:'not yet. I\'m still piecing it together', next:'mo_2_wait', fx:()=>{} },
     ],
   },
-  morgan_1b: {
-    incoming: { text:'just checking in lol', time:'11:44 PM' },
+  mo_1b: { // defensive
+    incoming: { text:'just checking. you seemed like a lot last night', time:'9:04 AM' },
     choices: [
-      { text:'oh ok. yeah I\'m fine',        next:'morgan_2a', fx:()=>{} },
-      { text:'you don\'t have to do that',   next:'morgan_2c', fx:()=>{ profile.defensive++; rel.morgan.tension+=10; } },
+      { text:'I was having fun',                       next:'mo_2_cover', fx:()=>{ profile.defensive++; } },
+      { text:'ok yeah. I don\'t actually remember it', next:'mo_2_truth', fx:()=>{ profile.trusting++; flags.add('admitted_blackout'); flags.add('admitted_to_morgan'); } },
     ],
   },
-  morgan_1c: {
-    incoming: { text:'...ok', time:'11:58 PM' },
+  mo_1c: { // still processing
+    incoming: { text:'take your time. I\'m here', time:'9:04 AM' },
     choices: [
-      { text:'sorry fell asleep',                next:'morgan_2a', fx:()=>{ profile.trusting++; } },
-      { text:'(still nothing)',silent:true,       next:'morgan_2d', fx:()=>{ profile.avoidant+=2; rel.morgan.tension+=20; } },
+      { text:'did I do anything bad',  next:'mo_2_probe', fx:()=>{} },
+      { text:'ok thanks',              next:'mo_2_deflect', fx:()=>{} },
     ],
   },
-  morgan_2a: { incoming:{ text:'ok. sleep well', time:'11:45 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_night_ok'); queueMorning(); } },
-  morgan_2b: {
-    incoming: { text:'idk you were just quiet. nvm forget I said anything', time:'11:46 PM' },
+  mo_1d: { // on read
+    incoming: { text:'ok.', time:'9:28 AM' },
     choices: [
-      { text:'no tell me', next:'morgan_2e', fx:()=>{ profile.trusting++; } },
-      { text:'yeah nvm',   next:'morgan_2f', fx:()=>{ profile.avoidant++; } },
+      { text:'sorry. rough morning',    next:'mo_1a', fx:()=>{ profile.trusting++; } },
+      { text:'(still nothing)',silent:true, next:'mo_1d_end', fx:()=>{ profile.avoidant+=2; rel.morgan.tension+=20; rel.morgan.trust-=10; } },
     ],
   },
-  morgan_2c: { incoming:{ text:'ok. noted.', time:'11:45 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_pushed_away'); rel.morgan.trust-=10; queueMorning(); } },
-  morgan_2d: { incoming:null, choices:null,
-    onEnd:()=>{ flags.add('morgan_silence'); rel.morgan.trust-=20; queueMorning(); } },
-  morgan_2e: {
-    incoming: { text:'you just seemed sad. I dunno. it doesn\'t matter', time:'11:47 PM' },
+  mo_1d_end: { incoming:null, choices:null, onEnd:()=>{ flags.add('morgan_silence_am'); rel.morgan.trust-=10; queueMorning(); } },
+  mo_2_truth: {
+    incoming: { text:'you texted me some things last night. I wasn\'t sure if you meant them or if it was just the alcohol talking', time:'9:06 AM' },
     choices: [
-      { text:'I\'m ok. thanks for noticing', next:'morgan_end_warm', fx:()=>{ rel.morgan.trust+=10; profile.trusting++; } },
-      { text:'I\'m fine',                    next:'morgan_end_flat', fx:()=>{ profile.defensive++; } },
+      { text:'what did I say',                next:'mo_3_reveal',  fx:()=>{ profile.trusting++;  } },
+      { text:'I\'m sorry. you can ignore it', next:'mo_3_dismiss', fx:()=>{ profile.defensive++; rel.morgan.trust-=8; } },
+      { text:'...I think I meant it',         next:'mo_3_own',     fx:()=>{ profile.trusting+=2; rel.morgan.trust+=10; flags.add('admitted_drunk_texts'); } },
     ],
   },
-  morgan_2f: { incoming:{ text:'ok.', time:'11:46 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_night_tense'); queueMorning(); } },
-  morgan_end_warm: { incoming:{ text:'❤️', time:'11:48 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_connected'); rel.morgan.trust+=5; queueMorning(); } },
-  morgan_end_flat: { incoming:{ text:'ok. night', time:'11:48 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_night_flat'); queueMorning(); } },
+  mo_2_cover: { incoming:{ text:'ok.', time:'9:05 AM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_am_closed'); queueMorning(); } },
+  mo_2_wait: { incoming:{ text:'ok. I\'ll be here', time:'9:05 AM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_am_deferred'); queueMorning(); } },
+  mo_2_probe: {
+    incoming: { text:'define "bad"', time:'9:05 AM' },
+    choices: [
+      { text:'like. anything I should apologize for', next:'mo_2b_probe2', fx:()=>{ profile.trusting++; } },
+      { text:'forget it. I\'m fine',                  next:'mo_2_cover',   fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  mo_2b_probe2: {
+    incoming: { text:'I mean. I don\'t think you meant any harm', time:'9:06 AM' },
+    choices: [
+      { text:'but something happened', next:'mo_2_truth',   fx:()=>{ profile.trusting++; } },
+      { text:'ok. that\'s something',  next:'mo_2_deflect', fx:()=>{} },
+    ],
+  },
+  mo_2_deflect: { incoming:{ text:'text me later if you want to talk', time:'9:06 AM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_am_deflected'); queueMorning(); } },
+  mo_3_reveal: {
+    incoming: { text:'you said I was the realest person you know. and that you don\'t know why we don\'t just say things to each other', time:'9:07 AM' },
+    choices: [
+      { text:'...god',               next:'mo_4a', fx:()=>{ profile.trusting++;  } },
+      { text:'that\'s embarrassing', next:'mo_4b', fx:()=>{ profile.defensive++; } },
+      { text:'I meant it',           next:'mo_4c', fx:()=>{ profile.trusting+=2; rel.morgan.trust+=12; flags.add('admitted_drunk_texts'); } },
+    ],
+  },
+  mo_3_dismiss: { incoming:{ text:'ok.', time:'9:07 AM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_hurt'); rel.morgan.trust-=10; rel.morgan.tension+=10; queueMorning(); } },
+  mo_3_own: { incoming:{ text:'ok. I think we should probably talk for real at some point then', time:'9:07 AM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_connection_started'); rel.morgan.trust+=5; queueMorning(); } },
+  mo_4a: {
+    incoming: { text:'I didn\'t know what to do with it honestly. it was a lot.', time:'9:08 AM' },
+    choices: [
+      { text:'I know. I\'m sorry.',              next:'mo_end_warm',   fx:()=>{ rel.morgan.trust+=8; profile.trusting++; } },
+      { text:'I was drunk. it doesn\'t mean anything', next:'mo_3_dismiss', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  mo_4b: { incoming:{ text:'it\'s ok. just. maybe we talk when things are less weird', time:'9:08 AM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_am_awkward'); queueMorning(); } },
+  mo_4c: { incoming:{ text:'ok then. yeah.', time:'9:08 AM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_connection_started'); rel.morgan.trust+=8; queueMorning(); } },
+  mo_end_warm: { incoming:{ text:'I know you are.', time:'9:09 AM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_connection_started'); rel.morgan.trust+=5; queueMorning(); } },
 
-  // ── Morgan — afternoon (3 entry variants) ────────────────────
-  morgan_aft_warm: {
-    incoming: { text:'hey. sorry if I was weird last night', time:'2:14 PM' },
+  // ── Morgan — afternoon ────────────────────────────────────────
+  morgan_aft: {
+    incoming: { text:'hey. have you talked to riley yet', time:'2:34 PM' },
     choices: [
-      { text:'you weren\'t weird',          next:'maw_1a', fx:()=>{ profile.trusting++;  } },
-      { text:'what do you mean',            next:'maw_1b', fx:()=>{ profile.defensive++; } },
-      { text:'(leave on read)',silent:true, next:'maw_1c', fx:()=>{ profile.avoidant++;  } },
+      { text:'yeah a little',      next:'maft_1a', fx:()=>{} },
+      { text:'not yet',            next:'maft_1b', fx:()=>{} },
+      { text:'(seen)',silent:true, next:'maft_silence', fx:()=>{ profile.avoidant++; rel.morgan.tension+=10; } },
     ],
   },
-  maw_1a: {
-    incoming: { text:'ok good. I just felt like something was off with you. I don\'t know.', time:'2:15 PM' },
+  maft_1a: {
+    incoming: { text:'just. riley was stressed last night. I think the lamp thing upset them more than they\'re saying', time:'2:35 PM' },
     choices: [
-      { text:'something was a little off', next:'maw_2a', fx:()=>{ profile.trusting++; rel.morgan.trust+=5; } },
-      { text:'everything was fine',        next:'maw_2b', fx:()=>{ profile.defensive++; } },
+      { text:'what lamp',           next:'maft_2_lamp',       fx:()=>{ profile.trusting++;  flags.add('lamp_mentioned'); } },
+      { text:'riley said they\'re fine', next:'maft_2_trust', fx:()=>{} },
     ],
   },
-  maw_1b: {
-    incoming: { text:'I don\'t know. I called you and... yeah. forget it.', time:'2:15 PM' },
+  maft_1b: {
+    incoming: { text:'worth checking in. I think you should know — the lamp thing upset them', time:'2:35 PM' },
     choices: [
-      { text:'wait — you called?',       next:'maw_call_reveal', fx:()=>{ profile.trusting++;  flags.add('morgan_call_mentioned'); } },
-      { text:'it\'s fine. really.',      next:'maw_2b',          fx:()=>{ profile.defensive++; } },
+      { text:'what lamp',                    next:'maft_2_lamp', fx:()=>{ profile.trusting++;  flags.add('lamp_mentioned'); } },
+      { text:'I don\'t remember a lamp',     next:'maft_2_lamp', fx:()=>{ profile.trusting++;  flags.add('lamp_mentioned'); flags.add('admitted_blackout'); } },
     ],
   },
-  maw_1c: { incoming:{ text:'ok nvm', time:'2:26 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_ignored'); rel.morgan.tension+=15; rel.morgan.trust-=8; } },
-  maw_2a: {
-    incoming: { text:'yeah. that\'s what I thought.', time:'2:16 PM' },
+  maft_silence: { incoming:{ text:'ok.', time:'2:50 PM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_aft_ignored'); rel.morgan.trust-=8; } },
+  maft_2_lamp: {
+    incoming: { text:'you knocked over their lamp. the tall one. I think it was their mom\'s or something', time:'2:36 PM' },
     choices: [
-      { text:'can we talk about it', next:'maw_3a', fx:()=>{ profile.trusting++; rel.morgan.trust+=8; } },
-      { text:'not right now',        next:'maw_3b', fx:()=>{ profile.avoidant++;  } },
+      { text:'oh god. I need to apologize',           next:'maft_3_apologize',    fx:()=>{ profile.trusting++;  flags.add('knows_about_lamp'); } },
+      { text:'riley didn\'t mention that to me',      next:'maft_3_surprised',    fx:()=>{} },
+      { text:'it was an accident. they\'ll get over it', next:'maft_3_dismiss',  fx:()=>{ profile.defensive++; } },
     ],
   },
-  maw_2b: { incoming:{ text:'ok.', time:'2:16 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_closed'); rel.morgan.tension+=5; } },
-  maw_call_reveal: {
-    incoming: { text:'yeah at 1am. you were probably asleep.', time:'2:16 PM' },
-    choices: [
-      { text:'I wasn\'t asleep',      next:'maw_3c', fx:()=>{ profile.trusting++; flags.add('admitted_not_asleep'); } },
-      { text:'I must have missed it', next:'maw_3d', fx:()=>{ profile.defensive++; } },
-    ],
-  },
-  maw_3a: { incoming:{ text:'yeah. me too.', time:'2:17 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_open'); rel.morgan.trust+=10; } },
-  maw_3b: { incoming:{ text:'ok. whenever.', time:'2:18 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_deferred'); } },
-  maw_3c: {
-    incoming: { text:'I figured. it\'s ok. I\'m not asking you to explain.', time:'2:17 PM' },
-    choices: [
-      { text:'I know. I\'m sorry.', next:'maw_end_honest', fx:()=>{ rel.morgan.trust+=12; profile.trusting++; } },
-      { text:'then why call',       next:'maw_end_push',   fx:()=>{ profile.defensive++; rel.morgan.tension+=8; } },
-    ],
-  },
-  maw_3d: { incoming:{ text:'it\'s fine.', time:'2:17 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_covered'); } },
-  maw_end_honest: { incoming:{ text:'I know you are.', time:'2:18 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_warm_end'); rel.morgan.trust+=5; } },
-  maw_end_push: { incoming:{ text:'because I wanted to know if you were ok. that\'s it.', time:'2:19 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_pushed'); rel.morgan.trust-=5; } },
+  maft_2_trust: { incoming:{ text:'ok. I mean maybe. just wanted to make sure you knew.', time:'2:36 PM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_aft_neutral'); } },
+  maft_3_apologize: { incoming:{ text:'yeah. that would probably mean a lot to them.', time:'2:37 PM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_pushed_apologize_riley'); rel.morgan.trust+=5; } },
+  maft_3_surprised: { incoming:{ text:'yeah. they wouldn\'t.', time:'2:37 PM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_aft_lamp_shock'); } },
+  maft_3_dismiss: { incoming:{ text:'I mean. yeah. just letting you know.', time:'2:38 PM' }, choices:null,
+    onEnd:()=>{ rel.morgan.trust-=5; } },
 
-  morgan_aft_cold: {
-    incoming: { text:'hey', time:'1:44 PM' },
+  // ── Morgan — evening (truth path) ────────────────────────────
+  morgan_eve: {
+    incoming: { text:'can I be honest with you about something', time:'7:28 PM' },
     choices: [
-      { text:'hey',    next:'mac_1a', fx:()=>{ profile.trusting++;  } },
-      { text:'what\'s up', next:'mac_1b', fx:()=>{ profile.defensive++; } },
-      { text:'(ignore)',silent:true, next:'mac_1c', fx:()=>{ profile.avoidant++; rel.morgan.tension+=20; } },
+      { text:'yeah of course',     next:'meve_1a',      fx:()=>{ profile.trusting++;  } },
+      { text:'...ok',              next:'meve_1a',      fx:()=>{} },
+      { text:'not tonight',        next:'meve_defer',   fx:()=>{ profile.avoidant++; } },
+      { text:'(seen)',silent:true, next:'meve_ignore',  fx:()=>{ profile.avoidant+=2; rel.morgan.tension+=15; } },
     ],
   },
-  mac_1a: {
-    incoming: { text:'you ok?', time:'1:44 PM' },
+  meve_defer:  { incoming:{ text:'ok. whenever you\'re ready.', time:'7:29 PM' }, choices:null, onEnd:()=>{} },
+  meve_ignore: { incoming:null, choices:null, onEnd:()=>{ rel.morgan.trust-=10; flags.add('eve_silence'); } },
+  meve_1a: {
+    incoming: { text:'when you were talking to me last night — the things you said — I don\'t think you know how much I actually felt that too', time:'7:30 PM' },
     choices: [
-      { text:'yeah. you?',           next:'mac_2a', fx:()=>{ profile.trusting++; } },
-      { text:'why does everyone keep asking me that', next:'mac_2b', fx:()=>{ profile.defensive+=2; } },
+      { text:'...are you serious',          next:'meve_2a', fx:()=>{ profile.trusting++;  rel.morgan.trust+=10; } },
+      { text:'I was drunk. you don\'t have to say that', next:'meve_2b', fx:()=>{ profile.defensive++; } },
+      { text:'(say nothing)',silent:true,   next:'meve_2c', fx:()=>{ profile.avoidant++; } },
     ],
   },
-  mac_1b: { incoming:{ text:'nothing. just checking in.', time:'1:45 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_deflected'); } },
-  mac_1c: { incoming:null, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_silence2'); rel.morgan.trust-=15; rel.morgan.tension+=20; } },
-  mac_2a: { incoming:{ text:'I\'m fine. call me sometime.', time:'1:45 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_ok'); rel.morgan.trust+=5; } },
-  mac_2b: {
-    incoming: { text:'I don\'t know. I just do.', time:'1:46 PM' },
+  meve_2a: {
+    incoming: { text:'I\'m serious. I just didn\'t know how to say it sober.', time:'7:31 PM' },
     choices: [
-      { text:'I appreciate it. I\'m ok.', next:'mac_end_ok',   fx:()=>{ profile.trusting++; rel.morgan.trust+=5; } },
-      { text:'(leave it)',silent:true,    next:'mac_end_cold', fx:()=>{ profile.avoidant++;  } },
+      { text:'me neither. clearly.',               next:'meve_end_warm',   fx:()=>{ rel.morgan.trust+=10; flags.add('morgan_told_the_truth'); } },
+      { text:'I still don\'t know what to do with that', next:'meve_end_honest', fx:()=>{ rel.morgan.trust+=6;  flags.add('morgan_told_the_truth'); } },
     ],
   },
-  mac_end_ok:   { incoming:{ text:'ok good.', time:'1:47 PM' }, choices:null, onEnd:()=>flags.add('morgan_aft_ok') },
-  mac_end_cold: { incoming:null, choices:null, onEnd:()=>{ flags.add('morgan_aft_silence2'); rel.morgan.tension+=10; } },
+  meve_2b: { incoming:{ text:'I know you were drunk. that doesn\'t mean it wasn\'t real.', time:'7:31 PM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_told_the_truth'); rel.morgan.trust+=5; } },
+  meve_2c: { incoming:null, choices:null, onEnd:()=>{ flags.add('morgan_eve_silence'); } },
+  meve_end_warm: { incoming:{ text:'same.', time:'7:32 PM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_connection'); rel.morgan.trust+=5; } },
+  meve_end_honest: { incoming:{ text:'I don\'t either. but I wanted you to know.', time:'7:32 PM' }, choices:null,
+    onEnd:()=>{ flags.add('morgan_connection'); rel.morgan.trust+=3; } },
 
-  morgan_aft_direct: {
-    incoming: { text:'were you at riley\'s last night', time:'1:58 PM' },
+  // ── Morgan — ambient ─────────────────────────────────────────
+  morgan_am1: {
+    incoming: { text:'also your jacket is at riley\'s btw. brown one.', time:'9:45 AM' },
     choices: [
-      { text:'yeah for a bit',              next:'mad_1a', fx:()=>{ profile.trusting++;  flags.add('admitted_rileys'); } },
-      { text:'why',                         next:'mad_1b', fx:()=>{ profile.defensive++; } },
-      { text:'(leave on read)',silent:true, next:'mad_1c', fx:()=>{ profile.avoidant++;  rel.morgan.tension+=20; } },
+      { text:'ugh ok thanks',      next:'mam1_a', fx:()=>{} },
+      { text:'(seen)',silent:true, next:'mam1_b', fx:()=>{ profile.avoidant++; } },
     ],
   },
-  mad_1a: {
-    incoming: { text:'I called at 1am. you didn\'t pick up.', time:'1:59 PM' },
+  mam1_a: { incoming:{ text:'it\'s safe don\'t worry', time:'9:45 AM' }, choices:null, onEnd:()=>flags.add('jacket_at_riley') },
+  mam1_b: { incoming:null, choices:null, onEnd:()=>{} },
+
+  morgan_pm1: {
+    incoming: { text:'random but — I\'ve been listening to this album all day and I don\'t know if it\'s helping', time:'3:22 PM' },
     choices: [
-      { text:'I know. I\'m sorry.',     next:'mad_2a', fx:()=>{ profile.trusting++; rel.morgan.trust+=5; } },
-      { text:'I didn\'t hear it',       next:'mad_2b', fx:()=>{ profile.defensive++; } },
-      { text:'I didn\'t want to talk',  next:'mad_2c', fx:()=>{ profile.trusting+=2; rel.morgan.trust+=8; rel.morgan.tension-=5; } },
+      { text:'same energy honestly',       next:'mpm1_a', fx:()=>{ rel.morgan.trust+=4; profile.trusting++; } },
+      { text:'which album',                next:'mpm1_b', fx:()=>{ rel.morgan.trust+=3; } },
+      { text:'(don\'t reply)',silent:true, next:'mpm1_c', fx:()=>{ profile.avoidant++; } },
     ],
   },
-  mad_1b: {
-    incoming: { text:'because I called you at 1am and you didn\'t pick up.', time:'1:59 PM' },
+  mpm1_a:    { incoming:{ text:'right? that\'s where I am.', time:'3:23 PM' }, choices:null, onEnd:()=>{} },
+  mpm1_b:    { incoming:{ text:'you\'d know it. I\'ll send it to you sometime.', time:'3:23 PM' }, choices:null, onEnd:()=>{} },
+  mpm1_c:    { incoming:null, choices:null, onEnd:()=>{} },
+
+  morgan_eve_soft: {
+    incoming: { text:'hey. still up?', time:'9:14 PM' },
     choices: [
-      { text:'I was still out',         next:'mad_2d', fx:()=>{ flags.add('admitted_late'); profile.trusting++; } },
-      { text:'I didn\'t hear it ring',  next:'mad_2b', fx:()=>{ profile.defensive++; } },
+      { text:'yeah',               next:'mes_a', fx:()=>{ rel.morgan.trust+=3; } },
+      { text:'(seen)',silent:true, next:'mes_b', fx:()=>{ profile.avoidant++; } },
     ],
   },
-  mad_1c: {
-    incoming: { text:'I\'m not trying to track you. I just wanted to know you were ok.', time:'2:10 PM' },
-    choices: [
-      { text:'I know. I\'m sorry.',      next:'mad_2a', fx:()=>{ profile.trusting++; } },
-      { text:'(still nothing)',silent:true, next:'mad_silence', fx:()=>{ profile.avoidant+=2; rel.morgan.tension+=25; rel.morgan.trust-=15; } },
-    ],
-  },
-  mad_2a: { incoming:{ text:'ok.', time:'2:00 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_forgiven'); rel.morgan.trust+=5; } },
-  mad_2b: { incoming:{ text:'ok.', time:'2:00 PM' }, choices:null,
-    onEnd:()=>flags.add('morgan_aft_covered') },
-  mad_2c: { incoming:{ text:'I know.', time:'2:00 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_aft_honest_moment'); rel.morgan.trust+=10; } },
-  mad_2d: {
-    incoming: { text:'I know. I saw you.', time:'2:01 PM' },
-    choices: [
-      { text:'what did you see',      next:'mad_saw', fx:()=>{ profile.trusting++; } },
-      { text:'ok',                    next:'mad_2b',  fx:()=>{ profile.defensive++; } },
-    ],
-  },
-  mad_saw: { incoming:{ text:'you and someone outside. I didn\'t stop.', time:'2:02 PM' }, choices:null,
-    onEnd:()=>{ flags.add('morgan_saw_you'); rel.morgan.trust-=5; } },
-  mad_silence: { incoming:null, choices:null,
-    onEnd:()=>{ flags.add('morgan_final_silence'); rel.morgan.trust-=20; } },
+  mes_a: { incoming:{ text:'ok good. just wanted to check. night.', time:'9:15 PM' }, choices:null, onEnd:()=>{} },
+  mes_b: { incoming:null, choices:null, onEnd:()=>{} },
 
   // ── Alex — morning ────────────────────────────────────────────
   alex_0: {
-    incoming: { text:'hey you left your jacket at riley\'s last night lol', time:'9:03 AM' },
+    incoming: { text:'hey you ok? you were pretty gone last night lol', time:'9:18 AM' },
     choices: [
-      { text:'oh no lol thanks',             next:'alex_1a', fx:()=>{ profile.trusting++;  } },
-      { text:'I wasn\'t there that long',    next:'alex_1b', fx:()=>{ profile.defensive++; } },
-      { text:'(seen, no reply)',silent:true, next:'alex_1c', fx:()=>{ profile.avoidant++;  rel.alex.tension+=10; } },
+      { text:'yeah I literally don\'t remember the second half',  next:'al_1a', fx:()=>{ profile.trusting++;  flags.add('admitted_blackout'); } },
+      { text:'I\'m fine. it wasn\'t that bad',                    next:'al_1b', fx:()=>{ profile.defensive++; } },
+      { text:'(seen)',                           silent:true,      next:'al_1c', fx:()=>{ profile.avoidant++;  rel.alex.tension+=10; } },
     ],
   },
-  alex_1a: {
-    incoming: { text:'yeah. riley asked about you btw', time:'9:05 AM' },
+  al_1a: {
+    incoming: { text:'yeah after like 1 it got pretty wild. Jordan was really going for it', time:'9:20 AM' },
     choices: [
-      { text:'oh yeah? what did they say',          next:'alex_2a', fx:()=>{ profile.trusting++; } },
-      { text:'I\'m fine if that\'s what they asked',next:'alex_2b', fx:()=>{ profile.defensive++; } },
+      { text:'Jordan was the one giving me shots?', next:'al_2_jordan', fx:()=>{ profile.trusting++;  flags.add('jordan_feeding_shots'); } },
+      { text:'what happened exactly',              next:'al_2_what',   fx:()=>{ profile.trusting++;  } },
+      { text:'yeah. Jordan\'s always like that',   next:'al_2_shrug',  fx:()=>{} },
     ],
   },
-  alex_1b: {
-    incoming: { text:'yeah you kind of disappeared. everything ok?', time:'9:05 AM' },
+  al_1b: {
+    incoming: { text:'I mean I\'m not judging but the lamp thing was kind of a lot', time:'9:20 AM' },
     choices: [
-      { text:'yeah I just needed air',             next:'alex_2c', fx:()=>{ profile.trusting++; } },
-      { text:'why does everyone keep asking that', next:'alex_2d', fx:()=>{ profile.defensive+=2; rel.alex.tension+=5; } },
+      { text:'what lamp thing',      next:'al_2_lamp',       fx:()=>{ profile.trusting++;  flags.add('lamp_mentioned'); } },
+      { text:'riley said it\'s fine', next:'al_2_riley_fine', fx:()=>{ profile.defensive++; } },
     ],
   },
-  alex_1c: { incoming:{ text:'ok lmk if you want it back', time:'9:18 AM' }, choices:null,
-    onEnd:()=>{ flags.add('alex_ignored'); queueAfternoon(); } },
-  alex_2a: {
-    incoming: { text:'just that you seemed like you were somewhere else all night', time:'9:07 AM' },
+  al_1c: { incoming:{ text:'ok lmk if you need anything', time:'9:31 AM' }, choices:null,
+    onEnd:()=>{ flags.add('alex_ignored'); queueMorning(); } },
+  al_2_jordan: {
+    incoming: { text:'yes?? like multiple rounds. and you were clearly past your limit but Jordan kept going lol', time:'9:22 AM' },
     choices: [
-      { text:'yeah. I was',      next:'alex_3a', fx:()=>{ profile.trusting++;  rel.alex.trust+=5; } },
-      { text:'that\'s not true', next:'alex_3b', fx:()=>{ profile.defensive++; } },
+      { text:'and nobody stopped it',         next:'al_3_nobody', fx:()=>{ profile.trusting++;  } },
+      { text:'I mean I could have said no',   next:'al_3_self',   fx:()=>{ profile.trusting++;  } },
+      { text:'Jordan was just being Jordan',  next:'al_3_excuse', fx:()=>{ profile.defensive++; } },
     ],
   },
-  alex_2b: {
-    incoming: { text:'I didn\'t say anything was wrong. did I?', time:'9:07 AM' },
+  al_2_what: {
+    incoming: { text:'you were talking a lot to Morgan mostly. and then the lamp happened and everyone kind of went quiet', time:'9:22 AM' },
     choices: [
-      { text:'no. sorry.',            next:'alex_3c', fx:()=>{ profile.trusting++; } },
-      { text:'it\'s just a lot lately',next:'alex_3d', fx:()=>{ rel.alex.trust+=5;  } },
+      { text:'what was I saying to Morgan', next:'al_3_morgan', fx:()=>{ profile.trusting++; } },
+      { text:'was anyone filming it',       next:'al_3_film',   fx:()=>{ profile.trusting++; } },
     ],
   },
-  alex_2c: { incoming:{ text:'totally fair. it was a lot in there', time:'9:06 AM' }, choices:null,
-    onEnd:()=>{ flags.add('alex_understood'); queueAfternoon(); } },
-  alex_2d: {
-    incoming: { text:'I mean... morgan texted me this morning too so', time:'9:07 AM' },
+  al_2_lamp: {
+    incoming: { text:'you knocked into riley\'s lamp. the big one. the shade cracked.', time:'9:22 AM' },
     choices: [
-      { text:'what did she say',        next:'alex_morgan_cross', fx:()=>{ profile.trusting++; } },
-      { text:'(leave it)',silent:true,  next:'alex_3e',           fx:()=>{ profile.avoidant++; } },
+      { text:'was riley upset',         next:'al_3_riley_lamp', fx:()=>{ flags.add('knows_about_lamp'); } },
+      { text:'I don\'t remember that',  next:'al_3_no_memory',  fx:()=>{ flags.add('knows_about_lamp'); flags.add('admitted_blackout'); } },
     ],
   },
-  alex_3a: { incoming:{ text:'yeah. I could tell.', time:'9:09 AM' }, choices:null,
-    onEnd:()=>{ flags.add('alex_honest'); rel.alex.trust+=10; queueAfternoon(); } },
-  alex_3b: { incoming:{ text:'ok.', time:'9:09 AM' }, choices:null,
-    onEnd:()=>{ flags.add('alex_deflected'); rel.alex.tension+=5; queueAfternoon(); } },
-  alex_3c: { incoming:{ text:'don\'t apologize. just checking in.', time:'9:09 AM' }, choices:null,
-    onEnd:()=>{ flags.add('alex_ok'); queueAfternoon(); } },
-  alex_3d: { incoming:{ text:'yeah. I get that.', time:'9:09 AM' }, choices:null,
-    onEnd:()=>{ flags.add('alex_opened_up'); rel.alex.trust+=5; queueAfternoon(); } },
-  alex_3e: { incoming:null, choices:null,
-    onEnd:()=>{ flags.add('alex_left_hanging'); queueAfternoon(); } },
-  alex_morgan_cross: {
-    incoming: { text:'just asked if you got home ok. I said I thought so.', time:'9:09 AM' },
+  al_2_riley_fine: { incoming:{ text:'I mean riley would say they\'re fine even if they weren\'t.', time:'9:21 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  al_2_shrug: { incoming:{ text:'haha yeah. anyway just making sure you got home ok', time:'9:21 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  al_3_nobody: {
+    incoming: { text:'not really. I was going to say something but then the lamp happened and honestly everything just moved on', time:'9:24 AM' },
+    choices:null, onEnd:()=>{ flags.add('alex_admits_inaction'); rel.alex.trust+=5; queueMorning(); } },
+  al_3_self: { incoming:{ text:'I mean sure. but also Jordan knows when to stop and they didn\'t stop.', time:'9:24 AM' }, choices:null,
+    onEnd:()=>{ flags.add('alex_blames_jordan'); queueMorning(); } },
+  al_3_excuse: { incoming:{ text:'yeah I know. anyway. hope you feel better', time:'9:24 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  al_3_morgan: {
+    incoming: { text:'I couldn\'t really hear but it looked like it got kind of intense? Morgan looked surprised', time:'9:24 AM' },
     choices: [
-      { text:'what do you mean you thought so', next:'alex_cross_2a', fx:()=>{ profile.defensive++; } },
-      { text:'ok thanks',                       next:'alex_cross_2b', fx:()=>{} },
+      { text:'intense how',             next:'al_4_morgan', fx:()=>{ profile.trusting++; } },
+      { text:'Morgan\'s fine with me',  next:'al_4_fine',   fx:()=>{ profile.defensive++; } },
     ],
   },
-  alex_cross_2a: { incoming:{ text:'you left at like 12:30. I just didn\'t see you actually leave.', time:'9:10 AM' }, choices:null,
-    onEnd:()=>{ flags.add('alex_timeline_revealed'); queueAfternoon(); } },
-  alex_cross_2b: { incoming:{ text:'yeah. anyway. jacket\'s at mine whenever.', time:'9:10 AM' }, choices:null,
-    onEnd:()=>{ flags.add('alex_end_neutral'); queueAfternoon(); } },
+  al_3_film: {
+    incoming: { text:'Jordan had their phone out for a bit yeah. said it was funny.', time:'9:24 AM' },
+    choices: [
+      { text:'Jordan was filming it?',  next:'al_4_filming', fx:()=>{ flags.add('filming_revealed'); profile.trusting++; } },
+      { text:'of course Jordan was',    next:'al_4_film_ok', fx:()=>{} },
+    ],
+  },
+  al_3_riley_lamp: { incoming:{ text:'you apologized like four times and riley kept saying it was fine but their face said otherwise', time:'9:23 AM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_was_upset'); queueMorning(); } },
+  al_3_no_memory: { incoming:{ text:'yeah. that tracks. you weren\'t really all there by that point', time:'9:23 AM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_was_upset'); queueMorning(); } },
+  al_4_morgan: { incoming:{ text:'like you were saying real stuff I think. I wasn\'t trying to listen', time:'9:26 AM' }, choices:null,
+    onEnd:()=>{ flags.add('alex_morgan_scene'); queueMorning(); } },
+  al_4_fine: { incoming:{ text:'yeah probably. anyway hope you\'re feeling ok', time:'9:26 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  al_4_filming: { incoming:{ text:'yeah. I don\'t know if they kept it. hopefully not.', time:'9:25 AM' }, choices:null,
+    onEnd:()=>{ flags.add('filming_revealed'); queueMorning(); } },
+  al_4_film_ok: { incoming:{ text:'lol yeah. anyway. feel better', time:'9:25 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
 
-  // ── Riley ─────────────────────────────────────────────────────
+  // ── Alex — ambient ────────────────────────────────────────────
+  alex_pm1: {
+    incoming: { text:'ok genuine question — do you think Jordan actually feels bad or just says they do', time:'3:44 PM' },
+    choices: [
+      { text:'I think they feel bad',      next:'apm1_a', fx:()=>{ profile.trusting++; } },
+      { text:'hard to tell with Jordan',   next:'apm1_b', fx:()=>{} },
+      { text:'(seen)',       silent:true,  next:'apm1_c', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  apm1_a: { incoming:{ text:'yeah maybe. I hope so.', time:'3:45 PM' }, choices:null, onEnd:()=>{} },
+  apm1_b: { incoming:{ text:'yeah. same.', time:'3:45 PM' }, choices:null, onEnd:()=>{} },
+  apm1_c: { incoming:null, choices:null, onEnd:()=>{} },
+
+  alex_eve1: {
+    incoming: { text:'hey. you\'ve been quiet today. you doing ok?', time:'7:40 PM' },
+    choices: [
+      { text:'yeah just processing',   next:'aev1_a', fx:()=>{ profile.trusting++; } },
+      { text:'not really',             next:'aev1_b', fx:()=>{ profile.trusting++; rel.alex.trust+=8; } },
+      { text:'(seen)',  silent:true,   next:'aev1_c', fx:()=>{ profile.avoidant++; rel.alex.tension+=5; } },
+    ],
+  },
+  aev1_a: { incoming:{ text:'yeah. makes sense. lmk if you need anything', time:'7:41 PM' }, choices:null, onEnd:()=>{} },
+  aev1_b: { incoming:{ text:'yeah I figured. I\'m here if you want to talk', time:'7:41 PM' }, choices:null, onEnd:()=>flags.add('alex_available') },
+  aev1_c: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Riley — morning ───────────────────────────────────────────
   riley_0: {
-    incoming: { text:'hey fun last night :) you seemed a little out of it toward the end though', time:'10:22 AM' },
+    incoming: { text:'hey. just wanted to make sure we\'re good', time:'10:14 AM' },
     choices: [
-      { text:'haha yeah sorry',                       next:'riley_1a', fx:()=>{ profile.trusting++;  } },
-      { text:'what do you mean toward the end',       next:'riley_1b', fx:()=>{ profile.defensive++; } },
-      { text:'(don\'t open it)',silent:true,           next:'riley_1c', fx:()=>{ profile.avoidant++;  rel.riley.tension+=10; } },
+      { text:'why wouldn\'t we be?',                          next:'ri_1a', fx:()=>{ profile.defensive++; } },
+      { text:'I\'m really sorry about your lamp',             next:'ri_1b', fx:()=>{ profile.trusting++;  flags.add('knows_about_lamp'); rel.riley.trust+=8; } },
+      { text:'I honestly don\'t remember much. what happened', next:'ri_1c', fx:()=>{ profile.trusting++;  flags.add('admitted_blackout'); } },
+      { text:'(don\'t open)',         silent:true,             next:'ri_1d', fx:()=>{ profile.avoidant++;  rel.riley.tension+=10; } },
     ],
   },
-  riley_1a: {
-    incoming: { text:'no don\'t be sorry. you left around 1ish right? I thought I said bye to you', time:'10:24 AM' },
+  ri_1a: {
+    incoming: { text:'no no we\'re fine. I just. the lamp thing was an accident I know', time:'10:15 AM' },
     choices: [
-      { text:'yeah around then',                   next:'riley_2a', fx:()=>{ flags.add('riley_1am_confirmed'); } },
-      { text:'I honestly don\'t remember',         next:'riley_2b', fx:()=>{ profile.trusting++; flags.add('riley_gap_admitted'); } },
+      { text:'what lamp',               next:'ri_2_lamp',  fx:()=>{ profile.trusting++;  flags.add('lamp_mentioned'); } },
+      { text:'yeah. accidents happen',  next:'ri_2_cover', fx:()=>{ profile.defensive++; } },
     ],
   },
-  riley_1b: {
-    incoming: { text:'just like. you were quiet. and then you were gone', time:'10:24 AM' },
+  ri_1b: {
+    incoming: { text:'it\'s seriously fine. it was old. I wasn\'t like. upset about it.', time:'10:16 AM' },
     choices: [
-      { text:'I had to get home',   next:'riley_2c', fx:()=>{ profile.defensive++; } },
-      { text:'yeah. I know.',       next:'riley_2d', fx:()=>{ profile.trusting++; rel.riley.trust+=5; } },
+      { text:'riley.',          next:'ri_2_press',  fx:()=>{ profile.trusting++; } },
+      { text:'ok. I\'m glad.',  next:'ri_2_accept', fx:()=>{} },
     ],
   },
-  riley_1c: { incoming:{ text:'ok lol. lmk if you wanna grab your jacket sometime', time:'10:38 AM' }, choices:null,
-    onEnd:()=>flags.add('riley_ignored') },
-  riley_2a: { incoming:{ text:'hope you\'re ok. lmk if you wanna talk', time:'10:25 AM' }, choices:null,
-    onEnd:()=>flags.add('riley_end_ok') },
-  riley_2b: { incoming:{ text:'lol valid. same honestly', time:'10:25 AM' }, choices:null,
-    onEnd:()=>{ flags.add('riley_end_honest'); rel.riley.trust+=5; } },
-  riley_2c: { incoming:{ text:'ok. 🙂', time:'10:25 AM' }, choices:null,
-    onEnd:()=>flags.add('riley_end_closed') },
-  riley_2d: { incoming:{ text:'yeah. I figured.', time:'10:26 AM' }, choices:null,
-    onEnd:()=>{ flags.add('riley_end_known'); rel.riley.trust+=8; } },
+  ri_1c: {
+    incoming: { text:'yeah. I thought so. the lamp thing is seriously not a big deal btw', time:'10:15 AM' },
+    choices: [
+      { text:'the lamp thing?',    next:'ri_2_lamp',         fx:()=>{ profile.trusting++;  flags.add('lamp_mentioned'); } },
+      { text:'I\'m really sorry',  next:'ri_2_generic_sorry', fx:()=>{ rel.riley.trust+=5; } },
+    ],
+  },
+  ri_1d: { incoming:{ text:'ok. lmk if you wanna talk.', time:'10:29 AM' }, choices:null, onEnd:()=>flags.add('riley_ignored') },
+  ri_2_lamp: {
+    incoming: { text:'you knocked into my lamp around 1am. the tall vintage one. the shade cracked', time:'10:17 AM' },
+    choices: [
+      { text:'was it the one from your mom\'s place', next:'ri_3_mom',     fx:()=>{ profile.trusting++;  } },
+      { text:'I\'ll replace it. tell me how much.',   next:'ri_3_replace', fx:()=>{ rel.riley.trust+=8;  flags.add('offered_to_pay'); } },
+      { text:'I\'m really sorry',                     next:'ri_3_sorry',   fx:()=>{ rel.riley.trust+=5;  } },
+    ],
+  },
+  ri_2_cover: { incoming:{ text:'yeah. these things happen.', time:'10:16 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  ri_2_press: {
+    incoming: { text:'ok fine. yeah. I was a little upset. it was my mom\'s and I know it sounds stupid but', time:'10:17 AM' },
+    choices: [
+      { text:'it doesn\'t sound stupid', next:'ri_3_listen', fx:()=>{ rel.riley.trust+=10; profile.trusting++; flags.add('riley_lamp_admitted'); } },
+      { text:'I\'m so sorry',             next:'ri_3_sorry', fx:()=>{ rel.riley.trust+=6;  flags.add('riley_lamp_admitted'); } },
+    ],
+  },
+  ri_2_accept: { incoming:{ text:'yeah. I know.', time:'10:17 AM' }, choices:null, onEnd:()=>{ queueMorning(); } },
+  ri_2_generic_sorry: { incoming:{ text:'don\'t worry. we\'re good.', time:'10:16 AM' }, choices:null,
+    onEnd:()=>{ rel.riley.trust+=3; queueMorning(); } },
+  ri_3_mom: {
+    incoming: { text:'...yeah. it was. you couldn\'t have known that though.', time:'10:19 AM' },
+    choices: [
+      { text:'I want to make it right somehow', next:'ri_end_warm', fx:()=>{ rel.riley.trust+=12; profile.trusting++;  flags.add('riley_lamp_admitted'); } },
+      { text:'I\'m so sorry',                   next:'ri_3_sorry',  fx:()=>{ flags.add('riley_lamp_admitted'); } },
+    ],
+  },
+  ri_3_replace: { incoming:{ text:'you don\'t have to. honestly. it\'s fine. I appreciate it though.', time:'10:18 AM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_lamp_admitted'); rel.riley.trust+=5; queueMorning(); } },
+  ri_3_sorry: { incoming:{ text:'I know you are. really. we\'re good.', time:'10:18 AM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_lamp_admitted'); queueMorning(); } },
+  ri_3_listen: {
+    incoming: { text:'yeah it\'s stupid. it\'s a lamp. anyway I\'m glad you got home ok.', time:'10:20 AM' },
+    choices: [
+      { text:'you\'re allowed to be upset about it', next:'ri_end_warm',    fx:()=>{ rel.riley.trust+=5; } },
+      { text:'yeah. thanks for having us.',           next:'ri_end_neutral', fx:()=>{ rel.riley.trust+=3; } },
+    ],
+  },
+  ri_end_warm: { incoming:{ text:'thanks. that means something.', time:'10:21 AM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_connection'); rel.riley.trust+=5; queueMorning(); } },
+  ri_end_neutral: { incoming:{ text:'of course. next time lighter on the shots.', time:'10:21 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
 
-  // ── Morgan — evening ──────────────────────────────────────────
-  morgan_eve: {
-    incoming: { text:'you doing ok?', time:'6:48 PM' },
-    choices: [
-      { text:'yeah. I think so',           next:'meve_1a', fx:()=>{ profile.trusting++;  } },
-      { text:'not really',                 next:'meve_1b', fx:()=>{ profile.trusting+=2; rel.morgan.trust+=8; } },
-      { text:'(leave it)', silent:true,    next:'meve_silence', fx:()=>{ profile.avoidant++; rel.morgan.tension+=10; } },
-    ],
-  },
-  meve_1a: { incoming:{ text:"ok. that's something.", time:'6:49 PM' }, choices:null,
-    onEnd:()=>flags.add('eve_ok') },
-  meve_1b: { incoming:{ text:'me neither.', time:'6:49 PM' }, choices:null,
-    onEnd:()=>{ flags.add('eve_honest'); rel.morgan.trust+=5; } },
-  meve_silence: { incoming:null, choices:null,
-    onEnd:()=>flags.add('eve_silence') },
-
-  // ── Unknown — the twist ───────────────────────────────────────
-  unknown_0: {
-    incoming: { text:"hey. I think you have my phone", time:'2:47 AM' },
-    choices: [
-      { text:'...what',                        next:'unk_1a', fx:()=>{ rel.unknown.trust+=5; } },
-      { text:'no, this is my phone',           next:'unk_1b', fx:()=>{ profile.defensive++; rel.unknown.tension+=10; } },
-      { text:'(don\'t open it)', silent:true,  next:'unk_1c', fx:()=>{ profile.avoidant++;  rel.unknown.tension+=15; } },
-    ],
-  },
-  unk_1a: {
-    incoming: { text:"we must have grabbed each other's at riley's. mine has a crack across the back", time:'2:47 AM' },
-    choices: [
-      { text:'...yeah. there\'s a crack.',    next:'unk_2a', fx:()=>{ profile.trusting++;  flags.add('phone_swap_confirmed'); } },
-      { text:'I don\'t know what you mean',   next:'unk_2b', fx:()=>{ profile.defensive++; } },
-    ],
-  },
-  unk_1b: {
-    incoming: { text:"is the wallpaper a black cat?", time:'2:48 AM' },
-    choices: [
-      { text:'...yeah',                next:'unk_2a', fx:()=>{ profile.trusting++;  flags.add('phone_swap_confirmed'); } },
-      { text:'no',                     next:'unk_2c', fx:()=>{ profile.defensive++; flags.add('phone_denied'); } },
-    ],
-  },
-  unk_1c: { incoming:{ text:"look. I'm not trying to be weird. I just need my phone back.", time:'2:58 AM' }, choices:null,
-    onEnd:()=>{ flags.add('phone_ignored'); rel.unknown.tension+=10; } },
-  unk_2a: {
-    incoming: { text:"I've been looking for it all night", time:'2:49 AM' },
-    choices: [
-      { text:'I\'m sorry. I didn\'t realize', next:'unk_3a', fx:()=>{ profile.trusting++;  rel.unknown.trust+=10; } },
-      { text:'I didn\'t go through it',       next:'unk_3b', fx:()=>{ profile.defensive++; } },
-    ],
-  },
-  unk_2b: { incoming:{ text:"ok.", time:'2:49 AM' }, choices:null,
-    onEnd:()=>flags.add('phone_denied') },
-  unk_2c: { incoming:{ text:"ok.", time:'2:49 AM' }, choices:null,
-    onEnd:()=>flags.add('phone_denied') },
-  unk_3a: {
-    incoming: { text:"it's ok. I'm just glad I found it. can we figure out a swap?", time:'2:50 AM' },
-    choices: [
-      { text:'yeah. where are you?', next:'unk_end_meet',  fx:()=>{ rel.unknown.trust+=10; flags.add('phone_swap_arranged'); } },
-      { text:'tomorrow maybe',       next:'unk_end_defer', fx:()=>{ } },
-    ],
-  },
-  unk_3b: {
-    incoming: { text:"...that's all you had to say.", time:'2:50 AM' },
-    choices: [
-      { text:'I know. I\'m sorry.',         next:'unk_end_late', fx:()=>{ profile.trusting++;  rel.unknown.trust+=5;  } },
-      { text:'can we sort the swap first',  next:'unk_end_meet', fx:()=>{ profile.defensive++; } },
-    ],
-  },
-  unk_end_meet:  { incoming:{ text:"riley's street. the bench outside. I'll be there in ten.", time:'2:51 AM' }, choices:null,
-    onEnd:()=>flags.add('phone_swap_meet') },
-  unk_end_defer: { incoming:{ text:"ok. just... don't go through it.", time:'2:51 AM' }, choices:null,
-    onEnd:()=>{ flags.add('phone_swap_deferred'); } },
-  unk_end_late:  { incoming:{ text:"it's late. let's just figure out the swap.", time:'2:51 AM' }, choices:null,
-    onEnd:()=>flags.add('phone_swap_arranged') },
-
-  // ── Morgan — ambient morning ──────────────────────────────────
-  morgan_mc: {
-    incoming: { text:'lol sorry for the late texts btw. I was in my head', time:'9:14 AM' },
-    choices: [
-      { text:'it\'s fine. I was up anyway',   next:'mmc_1a', fx:()=>{ profile.trusting++; rel.morgan.trust+=4; } },
-      { text:'don\'t worry about it',         next:'mmc_1b', fx:()=>{} },
-      { text:'(seen)',        silent:true,     next:'mmc_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  mmc_1a:      { incoming:{ text:'same honestly', time:'9:14 AM' }, choices:null, onEnd:()=>flags.add('morgan_mc_warm') },
-  mmc_1b:      { incoming:{ text:'ok :)', time:'9:15 AM' }, choices:null, onEnd:()=>{} },
-  mmc_silence: { incoming:null, choices:null, onEnd:()=>flags.add('morgan_mc_ignored') },
-
-  morgan_coffee: {
-    incoming: { text:'are you going to be around today? I might go to that place on 5th if you want', time:'10:08 AM' },
-    choices: [
-      { text:'yeah what time',            next:'mco_1a', fx:()=>{ rel.morgan.trust+=6; profile.trusting++; } },
-      { text:'I can\'t today',            next:'mco_1b', fx:()=>{} },
-      { text:'(leave it)', silent:true,   next:'mco_silence', fx:()=>{ profile.avoidant++; rel.morgan.tension+=5; } },
-    ],
-  },
-  mco_1a:      { incoming:{ text:'like 2? no pressure at all', time:'10:09 AM' }, choices:null, onEnd:()=>flags.add('morgan_coffee_yes') },
-  mco_1b:      { incoming:{ text:'ok. another time', time:'10:09 AM' }, choices:null, onEnd:()=>{} },
-  mco_silence: { incoming:null, choices:null, onEnd:()=>flags.add('morgan_coffee_ignored') },
-
-  // ── Morgan — ambient afternoon ────────────────────────────────
-  morgan_mundane: {
-    incoming: { text:'have you seen yellowjackets. I\'ve been watching it for three days straight', time:'3:11 PM' },
-    choices: [
-      { text:'yes oh my god',               next:'mmun_1a', fx:()=>{ rel.morgan.trust+=5; profile.trusting++; } },
-      { text:'no what is it',               next:'mmun_1b', fx:()=>{} },
-      { text:'(don\'t reply)', silent:true, next:'mmun_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  mmun_1a:      { incoming:{ text:'I KNEW you\'d like it', time:'3:12 PM' }, choices:null, onEnd:()=>flags.add('morgan_mundane_bonded') },
-  mmun_1b:      { incoming:{ text:'survival drama but make it unhinged. you\'d love it', time:'3:12 PM' }, choices:null, onEnd:()=>{} },
-  mmun_silence: { incoming:null, choices:null, onEnd:()=>{} },
-
-  // ── Morgan — ambient evening ──────────────────────────────────
-  morgan_eve_song: {
-    incoming: { text:'this song keeps making me think of last year for some reason', time:'7:04 PM' },
-    choices: [
-      { text:'which song',                    next:'mes_1a', fx:()=>{ rel.morgan.trust+=4; profile.trusting++; } },
-      { text:'what was last year like for you',next:'mes_1b', fx:()=>{ rel.morgan.trust+=8; profile.trusting+=2; } },
-      { text:'(don\'t reply)', silent:true,   next:'mes_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  mes_1a: { incoming:{ text:'you\'d know it. anyway. just a thing.', time:'7:05 PM' }, choices:null, onEnd:()=>{} },
-  mes_1b: { incoming:{ text:'complicated. like every year lol', time:'7:05 PM' }, choices:null, onEnd:()=>flags.add('morgan_opened_up') },
-  mes_silence: { incoming:null, choices:null, onEnd:()=>{} },
-
-  morgan_eve_stars: {
-    incoming: { text:'do you ever just sit outside at night', time:'8:32 PM' },
-    choices: [
-      { text:'sometimes yeah',               next:'mst_1a', fx:()=>{ rel.morgan.trust+=5; profile.trusting++; } },
-      { text:'not usually',                  next:'mst_1b', fx:()=>{} },
-      { text:'(seen)', silent:true,          next:'mst_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  mst_1a:      { incoming:{ text:'there\'s something about 2am that feels honest', time:'8:33 PM' }, choices:null, onEnd:()=>flags.add('morgan_2am_honest') },
-  mst_1b:      { incoming:{ text:'you should try it. it\'s weird in a good way', time:'8:33 PM' }, choices:null, onEnd:()=>{} },
-  mst_silence: { incoming:null, choices:null, onEnd:()=>{} },
-
-  // ── Alex — ambient morning ────────────────────────────────────
-  alex_mutual: {
-    incoming: { text:'btw did you talk to cam at all last night? they seemed off', time:'9:22 AM' },
-    choices: [
-      { text:'not really no',                next:'am_1a', fx:()=>{} },
-      { text:'yeah briefly. why',            next:'am_1b', fx:()=>{ profile.trusting++; } },
-      { text:'(shrug)', silent:true,         next:'am_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  am_1a:      { incoming:{ text:'I think they\'re going through something. idk', time:'9:23 AM' }, choices:null, onEnd:()=>{} },
-  am_1b:      { incoming:{ text:'they just broke up with someone I think. don\'t say anything', time:'9:23 AM' }, choices:null, onEnd:()=>flags.add('alex_gossip') },
-  am_silence: { incoming:null, choices:null, onEnd:()=>{} },
-
-  alex_recap: {
-    incoming: { text:'honestly that party was a lot. like in a fun way but also', time:'10:44 AM' },
-    choices: [
-      { text:'yeah it was a lot',             next:'ar_1a', fx:()=>{ rel.alex.trust+=3; } },
-      { text:'I had fun actually',            next:'ar_1b', fx:()=>{ profile.trusting++; } },
-      { text:'(seen)', silent:true,           next:'ar_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  ar_1a:      { incoming:{ text:'right? I love riley but they need to learn what a guest list is', time:'10:45 AM' }, choices:null, onEnd:()=>{} },
-  ar_1b:      { incoming:{ text:'good!! me too mostly', time:'10:45 AM' }, choices:null, onEnd:()=>flags.add('alex_fun_confirmed') },
-  ar_silence: { incoming:null, choices:null, onEnd:()=>{} },
-
-  // ── Alex — ambient afternoon ──────────────────────────────────
-  alex_hangout: {
-    incoming: { text:'do you want to come over later? we could watch something. I have snacks', time:'2:48 PM' },
-    choices: [
-      { text:'yeah that sounds good',        next:'ah_1a', fx:()=>{ rel.alex.trust+=8; profile.trusting++; flags.add('alex_hangout_yes'); } },
-      { text:'maybe. I\'ll see how I feel',  next:'ah_1b', fx:()=>{} },
-      { text:'I think I need to be home',    next:'ah_1c', fx:()=>{} },
-      { text:'(leave it)', silent:true,      next:'ah_silence', fx:()=>{ profile.avoidant++; rel.alex.tension+=5; } },
-    ],
-  },
-  ah_1a:      { incoming:{ text:'ok!! like 8? I\'ll put something on', time:'2:49 PM' }, choices:null, onEnd:()=>{} },
-  ah_1b:      { incoming:{ text:'ok no pressure. door\'s open', time:'2:49 PM' }, choices:null, onEnd:()=>{} },
-  ah_1c:      { incoming:{ text:'totally fair. rain check', time:'2:49 PM' }, choices:null, onEnd:()=>{} },
-  ah_silence: { incoming:null, choices:null, onEnd:()=>flags.add('alex_hangout_ignored') },
-
-  alex_drama: {
-    incoming: { text:'ok wait I have to tell you something about riley but you cannot make it weird', time:'4:02 PM' },
-    choices: [
-      { text:'ok what',                      next:'ad_1a', fx:()=>{ profile.trusting++; } },
-      { text:'I don\'t think I want to know',next:'ad_1b', fx:()=>{ profile.defensive++; } },
-      { text:'(seen)', silent:true,          next:'ad_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  ad_1a:      { incoming:{ text:'they\'ve been talking about you. like in a nice way. just. a lot.', time:'4:03 PM' }, choices:null, onEnd:()=>flags.add('riley_talks_about_you') },
-  ad_1b:      { incoming:{ text:'fair. probably smart.', time:'4:03 PM' }, choices:null, onEnd:()=>{} },
-  ad_silence: { incoming:null, choices:null, onEnd:()=>{} },
-
-  // ── Alex — ambient evening ────────────────────────────────────
-  alex_eve_check: {
-    incoming: { text:'hey. you\'ve been quiet today. everything ok?', time:'7:38 PM' },
-    choices: [
-      { text:'yeah just tired',              next:'aec_1a', fx:()=>{} },
-      { text:'not really',                   next:'aec_1b', fx:()=>{ profile.trusting++; rel.alex.trust+=8; } },
-      { text:'(seen)', silent:true,          next:'aec_silence', fx:()=>{ profile.avoidant++; rel.alex.tension+=5; } },
-    ],
-  },
-  aec_1a:      { incoming:{ text:'ok. get some sleep', time:'7:39 PM' }, choices:null, onEnd:()=>{} },
-  aec_1b:      { incoming:{ text:'yeah I figured. I\'m here if you want to talk', time:'7:39 PM' }, choices:null, onEnd:()=>flags.add('alex_available') },
-  aec_silence: { incoming:null, choices:null, onEnd:()=>flags.add('alex_eve_ignored') },
-
-  // ── Riley — ambient morning ───────────────────────────────────
-  riley_photo: {
-    incoming: { text:'also I found a photo from last night if you want it lol', time:'9:41 AM' },
-    choices: [
-      { text:'yes send it',                  next:'rp_1a', fx:()=>{ profile.trusting++;  rel.riley.trust+=4; } },
-      { text:'nah I\'m good',                next:'rp_1b', fx:()=>{ profile.defensive++; } },
-      { text:'(seen)', silent:true,          next:'rp_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  rp_1a:      { incoming:{ text:'ok I\'ll send it to your email. it\'s a good one', time:'9:42 AM' }, choices:null, onEnd:()=>flags.add('riley_photo_sent') },
-  rp_1b:      { incoming:{ text:'ok lol. just thought it was cute', time:'9:42 AM' }, choices:null, onEnd:()=>{} },
-  rp_silence: { incoming:null, choices:null, onEnd:()=>{} },
-
-  // ── Riley — ambient afternoon ─────────────────────────────────
-  riley_jacket: {
-    incoming: { text:'I think I found your jacket btw. brown? or like. burnt orange?', time:'1:33 PM' },
-    choices: [
-      { text:'yeah that\'s it',              next:'rj_1a', fx:()=>{ rel.riley.trust+=4; profile.trusting++; } },
-      { text:'maybe? I think it\'s brown',   next:'rj_1b', fx:()=>{} },
-      { text:'(seen)', silent:true,          next:'rj_silence', fx:()=>{ profile.avoidant++; } },
-    ],
-  },
-  rj_1a:      { incoming:{ text:'ok it\'s safe. come get it whenever', time:'1:34 PM' }, choices:null, onEnd:()=>flags.add('jacket_located') },
-  rj_1b:      { incoming:{ text:'I\'ll check. there\'s actually two here lol', time:'1:34 PM' }, choices:null, onEnd:()=>{} },
-  rj_silence: { incoming:null, choices:null, onEnd:()=>{} },
-
-  riley_aft_check: {
-    incoming: { text:'random question but are you doing ok in general? like not just last night', time:'3:47 PM' },
-    choices: [
-      { text:'yeah I\'m ok. why',            next:'rac_1a', fx:()=>{} },
-      { text:'honestly not great',           next:'rac_1b', fx:()=>{ profile.trusting+=2; rel.riley.trust+=10; } },
-      { text:'(don\'t answer)', silent:true, next:'rac_silence', fx:()=>{ profile.avoidant++; rel.riley.tension+=5; } },
-    ],
-  },
-  rac_1a: { incoming:{ text:'idk. just checking. you seem like you\'ve got a lot going on', time:'3:48 PM' }, choices:null, onEnd:()=>{} },
-  rac_1b: {
-    incoming: { text:'yeah I thought so. same honestly.', time:'3:48 PM' },
-    choices: [
-      { text:'we should actually talk sometime', next:'rac_2', fx:()=>{ rel.riley.trust+=8; flags.add('riley_wants_to_talk'); } },
-      { text:'yeah.',                            next:'rac_3', fx:()=>{} },
-    ],
-  },
-  rac_2:      { incoming:{ text:'yeah. I\'d like that.', time:'3:49 PM' }, choices:null, onEnd:()=>{} },
-  rac_3:      { incoming:{ text:'...yeah.', time:'3:49 PM' }, choices:null, onEnd:()=>{} },
-  rac_silence:{ incoming:null, choices:null, onEnd:()=>{} },
-
-  // ── Riley — ambient evening ───────────────────────────────────
+  // ── Riley — evening ───────────────────────────────────────────
   riley_eve: {
-    incoming: { text:'can I tell you something kind of embarrassing', time:'7:14 PM' },
+    incoming: { text:'hey one more thing. about last night. before the lamp.', time:'7:55 PM' },
     choices: [
-      { text:'yeah of course',               next:'rev_1a', fx:()=>{ profile.trusting++;  rel.riley.trust+=5; } },
-      { text:'maybe not tonight',            next:'rev_1b', fx:()=>{ profile.defensive++; } },
-      { text:'(seen)', silent:true,          next:'rev_silence', fx:()=>{ profile.avoidant++; } },
+      { text:'yeah?',               next:'reve_1a',     fx:()=>{ profile.trusting++; } },
+      { text:'(seen)',silent:true,  next:'reve_silence', fx:()=>{ profile.avoidant++; } },
     ],
   },
-  rev_1a: {
-    incoming: { text:'I was kind of hoping you\'d stay longer last night. I don\'t know why I\'m telling you that.', time:'7:15 PM' },
+  reve_silence: { incoming:null, choices:null, onEnd:()=>{ flags.add('riley_eve_ignored'); } },
+  reve_1a: {
+    incoming: { text:'you said sorry to me. like actually sorry. not just about the lamp. and I think I know what you meant but I wanted you to know I heard it.', time:'7:56 PM' },
     choices: [
-      { text:'I\'m glad you told me',         next:'rev_2a', fx:()=>{ rel.riley.trust+=8; profile.trusting++; } },
-      { text:'I didn\'t want to overstay',    next:'rev_2b', fx:()=>{ rel.riley.trust+=5; } },
-      { text:'(say nothing)', silent:true,    next:'rev_2c', fx:()=>{ profile.avoidant++;  } },
+      { text:'what did you think I meant', next:'reve_2a', fx:()=>{ profile.trusting++;  } },
+      { text:'I\'m glad',                  next:'reve_2b', fx:()=>{ profile.trusting++;  } },
+      { text:'I\'m not sure I do',         next:'reve_2c', fx:()=>{ profile.trusting++;  flags.add('admitted_blackout'); } },
     ],
   },
-  rev_1b:      { incoming:{ text:'ok. another time maybe.', time:'7:15 PM' }, choices:null, onEnd:()=>{} },
-  rev_silence: { incoming:null, choices:null, onEnd:()=>{} },
-  rev_2a:      { incoming:{ text:'ok. good.', time:'7:16 PM' }, choices:null, onEnd:()=>flags.add('riley_honest_eve') },
-  rev_2b:      { incoming:{ text:'you wouldn\'t have.', time:'7:16 PM' }, choices:null, onEnd:()=>{ flags.add('riley_honest_eve'); rel.riley.trust+=3; } },
-  rev_2c:      { incoming:null, choices:null, onEnd:()=>flags.add('riley_eve_silence') },
+  reve_2a: {
+    incoming: { text:'that you\'ve been kind of checked out lately. and that last night was you trying.', time:'7:58 PM' },
+    choices: [
+      { text:'yeah. that\'s right.',  next:'reve_end_honest', fx:()=>{ rel.riley.trust+=8; profile.trusting++;  flags.add('riley_sees_you'); } },
+      { text:'maybe.',                next:'reve_end_soft',   fx:()=>{ flags.add('riley_sees_you'); } },
+    ],
+  },
+  reve_2b: { incoming:{ text:'ok. good. that\'s all I wanted to say.', time:'7:58 PM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_eve_ok'); rel.riley.trust+=5; } },
+  reve_2c: { incoming:{ text:'me neither. I just wanted to make sure I said it.', time:'7:58 PM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_eve_ok'); rel.riley.trust+=3; } },
+  reve_end_honest: { incoming:{ text:'yeah. I know. I see you.', time:'7:59 PM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_sees_you'); rel.riley.trust+=5; } },
+  reve_end_soft: { incoming:{ text:'yeah. ok.', time:'7:59 PM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_eve_ok'); } },
 
-  riley_music: {
-    incoming: { text:'ok I\'ve been listening to the same album for 3 hours. I think I\'m spiraling lol', time:'8:58 PM' },
+  // ── Riley — ambient ───────────────────────────────────────────
+  riley_am1: {
+    incoming: { text:'also you left your jacket. brown? I\'ll hold it for you', time:'9:52 AM' },
     choices: [
-      { text:'which album',                  next:'rm_1a', fx:()=>{ rel.riley.trust+=3; } },
-      { text:'same honestly',                next:'rm_1b', fx:()=>{ rel.riley.trust+=6; profile.trusting++; } },
-      { text:'you ok?',                      next:'rm_1c', fx:()=>{ rel.riley.trust+=4; profile.trusting++; } },
-      { text:'(don\'t reply)', silent:true,  next:'rm_silence', fx:()=>{ profile.avoidant++; } },
+      { text:'yes thank you',      next:'ram1_a', fx:()=>{ rel.riley.trust+=3; } },
+      { text:'(seen)',silent:true, next:'ram1_b', fx:()=>{ profile.avoidant++; } },
     ],
   },
-  rm_1a: { incoming:{ text:'it\'s one of those ones. you\'d know it.', time:'8:59 PM' }, choices:null, onEnd:()=>{} },
-  rm_1b: {
-    incoming: { text:'ok wait which one', time:'8:59 PM' },
-    choices: [
-      { text:'[send album]', next:'rm_1b2', fx:()=>{ flags.add('shared_taste'); rel.riley.trust+=5; } },
-    ],
-  },
-  rm_1b2:     { incoming:{ text:'wait. same one. that\'s kind of insane.', time:'9:00 PM' }, choices:null, onEnd:()=>flags.add('riley_music_moment') },
-  rm_1c:      { incoming:{ text:'I think so. just one of those nights.', time:'8:59 PM' }, choices:null, onEnd:()=>{} },
-  rm_silence: { incoming:null, choices:null, onEnd:()=>{} },
+  ram1_a: { incoming:{ text:'it\'s safe :)', time:'9:53 AM' }, choices:null, onEnd:()=>flags.add('jacket_at_riley') },
+  ram1_b: { incoming:null, choices:null, onEnd:()=>{} },
 
+  riley_pm1: {
+    incoming: { text:'random but you were actually really funny last night before the whole. you know. part', time:'4:18 PM' },
+    choices: [
+      { text:'I\'ll take it',             next:'rp1_a', fx:()=>{ rel.riley.trust+=4; } },
+      { text:'what was the "you know" part', next:'rp1_b', fx:()=>{ profile.trusting++; } },
+      { text:'(don\'t reply)',silent:true, next:'rp1_c', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  rp1_a: { incoming:{ text:'lol. you\'re fine. just check in next time', time:'4:19 PM' }, choices:null, onEnd:()=>{} },
+  rp1_b: { incoming:{ text:'I mean. the lamp. and the Morgan thing. but that\'s not mine to say', time:'4:20 PM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_noticed_morgan_scene'); } },
+  rp1_c: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Jordan — morning ─────────────────────────────────────────
+  jordan_0: {
+    incoming: { text:'dude last night was actually insane hahahaha', time:'9:47 AM' },
+    choices: [
+      { text:'Jordan what happened last night',  next:'jo_1a', fx:()=>{ profile.trusting++;  flags.add('admitted_blackout'); } },
+      { text:'define insane',                    next:'jo_1b', fx:()=>{ profile.trusting++;  } },
+      { text:'yeah it was a lot',                next:'jo_1c', fx:()=>{ profile.defensive++; } },
+      { text:'(ignore)',         silent:true,    next:'jo_1d', fx:()=>{ profile.avoidant++;  rel.jordan.tension+=10; } },
+    ],
+  },
+  jo_1a: {
+    incoming: { text:'you don\'t remember?? oh my god', time:'9:49 AM' },
+    choices: [
+      { text:'not really. what did I do',  next:'jo_2_tell',  fx:()=>{} },
+      { text:'I remember most of it',      next:'jo_2_cover', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  jo_1b: {
+    incoming: { text:'you were just being you lol. it was good', time:'9:49 AM' },
+    choices: [
+      { text:'Jordan I need to know what actually happened', next:'jo_2_tell', fx:()=>{ profile.trusting++; } },
+      { text:'ok. good.',                                   next:'jo_2_accept', fx:()=>{} },
+    ],
+  },
+  jo_1c: {
+    incoming: { text:'a lot!! in a fun way though. you were great', time:'9:49 AM' },
+    choices: [
+      { text:'I knocked over riley\'s lamp',  next:'jo_2_lamp', fx:()=>{ flags.add('knows_about_lamp'); } },
+      { text:'I really don\'t remember',      next:'jo_2_tell', fx:()=>{ profile.trusting++;  flags.add('admitted_blackout'); } },
+    ],
+  },
+  jo_1d: { incoming:{ text:'ok let me know how you\'re feeling lol', time:'10:04 AM' }, choices:null,
+    onEnd:()=>{ flags.add('jordan_ignored'); queueMorning(); } },
+  jo_2_tell: {
+    incoming: { text:'I mean you were just kind of doing your thing. talking to Morgan a lot. it was cute honestly lol', time:'9:51 AM' },
+    choices: [
+      { text:'Jordan did you keep giving me shots', next:'jo_3_shots',  fx:()=>{ profile.trusting++;  flags.add('confronted_jordan'); } },
+      { text:'what was I saying to Morgan',         next:'jo_3_morgan', fx:()=>{ profile.trusting++;  } },
+      { text:'ok',                                  next:'jo_3_ok',     fx:()=>{} },
+    ],
+  },
+  jo_2_cover: { incoming:{ text:'yeah you seemed a little hazy lol. you\'re good though', time:'9:51 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  jo_2_accept: { incoming:{ text:'don\'t stress it. these things happen', time:'9:50 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  jo_2_lamp: {
+    incoming: { text:'the lamp! ok yes that happened. but riley said it was fine', time:'9:51 AM' },
+    choices: [
+      { text:'Jordan did you keep pouring me shots', next:'jo_3_shots', fx:()=>{ profile.trusting++;  flags.add('confronted_jordan'); } },
+      { text:'riley was upset though',               next:'jo_3_riley', fx:()=>{} },
+    ],
+  },
+  jo_3_shots: {
+    incoming: { text:'I mean... you were drinking?? I didn\'t force you to do anything', time:'9:53 AM' },
+    choices: [
+      { text:'Jordan.',                                         next:'jo_4_confront', fx:()=>{ profile.trusting++;  } },
+      { text:'I know. forget it.',                              next:'jo_4_drop',     fx:()=>{ profile.defensive++; } },
+      { text:'but you kept going after I was clearly already gone', next:'jo_4_confront', fx:()=>{ profile.trusting++;  flags.add('confronted_jordan'); } },
+    ],
+  },
+  jo_3_morgan: {
+    incoming: { text:'I genuinely couldn\'t hear. looked intense though haha', time:'9:53 AM' },
+    choices: [
+      { text:'were you filming it',  next:'jo_3_filming', fx:()=>{ profile.trusting++;  flags.add('confronted_jordan'); } },
+      { text:'ok.',                  next:'jo_3_ok',      fx:()=>{} },
+    ],
+  },
+  jo_3_ok: { incoming:{ text:'you\'re good man. just a night. happens to everyone', time:'9:53 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  jo_3_riley: { incoming:{ text:'riley is ALWAYS upset. that\'s just riley. you know how they are', time:'9:52 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  jo_3_filming: {
+    incoming: { text:'I took like one video but I deleted it. calm down', time:'9:54 AM' },
+    choices: [
+      { text:'what was on it',  next:'jo_4_video', fx:()=>{ profile.trusting++;  flags.add('jordan_filming_revealed'); } },
+      { text:'ok. thank you.',  next:'jo_4_drop',  fx:()=>{ flags.add('jordan_filming_revealed'); } },
+    ],
+  },
+  jo_4_confront: {
+    incoming: { text:'...ok. yeah. maybe I went a little far. I thought you were having fun.', time:'9:56 AM' },
+    choices: [
+      { text:'I\'m not mad. I just needed to know.',  next:'jo_end_honest', fx:()=>{ rel.jordan.trust+=5;  profile.trusting++; } },
+      { text:'it\'s fine.',                           next:'jo_end_ok',     fx:()=>{} },
+    ],
+  },
+  jo_4_drop: { incoming:{ text:'yeah. anyway. hope you feel better', time:'9:55 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+  jo_4_video: {
+    incoming: { text:'just you and Morgan talking. you were being kind of real with her. I swear I wasn\'t being a dick about it', time:'9:56 AM' },
+    choices: [
+      { text:'but you filmed it.',   next:'jo_4_confront', fx:()=>{ profile.trusting++; flags.add('confronted_jordan'); } },
+      { text:'ok. I believe you.',   next:'jo_end_ok',     fx:()=>{ rel.jordan.trust+=3; } },
+    ],
+  },
+  jo_end_honest: { incoming:{ text:'yeah. I know. I\'m sorry.', time:'9:57 AM' }, choices:null,
+    onEnd:()=>{ flags.add('jordan_accountable'); rel.jordan.trust+=8; queueMorning(); } },
+  jo_end_ok: { incoming:{ text:'yeah. these things happen. you\'re good.', time:'9:57 AM' }, choices:null,
+    onEnd:()=>{ queueMorning(); } },
+
+  // ── Jordan — ambient ─────────────────────────────────────────
+  jordan_pm1: {
+    incoming: { text:'hey also I talked to riley and they\'re seriously not mad about the lamp', time:'2:11 PM' },
+    choices: [
+      { text:'how do you know',         next:'jpm1_a', fx:()=>{ profile.trusting++; } },
+      { text:'ok thanks for checking',  next:'jpm1_b', fx:()=>{ rel.jordan.trust+=3; } },
+      { text:'(seen)',     silent:true,  next:'jpm1_c', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  jpm1_a: { incoming:{ text:'I just texted them. they said so. so.', time:'2:12 PM' }, choices:null, onEnd:()=>{} },
+  jpm1_b: { incoming:{ text:'yeah of course. we\'re good.', time:'2:12 PM' }, choices:null, onEnd:()=>{} },
+  jpm1_c: { incoming:null, choices:null, onEnd:()=>{} },
+
+  jordan_eve1: {
+    incoming: { text:'ok real talk — you doing ok? like actually', time:'8:10 PM' },
+    choices: [
+      { text:'honestly not great',    next:'jev1_a', fx:()=>{ profile.trusting++;  rel.jordan.trust+=6; flags.add('jordan_checks_in'); } },
+      { text:'I\'m fine. why',        next:'jev1_b', fx:()=>{ profile.defensive++; } },
+      { text:'(seen)',  silent:true,  next:'jev1_c', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  jev1_a: {
+    incoming: { text:'yeah. I figured. for what it\'s worth — last night wasn\'t all bad. some of it was real.', time:'8:11 PM' },
+    choices: [
+      { text:'which part',  next:'jev1_a2', fx:()=>{ profile.trusting++; } },
+      { text:'ok.',         next:'jev1_end', fx:()=>{} },
+    ],
+  },
+  jev1_a2: { incoming:{ text:'you and Morgan. the part before everything went sideways. that was real.', time:'8:12 PM' }, choices:null,
+    onEnd:()=>{ flags.add('jordan_saw_it_too'); } },
+  jev1_end: { incoming:{ text:'ok. you\'re good man.', time:'8:12 PM' }, choices:null, onEnd:()=>{} },
+  jev1_b: { incoming:{ text:'no reason. just checking.', time:'8:11 PM' }, choices:null, onEnd:()=>{} },
+  jev1_c: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Casey — the one you spammed ───────────────────────────────────
+  casey_0: {
+    incoming: { text:'hey. I read all of that this morning. are you ok', time:'9:33 AM' },
+    choices: [
+      { text:'I\'m so sorry. I don\'t remember sending most of that', next:'ca_1a', fx:()=>{ profile.trusting++; flags.add('admitted_spam_casey'); } },
+      { text:'how many messages did I send',                          next:'ca_1b', fx:()=>{ profile.trusting++;  } },
+      { text:'I was having a rough night. just ignore it',           next:'ca_1c', fx:()=>{ profile.defensive++; rel.casey.trust-=5; } },
+      { text:'(seen)',                           silent:true,         next:'ca_1d', fx:()=>{ profile.avoidant++;  rel.casey.tension+=15; } },
+    ],
+  },
+  ca_1a: {
+    incoming: { text:'it\'s ok. it\'s a lot but it\'s ok. I heard something happened at the party', time:'9:34 AM' },
+    choices: [
+      { text:'yeah. I\'m still figuring out what',  next:'ca_2_figuring', fx:()=>{ profile.trusting++; flags.add('admitted_blackout'); } },
+      { text:'it wasn\'t a big deal',               next:'ca_2_dismiss',  fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  ca_1b: {
+    incoming: { text:'eleven texts and a voice note. it\'s fine. what happened', time:'9:34 AM' },
+    choices: [
+      { text:'eleven. oh god',                next:'ca_2_figuring', fx:()=>{ profile.trusting++; flags.add('admitted_spam_casey'); } },
+      { text:'did I say anything bad',        next:'ca_2_read_it',  fx:()=>{ profile.trusting++;  } },
+    ],
+  },
+  ca_1c: {
+    incoming: { text:'ok. just. you said some stuff. I\'m not going to ignore it.', time:'9:35 AM' },
+    choices: [
+      { text:'what did I say',        next:'ca_2_read_it', fx:()=>{ profile.trusting++; flags.add('admitted_spam_casey'); } },
+      { text:'it was the alcohol',    next:'ca_2_excuse',  fx:()=>{ profile.defensive++; rel.casey.trust-=5; } },
+    ],
+  },
+  ca_1d: { incoming:{ text:'ok. let me know when you\'re ready to talk', time:'9:48 AM' }, choices:null,
+    onEnd:()=>{ flags.add('casey_ignored'); rel.casey.tension+=10; } },
+  ca_2_figuring: {
+    incoming: { text:'you kept saying you felt like nobody actually knew you. like the real you.', time:'9:35 AM' },
+    choices: [
+      { text:'I mean. I don\'t think that\'s wrong',           next:'ca_3_honest',  fx:()=>{ profile.trusting+=2; rel.casey.trust+=8;  flags.add('casey_confession_owned'); } },
+      { text:'that\'s embarrassing. sorry you had to read that', next:'ca_3_deflect', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  ca_2_read_it: {
+    incoming: { text:'you said you\'ve been a bad friend. and something about standing at the edge of something', time:'9:35 AM' },
+    choices: [
+      { text:'I still don\'t know which way I fell', next:'ca_3_honest',  fx:()=>{ profile.trusting++; rel.casey.trust+=5; } },
+      { text:'that doesn\'t sound like me',          next:'ca_3_doubt',   fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  ca_2_dismiss: { incoming:{ text:'ok.', time:'9:36 AM' }, choices:null,
+    onEnd:()=>{ flags.add('casey_pushed_away'); rel.casey.trust-=8; } },
+  ca_2_excuse: {
+    incoming: { text:'I know you were drunk. that\'s kind of the point.', time:'9:36 AM' },
+    choices: [
+      { text:'...yeah. ok. what did I say',     next:'ca_2_read_it', fx:()=>{ profile.trusting++; } },
+      { text:'I\'m not having this conversation', next:'ca_shut_down', fx:()=>{ profile.avoidant++; rel.casey.tension+=15; } },
+    ],
+  },
+  ca_3_honest: {
+    incoming: { text:'I know. I\'ve thought that for a while. you\'ve seemed off.', time:'9:37 AM' },
+    choices: [
+      { text:'why didn\'t you say anything',            next:'ca_end_warm',    fx:()=>{ profile.trusting++; rel.casey.trust+=8; flags.add('casey_real_talk'); } },
+      { text:'I\'m ok. I think last night was just a lot', next:'ca_end_deflect', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  ca_3_deflect: { incoming:{ text:'it\'s fine. don\'t worry about it.', time:'9:37 AM' }, choices:null,
+    onEnd:()=>{ flags.add('casey_let_it_drop'); } },
+  ca_3_doubt: { incoming:{ text:'I have screenshots if that helps.', time:'9:36 AM' }, choices:null,
+    onEnd:()=>{ flags.add('casey_has_receipts'); rel.casey.trust-=3; } },
+  ca_shut_down: { incoming:{ text:'ok.', time:'9:37 AM' }, choices:null,
+    onEnd:()=>{ flags.add('casey_pushed_away'); rel.casey.trust-=10; rel.casey.tension+=10; } },
+  ca_end_warm: {
+    incoming: { text:'because you always seem fine. I didn\'t want to be the one who said you weren\'t.', time:'9:38 AM' }, choices:null,
+    onEnd:()=>{ flags.add('casey_connection'); rel.casey.trust+=8; } },
+  ca_end_deflect: { incoming:{ text:'ok. just text me next time instead of waiting until 1am', time:'9:38 AM' }, choices:null,
+    onEnd:()=>{ rel.casey.trust+=3; } },
+
+  casey_pm1: {
+    incoming: { text:'hey. you seem like you\'re doing ok. are you actually ok', time:'4:02 PM' },
+    choices: [
+      { text:'honestly? not really. but I\'m working on it', next:'cpm1_a', fx:()=>{ rel.casey.trust+=5; profile.trusting++; flags.add('casey_honest_pm'); } },
+      { text:'yeah I think so',                              next:'cpm1_b', fx:()=>{} },
+      { text:'(seen)',              silent:true,             next:'cpm1_c', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  cpm1_a: { incoming:{ text:'ok. that\'s the right answer.', time:'4:03 PM' }, choices:null, onEnd:()=>{ flags.add('casey_connection'); rel.casey.trust+=5; } },
+  cpm1_b: { incoming:{ text:'ok. good.', time:'4:03 PM' }, choices:null, onEnd:()=>{} },
+  cpm1_c: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Sam — the one you argued with ────────────────────────────────
+  sam_0: {
+    incoming: { text:'so we\'re just not going to talk about last night?', time:'9:55 AM' },
+    choices: [
+      { text:'I don\'t remember everything. what happened',  next:'sa_1a',       fx:()=>{ profile.trusting++; flags.add('admitted_blackout'); } },
+      { text:'I said I was sorry. at the party.',            next:'sa_1b',       fx:()=>{ profile.defensive++; } },
+      { text:'what do you want me to say',                   next:'sa_1c',       fx:()=>{ profile.defensive++; } },
+      { text:'(ignore)',                    silent:true,     next:'sa_1d',       fx:()=>{ profile.avoidant++;  rel.sam.tension+=20; } },
+    ],
+  },
+  sa_1a: {
+    incoming: { text:'you told Dylan I bailed on you when you needed me. in front of everyone.', time:'9:57 AM' },
+    choices: [
+      { text:'I said that?',                              next:'sa_2_shocked', fx:()=>{ profile.trusting++;  flags.add('sam_accusation_known'); } },
+      { text:'because you did',                          next:'sa_2_back',    fx:()=>{ profile.trusting++;  flags.add('sam_confronted_directly'); } },
+      { text:'I was drunk. I wasn\'t trying to start something', next:'sa_2_excuse', fx:()=>{ profile.defensive++; rel.sam.trust-=5; } },
+    ],
+  },
+  sa_1b: {
+    incoming: { text:'at the party you were already drunk when you said it. that\'s not the same as an apology.', time:'9:57 AM' },
+    choices: [
+      { text:'what exactly did I say',         next:'sa_2_what',    fx:()=>{ profile.trusting++;  } },
+      { text:'what do you want from me Sam',   next:'sa_2_exhaust', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  sa_1c: {
+    incoming: { text:'the truth would be a start.', time:'9:56 AM' },
+    choices: [
+      { text:'ok. the truth is I don\'t remember everything', next:'sa_1a_redir', fx:()=>{ profile.trusting++; flags.add('admitted_blackout'); } },
+      { text:'I don\'t know what you want',                   next:'sa_2_exhaust', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  sa_1d: { incoming:{ text:'ok. cool.', time:'10:14 AM' }, choices:null,
+    onEnd:()=>{ flags.add('sam_ghosted'); rel.sam.trust-=15; rel.sam.tension+=20; } },
+  sa_1a_redir: {
+    incoming: { text:'you told Dylan I bailed on you when you needed me. at riley\'s. out loud.', time:'9:58 AM' },
+    choices: [
+      { text:'I said that?',            next:'sa_2_shocked', fx:()=>{ profile.trusting++; flags.add('sam_accusation_known'); } },
+      { text:'did I say anything else', next:'sa_2_more',    fx:()=>{ profile.trusting++;  } },
+    ],
+  },
+  sa_2_shocked: {
+    incoming: { text:'yes. and Dylan wasn\'t supposed to know any of that. that was between us.', time:'9:58 AM' },
+    choices: [
+      { text:'you\'re right. I shouldn\'t have said it',           next:'sa_3_own',      fx:()=>{ profile.trusting++;  rel.sam.trust+=8; flags.add('sam_apology_given'); } },
+      { text:'I didn\'t mean for Dylan to hear',                   next:'sa_3_qualify',  fx:()=>{ profile.defensive++; } },
+      { text:'but it\'s true though',                              next:'sa_3_push',     fx:()=>{ profile.trusting++;  flags.add('sam_confronted_directly'); } },
+    ],
+  },
+  sa_2_back: {
+    incoming: { text:'ok. so you decided the right time to bring that up was drunk at riley\'s party.', time:'9:58 AM' },
+    choices: [
+      { text:'no. I know. that was wrong.',    next:'sa_3_own',       fx:()=>{ profile.trusting++; rel.sam.trust+=5; flags.add('sam_apology_given'); } },
+      { text:'I\'ve been holding it for months', next:'sa_3_real_talk', fx:()=>{ profile.trusting+=2; flags.add('sam_confronted_directly'); } },
+    ],
+  },
+  sa_2_excuse: { incoming:{ text:'ok.', time:'9:58 AM' }, choices:null,
+    onEnd:()=>{ flags.add('sam_unconvinced'); rel.sam.trust-=8; } },
+  sa_2_what: {
+    incoming: { text:'you said I wasn\'t really there when things were bad. in front of people who didn\'t need to hear it.', time:'9:58 AM' },
+    choices: [
+      { text:'I shouldn\'t have done it like that', next:'sa_3_own',       fx:()=>{ profile.trusting++; rel.sam.trust+=5; flags.add('sam_apology_given'); } },
+      { text:'but was I wrong',                     next:'sa_3_real_talk', fx:()=>{ profile.trusting++;  flags.add('sam_confronted_directly'); } },
+    ],
+  },
+  sa_2_exhaust: {
+    incoming: { text:'I want to know if you actually feel bad or if you just want this to go away.', time:'9:58 AM' },
+    choices: [
+      { text:'I actually feel bad',  next:'sa_3_own',            fx:()=>{ profile.trusting++; rel.sam.trust+=5; } },
+      { text:'both, honestly',       next:'sa_3_honest_exhaust', fx:()=>{ profile.trusting++;  } },
+    ],
+  },
+  sa_2_more: {
+    incoming: { text:'you also said you were done pretending everything was fine between us.', time:'9:59 AM' },
+    choices: [
+      { text:'ok. that one I stand by',      next:'sa_3_real_talk', fx:()=>{ profile.trusting++; flags.add('sam_confronted_directly'); } },
+      { text:'I\'m sorry. all of it wrong.', next:'sa_3_own',       fx:()=>{ profile.trusting++; rel.sam.trust+=5; flags.add('sam_apology_given'); } },
+    ],
+  },
+  sa_3_own: { incoming:{ text:'thank you. that\'s all I needed.', time:'10:00 AM' }, choices:null,
+    onEnd:()=>{ flags.add('sam_acknowledged'); rel.sam.trust+=5; } },
+  sa_3_qualify: { incoming:{ text:'but you said it. and now Dylan knows.', time:'10:00 AM' }, choices:null,
+    onEnd:()=>{ flags.add('sam_unconvinced'); rel.sam.trust-=3; } },
+  sa_3_push: {
+    incoming: { text:'maybe. but you don\'t get to decide how I hear it.', time:'10:00 AM' },
+    choices: [
+      { text:'you\'re right. I\'m sorry.',             next:'sa_end_soft', fx:()=>{ profile.trusting++; flags.add('sam_apology_given'); } },
+      { text:'we should actually talk about this',     next:'sa_end_open', fx:()=>{ profile.trusting++;  flags.add('sam_confronted_directly'); } },
+    ],
+  },
+  sa_3_real_talk: {
+    incoming: { text:'ok. yeah. maybe we do. not like this though.', time:'10:00 AM' },
+    choices: [
+      { text:'yeah. not like this.', next:'sa_end_open', fx:()=>{ rel.sam.trust+=8; flags.add('sam_real_talk_started'); } },
+    ],
+  },
+  sa_3_honest_exhaust: { incoming:{ text:'that\'s the first honest thing you\'ve said.', time:'10:00 AM' }, choices:null,
+    onEnd:()=>{ flags.add('sam_acknowledged'); rel.sam.trust+=3; } },
+  sa_end_soft: { incoming:{ text:'ok.', time:'10:01 AM' }, choices:null, onEnd:()=>{ rel.sam.trust+=3; } },
+  sa_end_open: { incoming:{ text:'later then.', time:'10:01 AM' }, choices:null,
+    onEnd:()=>{ flags.add('sam_real_talk_started'); rel.sam.trust+=5; } },
+
+  sam_eve1: {
+    incoming: { text:'hey. I don\'t want to end the day weird with you.', time:'7:15 PM' },
+    choices: [
+      { text:'me neither. I\'m sorry.',  next:'sev1_a', fx:()=>{ profile.trusting++; rel.sam.trust+=8; flags.add('sam_evening_peace'); } },
+      { text:'yeah. same.',              next:'sev1_b', fx:()=>{ rel.sam.trust+=4;  flags.add('sam_evening_peace'); } },
+      { text:'(seen)', silent:true,      next:'sev1_c', fx:()=>{ profile.avoidant++; rel.sam.tension+=10; } },
+    ],
+  },
+  sev1_a: { incoming:{ text:'it\'s ok. we\'ll figure it out.', time:'7:16 PM' }, choices:null, onEnd:()=>{ flags.add('sam_evening_peace'); } },
+  sev1_b: { incoming:{ text:'yeah.', time:'7:16 PM' }, choices:null, onEnd:()=>{ flags.add('sam_evening_peace'); } },
+  sev1_c: { incoming:null, choices:null, onEnd:()=>{ rel.sam.trust-=5; } },
+
+  // ── Taylor — the camera person ────────────────────────────────────
+  taylor_0: {
+    incoming: { text:'hey I have a bunch of footage from last night if you want any of it', time:'10:02 AM' },
+    choices: [
+      { text:'yes. I need to see what happened',       next:'ta_1a', fx:()=>{ profile.trusting++;  flags.add('asked_for_footage'); } },
+      { text:'what kind of footage',                   next:'ta_1b', fx:()=>{ profile.trusting++;  } },
+      { text:'I\'m a little scared to look honestly',  next:'ta_1c', fx:()=>{ profile.trusting++;  } },
+      { text:'(seen)',              silent:true,        next:'ta_1d', fx:()=>{ profile.avoidant++;  rel.taylor.tension+=5; } },
+    ],
+  },
+  ta_1a: {
+    incoming: { text:'ok so I have the lamp thing obviously. and some stuff from earlier that\'s actually kind of sweet', time:'10:04 AM' },
+    choices: [
+      { text:'what\'s the sweet stuff',         next:'ta_2_sweet',  fx:()=>{ profile.trusting++; } },
+      { text:'what does the lamp thing look like', next:'ta_2_lamp', fx:()=>{ flags.add('saw_lamp_footage'); } },
+      { text:'did Jordan have their phone out',   next:'ta_2_jordan', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  ta_1b: {
+    incoming: { text:'normal party stuff mostly. some of it is you being you. some is the lamp. some is missing.', time:'10:04 AM' },
+    choices: [
+      { text:'what\'s missing',    next:'ta_2_missing', fx:()=>{ profile.trusting++; flags.add('footage_gap_known'); } },
+      { text:'I\'ll take what you have', next:'ta_2_sweet', fx:()=>{ flags.add('asked_for_footage'); } },
+    ],
+  },
+  ta_1c: {
+    incoming: { text:'honestly it\'s not that bad. one rough part but a lot of it is fine.', time:'10:04 AM' },
+    choices: [
+      { text:'what\'s the rough part',         next:'ta_2_lamp',  fx:()=>{ flags.add('saw_lamp_footage'); } },
+      { text:'can you just describe it to me', next:'ta_2_sweet', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  ta_1d: { incoming:{ text:'ok lmk', time:'10:15 AM' }, choices:null,
+    onEnd:()=>{ flags.add('taylor_ignored'); } },
+  ta_2_sweet: {
+    incoming: { text:'there\'s a clip around 11:30 where you and Morgan are talking on the stairs and you\'re both laughing. it\'s genuinely nice.', time:'10:06 AM' },
+    choices: [
+      { text:'I don\'t remember that at all',  next:'ta_3_gap',   fx:()=>{ flags.add('saw_morgan_stairs_clip'); flags.add('admitted_blackout'); } },
+      { text:'can you send it?',               next:'ta_3_send',  fx:()=>{ flags.add('saw_morgan_stairs_clip'); } },
+      { text:'what happens after that',        next:'ta_3_after', fx:()=>{ profile.trusting++; flags.add('saw_morgan_stairs_clip'); } },
+    ],
+  },
+  ta_2_lamp: {
+    incoming: { text:'ok it\'s not as bad as it sounds. you knock into it, it goes over, you look genuinely horrified. timestamp says 1:03 AM.', time:'10:06 AM' },
+    choices: [
+      { text:'1:03. that fills in a gap',   next:'ta_3_timeline', fx:()=>{ profile.trusting++; flags.add('lamp_timestamp_known'); flags.add('knows_about_lamp'); } },
+      { text:'was I the only one filmed',   next:'ta_3_others',   fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  ta_2_missing: {
+    incoming: { text:'there\'s a 45-minute gap between 1:30 and 2:15 where I don\'t have anything. phone died or I was inside.', time:'10:07 AM' },
+    choices: [
+      { text:'that\'s exactly the gap I can\'t account for', next:'ta_3_gap',         fx:()=>{ flags.add('footage_gap_known'); flags.add('timeline_gap_confirmed'); profile.trusting++; } },
+      { text:'do you know where I was during that',          next:'ta_3_whereabouts', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  ta_2_jordan: {
+    incoming: { text:'yeah Jordan had their phone out around the same time I did. not sure if they kept anything.', time:'10:06 AM' },
+    choices: [
+      { text:'what was Jordan filming',  next:'ta_3_jordan_cam', fx:()=>{ profile.trusting++; flags.add('filming_revealed'); } },
+      { text:'ok. what do you have',     next:'ta_2_sweet',      fx:()=>{} },
+    ],
+  },
+  ta_3_gap: { incoming:{ text:'yeah. I don\'t have that part. sorry.', time:'10:08 AM' }, choices:null,
+    onEnd:()=>{ flags.add('footage_gap_known'); flags.add('timeline_gap_confirmed'); } },
+  ta_3_send: { incoming:{ text:'sent. and I didn\'t share the other stuff with anyone. just so you know.', time:'10:07 AM' }, choices:null,
+    onEnd:()=>{ flags.add('taylor_trustworthy'); rel.taylor.trust+=8; } },
+  ta_3_after: {
+    incoming: { text:'about 20 minutes later you\'re giving a passionate speech to Jordan about something. couldn\'t hear the audio.', time:'10:07 AM' },
+    choices: [
+      { text:'Jordan never mentioned a speech',  next:'ta_4_jordan_disc', fx:()=>{ profile.trusting++; flags.add('jordan_discrepancy_found'); } },
+      { text:'that tracks honestly',             next:'ta_3_send',        fx:()=>{} },
+    ],
+  },
+  ta_3_timeline: { incoming:{ text:'yeah. the stuff before that was actually pretty chill for what it\'s worth.', time:'10:07 AM' }, choices:null,
+    onEnd:()=>{ flags.add('lamp_timestamp_known'); rel.taylor.trust+=3; } },
+  ta_3_others: {
+    incoming: { text:'I got Riley looking stressed around 12:45 before the lamp. and Jordan handing you something.', time:'10:08 AM' },
+    choices: [
+      { text:'handing me what',                     next:'ta_4_jordan_shot',  fx:()=>{ flags.add('taylor_saw_jordan_shots'); } },
+      { text:'Riley was already stressed at 12:45?', next:'ta_4_riley_early', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  ta_3_whereabouts: { incoming:{ text:'no idea. you just kind of weren\'t around for a while.', time:'10:08 AM' }, choices:null,
+    onEnd:()=>{ flags.add('timeline_gap_confirmed'); } },
+  ta_3_jordan_cam: { incoming:{ text:'I don\'t know. they were filming you at some point. I assumed they\'d ask.', time:'10:07 AM' }, choices:null,
+    onEnd:()=>{ flags.add('filming_revealed'); flags.add('jordan_has_footage'); } },
+  ta_4_jordan_disc: { incoming:{ text:'yeah. that\'s interesting.', time:'10:09 AM' }, choices:null,
+    onEnd:()=>{ flags.add('jordan_discrepancy_found'); rel.taylor.trust+=3; } },
+  ta_4_jordan_shot: { incoming:{ text:'a drink. a shot glass I think. around 12:50.', time:'10:09 AM' }, choices:null,
+    onEnd:()=>{ flags.add('taylor_saw_jordan_shots'); flags.add('jordan_feeding_shots'); } },
+  ta_4_riley_early: { incoming:{ text:'yeah. before anything even happened. I noticed because it seemed off.', time:'10:09 AM' }, choices:null,
+    onEnd:()=>{ flags.add('riley_was_stressed_early'); } },
+
+  taylor_pm1: {
+    incoming: { text:'hey — for what it\'s worth I don\'t think it was as bad as you probably think it was', time:'4:45 PM' },
+    choices: [
+      { text:'you might be the first person to say that', next:'tpm1_a', fx:()=>{ rel.taylor.trust+=5; } },
+      { text:'how bad was it actually',                   next:'tpm1_b', fx:()=>{ profile.trusting++; } },
+      { text:'(seen)',              silent:true,          next:'tpm1_c', fx:()=>{ profile.avoidant++; } },
+    ],
+  },
+  tpm1_a: { incoming:{ text:'lol. night is long. be kind to yourself.', time:'4:46 PM' }, choices:null, onEnd:()=>{} },
+  tpm1_b: { incoming:{ text:'like a 6 out of 10. people have done worse at better parties.', time:'4:46 PM' }, choices:null, onEnd:()=>{} },
+  tpm1_c: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ── Drew — left early ──────────────────────────────────────────────
+  drew_0: {
+    incoming: { text:'hey. heard about last night. I left around 1 so I missed the end but I was there for the beginning', time:'2:08 PM' },
+    choices: [
+      { text:'what did you see before you left',           next:'dr_1a', fx:()=>{ profile.trusting++; flags.add('asked_drew'); } },
+      { text:'when did things start going wrong',          next:'dr_1b', fx:()=>{ profile.trusting++;  } },
+      { text:'I\'m still trying to figure out what happened', next:'dr_1c', fx:()=>{ flags.add('admitted_blackout'); } },
+      { text:'(seen)',                    silent:true,      next:'dr_1d', fx:()=>{ profile.avoidant++;  } },
+    ],
+  },
+  dr_1a: {
+    incoming: { text:'you were fine at 11. like genuinely fine. somewhere around midnight you hit a wall and it went fast.', time:'2:10 PM' },
+    choices: [
+      { text:'did you see what I was drinking',  next:'dr_2_drinks', fx:()=>{ profile.trusting++;  } },
+      { text:'who was around when I hit that wall', next:'dr_2_who', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  dr_1b: {
+    incoming: { text:'maybe 12:30? I remember thinking you seemed off but I didn\'t say anything. I should have.', time:'2:10 PM' },
+    choices: [
+      { text:'what seemed off',              next:'dr_2_off',     fx:()=>{ profile.trusting++; } },
+      { text:'it\'s not your responsibility', next:'dr_2_deflect', fx:()=>{} },
+    ],
+  },
+  dr_1c: {
+    incoming: { text:'yeah that tracks. you were already pretty far gone by the time I left.', time:'2:09 PM' },
+    choices: [
+      { text:'when you left, was I ok',    next:'dr_2_ok',     fx:()=>{ profile.trusting++; } },
+      { text:'what do you mean far gone',  next:'dr_2_drinks', fx:()=>{ profile.trusting++; flags.add('admitted_blackout'); } },
+    ],
+  },
+  dr_1d: { incoming:null, choices:null, onEnd:()=>{ flags.add('drew_ignored'); } },
+  dr_2_drinks: {
+    incoming: { text:'Jordan kept handing you things and you kept taking them. I counted at least three in like half an hour.', time:'2:12 PM' },
+    choices: [
+      { text:'did Jordan know I was already drunk',  next:'dr_3_jordan',  fx:()=>{ profile.trusting++; flags.add('jordan_knew'); } },
+      { text:'nobody stopped it?',                   next:'dr_3_nobody',  fx:()=>{ profile.trusting++;  } },
+    ],
+  },
+  dr_2_who: {
+    incoming: { text:'Jordan was there. you were talking to Sam earlier but I think that got tense.', time:'2:11 PM' },
+    choices: [
+      { text:'Sam. what did you see',  next:'dr_3_sam',    fx:()=>{ profile.trusting++; flags.add('drew_saw_sam_tension'); } },
+      { text:'Jordan again. ok.',      next:'dr_3_jordan', fx:()=>{ profile.trusting++;  } },
+    ],
+  },
+  dr_2_off: {
+    incoming: { text:'you were talking louder than you thought you were. saying true things in the wrong way.', time:'2:11 PM' },
+    choices: [
+      { text:'yeah. that makes sense',   next:'dr_3_truth', fx:()=>{ profile.trusting++;  } },
+      { text:'what kind of true things', next:'dr_3_sam',   fx:()=>{ profile.trusting++;  } },
+    ],
+  },
+  dr_2_deflect: { incoming:{ text:'maybe not. but I still feel it a little.', time:'2:11 PM' }, choices:null, onEnd:()=>{} },
+  dr_2_ok: {
+    incoming: { text:'I mean. upright, yes. I don\'t know if ok is the right word.', time:'2:10 PM' },
+    choices: [
+      { text:'what happened between 1 and 2:30',  next:'dr_3_gap',   fx:()=>{ profile.trusting++; flags.add('timeline_gap_confirmed'); } },
+      { text:'ok. that\'s something.',            next:'dr_3_truth', fx:()=>{} },
+    ],
+  },
+  dr_3_jordan: { incoming:{ text:'I think Jordan thought it was funny. or didn\'t think. I\'m not sure which is worse.', time:'2:13 PM' }, choices:null,
+    onEnd:()=>{ flags.add('jordan_knew'); flags.add('drew_saw_jordan'); } },
+  dr_3_nobody: { incoming:{ text:'I was about to. then I got pulled into another conversation. I\'m sorry.', time:'2:13 PM' }, choices:null,
+    onEnd:()=>{ flags.add('drew_admits_inaction'); rel.drew.trust+=5; } },
+  dr_3_sam: {
+    incoming: { text:'you said something to Sam and Sam got quiet. like they\'d been waiting for it.', time:'2:13 PM' },
+    choices: [
+      { text:'like they expected it?', next:'dr_end_sam', fx:()=>{ profile.trusting++; flags.add('sam_tension_old'); } },
+      { text:'like they were hurt?',   next:'dr_end_sam', fx:()=>{ profile.trusting++; flags.add('sam_tension_old'); } },
+    ],
+  },
+  dr_3_truth: { incoming:{ text:'you were saying real things in a room full of people who weren\'t ready for them.', time:'2:13 PM' }, choices:null,
+    onEnd:()=>{ rel.drew.trust+=5; } },
+  dr_3_gap: { incoming:{ text:'I don\'t know. that\'s after I left. I\'m sorry I can\'t help more.', time:'2:13 PM' }, choices:null,
+    onEnd:()=>{ flags.add('timeline_gap_confirmed'); } },
+  dr_end_sam: { incoming:{ text:'both, I think. those are the same face sometimes.', time:'2:14 PM' }, choices:null,
+    onEnd:()=>{ flags.add('sam_tension_old'); rel.drew.trust+=3; } },
+
+  // ── Quinn — friend-of-a-friend ────────────────────────────────────
+  quinn_0: {
+    incoming: { text:'hey. I don\'t think we\'ve talked much but I was at that party last night. just wanted to make sure you\'re ok', time:'3:17 PM' },
+    choices: [
+      { text:'yeah I remember you. what did you see?',  next:'qu_1a', fx:()=>{ profile.trusting++;  } },
+      { text:'who is this?',                            next:'qu_1b', fx:()=>{} },
+      { text:'honestly no. what happened out there?',   next:'qu_1c', fx:()=>{ profile.trusting++;  flags.add('admitted_blackout'); } },
+      { text:'(ignore)',            silent:true,         next:'qu_1d', fx:()=>{ profile.avoidant++;  } },
+    ],
+  },
+  qu_1a: {
+    incoming: { text:'ok so. genuinely I don\'t have a stake in this. I just noticed some stuff.', time:'3:19 PM' },
+    choices: [
+      { text:'say it',            next:'qu_2_blunt', fx:()=>{ profile.trusting++; } },
+      { text:'what kind of stuff', next:'qu_2_blunt', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  qu_1b: {
+    incoming: { text:'Quinn. I know Riley through Jamie. I was there for most of it.', time:'3:19 PM' },
+    choices: [
+      { text:'what did you see?',         next:'qu_2_blunt', fx:()=>{ profile.trusting++; } },
+      { text:'ok. and you\'re texting because?', next:'qu_2_why', fx:()=>{} },
+    ],
+  },
+  qu_1c: {
+    incoming: { text:'ok. I\'ll just tell you then. you probably need an outside view.', time:'3:19 PM' },
+    choices: [
+      { text:'yeah. go ahead', next:'qu_2_blunt', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  qu_1d: { incoming:null, choices:null, onEnd:()=>{ flags.add('quinn_ignored'); } },
+  qu_2_why: {
+    incoming: { text:'because everyone else there is going to tell you a version that protects themselves. I don\'t know you well enough to do that.', time:'3:20 PM' },
+    choices: [
+      { text:'ok. fair. tell me', next:'qu_2_blunt', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  qu_2_blunt: {
+    incoming: { text:'you were in your own world for most of the night. not in a bad way. you seemed like you were trying to feel something.', time:'3:21 PM' },
+    choices: [
+      { text:'feel what',               next:'qu_3_feel',    fx:()=>{ profile.trusting++; } },
+      { text:'what do you mean my own world', next:'qu_3_world', fx:()=>{ profile.trusting++; } },
+      { text:'was it obvious',          next:'qu_3_obvious', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  qu_3_feel: {
+    incoming: { text:'I don\'t know. like you were right on the edge of something and kept almost going there and then pulling back.', time:'3:23 PM' },
+    choices: [
+      { text:'except eventually I stopped pulling back',        next:'qu_end_a', fx:()=>{ profile.trusting++; flags.add('quinn_saw_it'); } },
+      { text:'what does that look like from the outside',      next:'qu_end_b', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  qu_3_world: {
+    incoming: { text:'like. you had full conversations but you were also somewhere else. it was a weird night.', time:'3:23 PM' },
+    choices: [
+      { text:'was anyone else like that',     next:'qu_end_c', fx:()=>{} },
+      { text:'yeah. I think I know what you mean.', next:'qu_end_a', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  qu_3_obvious: {
+    incoming: { text:'to me? a little. but I was watching. most people were caught up in their own stuff.', time:'3:23 PM' },
+    choices: [
+      { text:'what were you watching for',   next:'qu_end_b', fx:()=>{ profile.trusting++; flags.add('quinn_saw_it'); } },
+      { text:'that\'s a weird answer',       next:'qu_end_a', fx:()=>{} },
+    ],
+  },
+  qu_end_a: { incoming:{ text:'yeah. that\'s what it looked like.', time:'3:24 PM' }, choices:null,
+    onEnd:()=>{ flags.add('quinn_saw_it'); rel.quinn.trust+=5; } },
+  qu_end_b: { incoming:{ text:'it looks like someone about to be really honest and doesn\'t know it yet.', time:'3:24 PM' }, choices:null,
+    onEnd:()=>{ flags.add('quinn_saw_it'); rel.quinn.trust+=8; } },
+  qu_end_c: { incoming:{ text:'yeah. most people at parties are.', time:'3:24 PM' }, choices:null, onEnd:()=>{} },
+
+  // ── Unknown Number ─────────────────────────────────────────────────
+  unk_0: {
+    incoming: { text:'hey. you don\'t have me saved. you texted me last night.', time:'11:18 PM' },
+    choices: [
+      { text:'I\'m sorry — who is this?',  next:'un_1a', fx:()=>{ profile.trusting++; } },
+      { text:'...what did I say',           next:'un_1b', fx:()=>{ profile.trusting++;  flags.add('unknown_engaged'); } },
+      { text:'(don\'t reply)', silent:true, next:'un_1c', fx:()=>{ profile.avoidant++;  flags.add('unknown_ignored'); } },
+    ],
+  },
+  un_1a: {
+    incoming: { text:'we talked for like 20 minutes at the party. I don\'t think you\'d remember.', time:'11:20 PM' },
+    choices: [
+      { text:'I\'m sorry. what did I say to you', next:'un_2_what', fx:()=>{ flags.add('unknown_engaged'); } },
+      { text:'why are you texting now',           next:'un_2_why',  fx:()=>{ profile.trusting++;  } },
+    ],
+  },
+  un_1b: {
+    incoming: { text:'you were kind. it was a weird night and you were just kind.', time:'11:20 PM' },
+    choices: [
+      { text:'what did you say back',        next:'un_2_good', fx:()=>{ flags.add('unknown_was_kind'); } },
+      { text:'what were we talking about',   next:'un_2_what', fx:()=>{ profile.trusting++; flags.add('unknown_engaged'); } },
+    ],
+  },
+  un_1c: { incoming:null, choices:null, onEnd:()=>{ flags.add('unknown_ignored'); } },
+  un_2_what: {
+    incoming: { text:'you said you weren\'t sure if you\'d made a mess of things. then you said sorry for the mess.', time:'11:22 PM' },
+    choices: [
+      { text:'did I say what mess',  next:'un_3_mess', fx:()=>{ profile.trusting++; } },
+      { text:'what did you say',     next:'un_2_good', fx:()=>{ flags.add('unknown_was_kind'); } },
+    ],
+  },
+  un_2_why: {
+    incoming: { text:'I don\'t know. you seemed like you needed someone to tell you it was ok. I\'m not sure it was.', time:'11:21 PM' },
+    choices: [
+      { text:'ok or not ok?',              next:'un_3_okornot', fx:()=>{ profile.trusting++; } },
+      { text:'why are you telling me now', next:'un_3_now',     fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  un_2_good: {
+    incoming: { text:'I said it seemed like you were being really honest with yourself. even if it looked like a mess from the outside.', time:'11:22 PM' },
+    choices: [
+      { text:'that\'s a generous way to put it', next:'un_end_warm', fx:()=>{ profile.trusting++; flags.add('unknown_connection'); } },
+      { text:'I think it was mostly just a mess', next:'un_end_real', fx:()=>{ profile.trusting++; } },
+    ],
+  },
+  un_3_mess: { incoming:{ text:'no. you just kept saying sorry for the mess. I think you meant a lot of things at once.', time:'11:23 PM' }, choices:null,
+    onEnd:()=>{ flags.add('unknown_was_kind'); flags.add('unknown_connection'); rel.unknown.trust+=5; } },
+  un_3_okornot: { incoming:{ text:'I don\'t know. honestly. but you seemed like someone trying.', time:'11:22 PM' }, choices:null,
+    onEnd:()=>{ flags.add('unknown_connection'); rel.unknown.trust+=5; } },
+  un_3_now: { incoming:{ text:'because you texted me again at 3am. just "I\'m home". I figured you\'d want to know you made it.', time:'11:23 PM' }, choices:null,
+    onEnd:()=>{ flags.add('unknown_anchor'); flags.add('unknown_connection'); rel.unknown.trust+=8; } },
+  un_end_warm: { incoming:{ text:'I tried to be. sleep well.', time:'11:24 PM' }, choices:null,
+    onEnd:()=>{ flags.add('unknown_connection'); rel.unknown.trust+=5; } },
+  un_end_real: { incoming:{ text:'yeah. it happens. sleep well though.', time:'11:24 PM' }, choices:null,
+    onEnd:()=>{ rel.unknown.trust+=3; } },
+
+  // ── Morgan — call-back transcript variants (for getCallBackLines) ─
+  // (handled separately in getCallBackLines function)
+
+
+};
+
+// ── Message history (scrollable past context) ──────────────────────
+// Each entry is prepended to the thread so players can scroll up to find it.
+// { from:'date', text:'label' } entries render as centered date chip separators.
+const HISTORY = {
+  morgan: [
+    { from:'date', text:'4 days ago', time:'', read:true },
+    { from:'me',   text:'hey are you around tonight', time:'8:41 PM', read:true },
+    { from:'them', text:'yeah whats up', time:'8:43 PM', read:true },
+    { from:'me',   text:'nothing just wanted to talk', time:'8:44 PM', read:true },
+    { from:'them', text:'you ok?', time:'8:44 PM', read:true },
+    { from:'me',   text:'yeah I think so', time:'8:45 PM', read:true },
+    { from:'them', text:'ok well I\'m here', time:'8:45 PM', read:true },
+    { from:'date', text:'yesterday', time:'', read:true },
+    { from:'them', text:'you seemed kind of off today. you good?', time:'2:17 PM', read:true },
+    { from:'me',   text:'I\'m fine', time:'2:44 PM', read:true },
+    { from:'them', text:'you don\'t have to be fine with me', time:'2:45 PM', read:true },
+    { from:'me',   text:'I know', time:'2:46 PM', read:true },
+  ],
+  casey: [
+    { from:'date', text:'5 days ago', time:'', read:true },
+    { from:'them', text:'how\'d the thing go', time:'4:12 PM', read:true },
+    { from:'me',   text:'not great', time:'4:38 PM', read:true },
+    { from:'them', text:'ugh I\'m sorry. what happened', time:'4:39 PM', read:true },
+    { from:'me',   text:'I\'ll tell you later', time:'4:40 PM', read:true },
+    { from:'them', text:'whenever you\'re ready', time:'4:40 PM', read:true },
+    { from:'date', text:'2 days ago', time:'', read:true },
+    { from:'me',   text:'have you ever felt like you\'re doing everything right but it still feels wrong', time:'11:43 PM', read:true },
+    { from:'them', text:'yes. that\'s called being alive I think', time:'11:51 PM', read:true },
+    { from:'me',   text:'that\'s not helpful', time:'11:52 PM', read:true },
+    { from:'them', text:'lol sorry. what\'s going on', time:'11:52 PM', read:true },
+    { from:'me',   text:'idk forget it', time:'11:54 PM', read:true },
+    { from:'them', text:'ok. I\'m here though', time:'11:55 PM', read:true },
+  ],
+  sam: [
+    { from:'date', text:'2 weeks ago', time:'', read:true },
+    { from:'me',   text:'hey can we talk about the thing from last weekend', time:'7:14 PM', read:true },
+    { from:'them', text:'what thing', time:'8:02 PM', read:true },
+    { from:'me',   text:'you know what thing', time:'8:03 PM', read:true },
+    { from:'them', text:'I said I was sorry', time:'8:05 PM', read:true },
+    { from:'me',   text:'I know I just feel like it keeps happening', time:'8:07 PM', read:true },
+    { from:'them', text:'I think you\'re reading into it', time:'8:21 PM', read:true },
+    { from:'me',   text:'ok. forget it', time:'8:22 PM', read:true },
+    { from:'date', text:'6 days ago', time:'', read:true },
+    { from:'them', text:'you coming to riley\'s friday', time:'1:34 PM', read:true },
+    { from:'me',   text:'yeah', time:'3:08 PM', read:true },
+    { from:'them', text:'ok cool', time:'3:09 PM', read:true },
+  ],
+  alex: [
+    { from:'date', text:'last week', time:'', read:true },
+    { from:'them', text:'you coming to riley\'s friday', time:'2:18 PM', read:true },
+    { from:'me',   text:'probably yeah', time:'2:45 PM', read:true },
+    { from:'them', text:'nice. gonna be good', time:'2:46 PM', read:true },
+    { from:'me',   text:'who\'s all going', time:'2:47 PM', read:true },
+    { from:'them', text:'the usual. jordan\'s coming so it\'ll either be great or a disaster', time:'2:48 PM', read:true },
+    { from:'me',   text:'ha. yeah', time:'2:49 PM', read:true },
+    { from:'date', text:'2 days ago', time:'', read:true },
+    { from:'them', text:'wait are you and sam good?', time:'6:11 PM', read:true },
+    { from:'me',   text:'why', time:'6:30 PM', read:true },
+    { from:'them', text:'idk saw something weird at the thing last week', time:'6:31 PM', read:true },
+    { from:'me',   text:'yeah we\'re fine', time:'6:32 PM', read:true },
+    { from:'them', text:'ok cool', time:'6:33 PM', read:true },
+  ],
+  riley: [
+    { from:'date', text:'1 week ago', time:'', read:true },
+    { from:'them', text:'ok I\'m doing the thing on friday', time:'11:22 AM', read:true },
+    { from:'me',   text:'yesss', time:'11:34 AM', read:true },
+    { from:'them', text:'tell people to actually be on time this time', time:'11:35 AM', read:true },
+    { from:'me',   text:'I\'ll try lol', time:'11:36 AM', read:true },
+    { from:'them', text:'and tell jordan not to bring randos again please', time:'11:36 AM', read:true },
+    { from:'me',   text:'jordan does what jordan wants', time:'11:37 AM', read:true },
+    { from:'them', text:'unfortunately', time:'11:37 AM', read:true },
+    { from:'date', text:'4 days ago', time:'', read:true },
+    { from:'me',   text:'need anything for friday', time:'3:44 PM', read:true },
+    { from:'them', text:'just yourself and maybe not your drama lol', time:'4:02 PM', read:true },
+    { from:'me',   text:'lol rude', time:'4:03 PM', read:true },
+    { from:'them', text:'love you though', time:'4:04 PM', read:true },
+  ],
+  jordan: [
+    { from:'date', text:'1 week ago', time:'', read:true },
+    { from:'them', text:'riley\'s friday. you IN', time:'12:44 PM', read:true },
+    { from:'me',   text:'yeah', time:'12:51 PM', read:true },
+    { from:'them', text:'ok good I\'m bringing stuff', time:'12:52 PM', read:true },
+    { from:'me',   text:'jordan', time:'12:52 PM', read:true },
+    { from:'them', text:'what', time:'12:53 PM', read:true },
+    { from:'me',   text:'please don\'t make it a whole thing', time:'12:53 PM', read:true },
+    { from:'them', text:'it\'s always a whole thing with me you know this', time:'12:54 PM', read:true },
+    { from:'me',   text:'...yeah I know', time:'12:55 PM', read:true },
+    { from:'them', text:'it\'ll be fun I promise', time:'12:55 PM', read:true },
+    { from:'date', text:'yesterday', time:'', read:true },
+    { from:'them', text:'tomorrow night gonna be GOOD. trust', time:'9:14 PM', read:true },
+    { from:'me',   text:'that\'s ominous', time:'9:27 PM', read:true },
+    { from:'them', text:':)', time:'9:28 PM', read:true },
+  ],
+  taylor: [
+    { from:'date', text:'2 weeks ago', time:'', read:true },
+    { from:'them', text:'[photo from the last thing — you looked good here]', time:'3:14 PM', read:true },
+    { from:'me',   text:'omg no I look horrified', time:'3:22 PM', read:true },
+    { from:'them', text:'you look alive. that\'s something', time:'3:23 PM', read:true },
+    { from:'me',   text:'send it anyway', time:'3:24 PM', read:true },
+    { from:'them', text:'already did', time:'3:24 PM', read:true },
+    { from:'date', text:'3 days ago', time:'', read:true },
+    { from:'them', text:'going to riley\'s friday?', time:'1:58 PM', read:true },
+    { from:'me',   text:'yeah, you?', time:'2:14 PM', read:true },
+    { from:'them', text:'yeah. bringing my phone obviously', time:'2:15 PM', read:true },
+    { from:'me',   text:'of course you are', time:'2:16 PM', read:true },
+    { from:'them', text:'history needs to be documented', time:'2:17 PM', read:true },
+  ],
+  drew: [
+    { from:'date', text:'2 weeks ago', time:'', read:true },
+    { from:'them', text:'hey. haven\'t heard from you in a bit. you good?', time:'11:04 AM', read:true },
+    { from:'me',   text:'yeah I\'ve just been kind of in my head', time:'2:33 PM', read:true },
+    { from:'them', text:'anything specific', time:'2:34 PM', read:true },
+    { from:'me',   text:'not really. just. a lot', time:'2:35 PM', read:true },
+    { from:'them', text:'ok. you know where to find me', time:'2:36 PM', read:true },
+    { from:'date', text:'6 days ago', time:'', read:true },
+    { from:'them', text:'going to riley\'s friday?', time:'4:47 PM', read:true },
+    { from:'me',   text:'yeah', time:'5:02 PM', read:true },
+    { from:'them', text:'me too. I\'ll probably head out early though', time:'5:03 PM', read:true },
+    { from:'me',   text:'lol that\'s so you', time:'5:04 PM', read:true },
+    { from:'them', text:'I have a dog. sue me', time:'5:04 PM', read:true },
+    { from:'me',   text:'fair', time:'5:05 PM', read:true },
+  ],
+  quinn: [
+    { from:'date', text:'3 days ago', time:'', read:true },
+    { from:'them', text:'hey riley said to add you. I\'m coming to the thing friday', time:'6:33 PM', read:true },
+    { from:'me',   text:'oh hey yeah riley mentioned you. should be a good time', time:'7:02 PM', read:true },
+    { from:'them', text:'yeah hopefully. I don\'t really know anyone there', time:'7:03 PM', read:true },
+    { from:'me',   text:'you\'ll be fine, it\'s a pretty laid back group', time:'7:04 PM', read:true },
+    { from:'them', text:'ok. see you there', time:'7:05 PM', read:true },
+  ],
+  // unknown: intentionally no history — that's the mystery
 };
 
 // ── Threads ────────────────────────────────────────────────────────
 const threads = {
-  morgan: { contact:'morgan', messages:[], unread:0, scriptNode:'morgan_0' },
+  morgan: { contact:'morgan', messages:[...(HISTORY.morgan||[])], unread:0, scriptNode:'morgan_0' },
 };
 
 (function seedNight() {
-  const node = SCRIPT[threads.morgan.scriptNode];
-  if (node?.incoming) {
-    threads.morgan.messages.push({ from:'them', text:node.incoming.text, time:node.incoming.time, read:false });
-    threads.morgan.unread = 1;
+  // Pre-seed drunk texts from last night — the player wakes up and sees these
+
+  // Morgan — drunk confessions
+  threads.morgan.messages.push(
+    { from:'me',   text:"you're the realest person i know. i'm serious. why don't we ever just SAY things", time:'12:47 AM', read:true },
+    { from:'them', text:"hey are you ok? where are you right now", time:'12:48 AM', read:false },
+    { from:'me',   text:"I'm fine!! I'm great!! this night is great!!", time:'12:49 AM', read:true },
+    { from:'them', text:"ok. just... text me when you're home?", time:'12:51 AM', read:false },
+  );
+  const mNode = SCRIPT[threads.morgan.scriptNode];
+  if (mNode?.incoming) {
+    threads.morgan.messages.push({ from:'them', text:mNode.incoming.text, time:mNode.incoming.time, read:false });
   }
+  threads.morgan.unread = 3;
+
+  // Casey — full spam run, player sent 8 messages to someone who wasn't even at the party
+  threads.casey = { contact:'casey', messages:[...(HISTORY.casey||[])], unread:0, scriptNode:'casey_0' };
+  threads.casey.messages.push(
+    { from:'me', text:"hey are you still up",                                                                       time:'12:52 AM', read:true },
+    { from:'me', text:"casey I've been thinking about this for a while and I need to tell you something",            time:'12:53 AM', read:true },
+    { from:'me', text:"I think I've been really bad at being a friend lately. like really bad. I don't say that enough", time:'12:54 AM', read:true },
+    { from:'me', text:"also I'm at riley's and something happened but I don't want to talk about it yet but I'm fine I promise", time:'12:56 AM', read:true },
+    { from:'me', text:"do you ever feel like you're standing at the edge of something but you don't know if you should jump", time:'1:03 AM',  read:true },
+    { from:'me', text:"[voice note · 2:14]",                                                                        time:'1:07 AM',  read:true },
+    { from:'me', text:"sorry about the voice note. that was too much",                                              time:'1:09 AM',  read:true },
+    { from:'me', text:"I just feel like nobody actually knows me. like they know the version I show them",           time:'1:11 AM',  read:true },
+  );
+  const cNode = SCRIPT[threads.casey.scriptNode];
+  if (cNode?.incoming) {
+    threads.casey.messages.push({ from:'them', text:cNode.incoming.text, time:cNode.incoming.time, read:false });
+  }
+  threads.casey.unread = 1;
 })();
 
 // ── Ambient interactions ───────────────────────────────────────────
 // Each fires once when: correct phase, delay elapsed, condition met, thread free.
 const ambientSeeds = [
   // — Morning —
-  { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_mc',       delay:10,  fired:false, cond:()=>true },
-  { phase:PHASE.MORNING,   thread:'alex',   node:'alex_mutual',     delay:30,  fired:false, cond:()=>!flags.has('alex_ignored') },
-  { phase:PHASE.MORNING,   thread:'riley',  node:'riley_photo',     delay:55,  fired:false, cond:()=>!flags.has('riley_ignored') },
-  { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_coffee',   delay:85,  fired:false, cond:()=>!flags.has('morgan_silence')&&!flags.has('morgan_mc_ignored') },
-  { phase:PHASE.MORNING,   thread:'alex',   node:'alex_recap',      delay:120, fired:false, cond:()=>true },
+  // — Morning —
+  { phase:PHASE.MORNING, thread:'morgan', node:'morgan_am1',    delay:25,  fired:false, cond:()=>!flags.has('morgan_am_closed') },
+  { phase:PHASE.MORNING, thread:'riley',  node:'riley_am1',     delay:50,  fired:false, cond:()=>!flags.has('riley_ignored') },
   // — Afternoon —
-  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_jacket',    delay:15,  fired:false, cond:()=>!flags.has('riley_ignored') },
-  { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_mundane',  delay:45,  fired:false, cond:()=>!flags.has('morgan_final_silence') },
-  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_hangout',    delay:80,  fired:false, cond:()=>!flags.has('alex_ignored')&&!flags.has('alex_left_hanging') },
-  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_aft_check', delay:120, fired:false, cond:()=>true },
-  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_drama',      delay:165, fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'jordan', node:'jordan_pm1',  delay:20,  fired:false, cond:()=>!flags.has('jordan_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_pm1',  delay:55,  fired:false, cond:()=>!flags.has('morgan_am_closed') },
+  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_pm1',    delay:100, fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_pm1',   delay:145, fired:false, cond:()=>!flags.has('riley_ignored') },
+  // — Afternoon continued —
+  { phase:PHASE.AFTERNOON, thread:'taylor', node:'taylor_pm1',  delay:120, fired:false, cond:()=>flags.has('taylor_trustworthy')&&!flags.has('taylor_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'casey',  node:'casey_pm1',   delay:80,  fired:false, cond:()=>(flags.has('casey_real_talk')||flags.has('casey_connection'))&&!flags.has('casey_ignored') },
   // — Evening —
-  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_jacket',    delay:10,  fired:false, cond:()=>!flags.has('jacket_located')&&!flags.has('riley_ignored') },
-  { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_song', delay:40,  fired:false, cond:()=>rel.morgan.trust>=35&&!flags.has('morgan_final_silence') },
-  { phase:PHASE.EVENING,   thread:'alex',   node:'alex_eve_check',  delay:75,  fired:false, cond:()=>!flags.has('alex_ignored') },
-  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_eve',       delay:115, fired:false, cond:()=>rel.riley.trust>=45 },
-  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_music',     delay:160, fired:false, cond:()=>!flags.has('riley_ignored') },
-  { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_stars',delay:210, fired:false, cond:()=>!flags.has('morgan_final_silence') },
+  { phase:PHASE.EVENING, thread:'riley',  node:'riley_eve',      delay:20,  fired:false, cond:()=>rel.riley.trust>=45&&!flags.has('riley_ignored') },
+  { phase:PHASE.EVENING, thread:'alex',   node:'alex_eve1',      delay:60,  fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.EVENING, thread:'jordan', node:'jordan_eve1',    delay:100, fired:false, cond:()=>!flags.has('jordan_ignored') },
+  { phase:PHASE.EVENING, thread:'sam',    node:'sam_eve1',       delay:45,  fired:false, cond:()=>flags.has('sam_real_talk_started')&&!flags.has('sam_ghosted') },
+  { phase:PHASE.EVENING, thread:'morgan', node:'morgan_eve_soft',delay:180, fired:false, cond:()=>!flags.has('morgan_connection')&&!flags.has('eve_silence') },
 ];
 
 function tickAmbientSeeds() {
@@ -820,20 +1507,54 @@ function seedMorning() {
   timePhase = PHASE.MORNING;
   phaseStartTime = totalTime;
 
-  threads.alex = { contact:'alex', messages:[], unread:0, scriptNode:'alex_0' };
+  // Alex thread — heard you were pretty gone
+  threads.alex = { contact:'alex', messages:[...(HISTORY.alex||[])], unread:0, scriptNode:'alex_0' };
   const aNode = SCRIPT['alex_0'];
   if (aNode?.incoming) {
     threads.alex.messages.push({ from:'them', text:aNode.incoming.text, time:aNode.incoming.time, read:false });
     threads.alex.unread = 1;
   }
+
+  // Riley thread — just wanted to make sure we're good
+  threads.riley = { contact:'riley', messages:[...(HISTORY.riley||[])], unread:0, scriptNode:'riley_0' };
+  const rNode = SCRIPT['riley_0'];
+  if (rNode?.incoming) {
+    threads.riley.messages.push({ from:'them', text:rNode.incoming.text, time:rNode.incoming.time, read:false });
+    threads.riley.unread = 1;
+  }
+
+  // Jordan thread — last night was actually insane
+  threads.jordan = { contact:'jordan', messages:[...(HISTORY.jordan||[])], unread:0, scriptNode:'jordan_0' };
+  const jNode = SCRIPT['jordan_0'];
+  if (jNode?.incoming) {
+    threads.jordan.messages.push({ from:'them', text:jNode.incoming.text, time:jNode.incoming.time, read:false });
+    threads.jordan.unread = 1;
+  }
+
+  // Sam thread — hostile morning text
+  threads.sam = { contact:'sam', messages:[...(HISTORY.sam||[])], unread:0, scriptNode:'sam_0' };
+  const sNode = SCRIPT['sam_0'];
+  if (sNode?.incoming) {
+    threads.sam.messages.push({ from:'them', text:sNode.incoming.text, time:sNode.incoming.time, read:false });
+    threads.sam.unread = 1;
+  }
+
+  // Taylor thread — camera person, offers footage
+  threads.taylor = { contact:'taylor', messages:[...(HISTORY.taylor||[])], unread:0, scriptNode:'taylor_0' };
+  const tNode = SCRIPT['taylor_0'];
+  if (tNode?.incoming) {
+    threads.taylor.messages.push({ from:'them', text:tNode.incoming.text, time:tNode.incoming.time, read:false });
+    threads.taylor.unread = 1;
+  }
+
   notes.push({ time:'8:47 AM', body:morningNoteBody() });
-  pushNotif('Alex', "hey you left your jacket at riley's last night lol");
+  pushNotif('Alex', "hey you ok? you were pretty gone last night lol");
 }
 
 function morningNoteBody() {
-  if (flags.has('morgan_connected'))   return "morgan texted last night. I told her I was fine. I think I believed it at the time.";
-  if (flags.has('morgan_pushed_away')) return "I pushed morgan away again. I'm starting to think that's what I do.";
-  if (flags.has('morgan_silence'))     return "didn't answer morgan. didn't answer a lot of things last night.";
+  if (flags.has('morgan_connection_started')) return "morgan said what I needed to hear. I think. I'm still not sure I deserved it.";
+  if (flags.has('morgan_am_closed') || flags.has('morgan_hurt')) return "I shut it down again. I always shut it down.";
+  if (flags.has('morgan_silence_am'))  return "didn't answer morgan. didn't answer a lot of things last night.";
   return "woke up and the first thing I did was check my phone. that's probably not a good sign.";
 }
 
@@ -847,15 +1568,7 @@ function seedAfternoon() {
   timePhase = PHASE.AFTERNOON;
   phaseStartTime = totalTime;
 
-  // Riley thread
-  threads.riley = { contact:'riley', messages:[], unread:0, scriptNode:'riley_0' };
-  const rNode = SCRIPT['riley_0'];
-  if (rNode?.incoming) {
-    threads.riley.messages.push({ from:'them', text:rNode.incoming.text, time:rNode.incoming.time, read:false });
-    threads.riley.unread = 1;
-  }
-
-  // Re-seed Morgan with afternoon variant
+  // Advance Morgan to afternoon conversation
   const maftId = getMorganAftNode();
   threads.morgan.scriptNode = maftId;
   const maftNode = SCRIPT[maftId];
@@ -864,19 +1577,30 @@ function seedAfternoon() {
     threads.morgan.unread += 1;
   }
 
-  // 2:14 AM note — written after the photo, after leaving, after everything
-  notes.push({ time:'2:14 AM', body:"I should tell them. I keep not telling them and it keeps being the wrong call." });
+  // Drew thread — left early, most reliable timeline witness
+  threads.drew = { contact:'drew', messages:[...(HISTORY.drew||[])], unread:0, scriptNode:'drew_0' };
+  const drNode = SCRIPT['drew_0'];
+  if (drNode?.incoming) {
+    threads.drew.messages.push({ from:'them', text:drNode.incoming.text, time:drNode.incoming.time, read:false });
+    threads.drew.unread = 1;
+  }
 
-  // Missed call badge notification
-  pushNotif('Missed call', 'Morgan called at 1:07 AM');
+  // Quinn thread — friend-of-a-friend, blunt outsider view (fires a bit later)
+  threads.quinn = { contact:'quinn', messages:[...(HISTORY.quinn||[])], unread:0, scriptNode:'quinn_0' };
+  const quNode = SCRIPT['quinn_0'];
+  if (quNode?.incoming) {
+    threads.quinn.messages.push({ from:'them', text:quNode.incoming.text, time:quNode.incoming.time, read:false });
+    threads.quinn.unread = 1;
+  }
+
+  // Drunk note — written at 2am, only discovered now
+  notes.push({ time:'2:14 AM', body:"wrote this around 2am apparently. can't tell if I was trying to remember or trying to forget.", recovered:true });
+
+  pushNotif('Morgan', maftNode?.incoming?.text || 'hey');
 }
 
 function getMorganAftNode() {
-  if (flags.has('morgan_night_tense') || flags.has('morgan_night_flat') || flags.has('morgan_pushed_away'))
-    return 'morgan_aft_direct';
-  if (flags.has('morgan_silence') || flags.has('morgan_aft_silence2'))
-    return 'morgan_aft_cold';
-  return 'morgan_aft_warm';
+  return 'morgan_aft';
 }
 
 function queueEvening() {
@@ -904,10 +1628,11 @@ function seedEvening() {
 }
 
 function getMorganEveNode() {
-  if (flags.has('morgan_final_silence')) return null;
-  if (flags.has('called_morgan_back'))   return null;
-  if (rel.morgan.trust < 28)             return null;
-  return 'morgan_eve';
+  if (flags.has('eve_silence') || flags.has('morgan_aft_ignored')) return null;
+  if (rel.morgan.trust < 30) return null;
+  if (flags.has('morgan_told_the_truth') || flags.has('morgan_connection_started') || rel.morgan.trust >= 55)
+    return 'morgan_eve';
+  return 'morgan_eve_soft';
 }
 
 function queueLate() {
@@ -919,35 +1644,54 @@ function seedLate() {
   if (timePhase >= PHASE.LATE) return;
   timePhase = PHASE.LATE;
 
-  threads.unknown = { contact:'unknown', messages:[], unread:0, scriptNode:'unknown_0' };
-  const uNode = SCRIPT['unknown_0'];
-  if (uNode?.incoming) {
-    threads.unknown.messages.push({ from:'them', text:uNode.incoming.text, time:uNode.incoming.time, read:false });
+  notes.push({ time:'3:02 AM', body:lateNoteBody(), recovered:true });
+
+  // Unknown number — texts from someone you met at the party (player had already texted them)
+  threads.unknown = { contact:'unknown', messages:[], unread:0, scriptNode:'unk_0' };
+  threads.unknown.messages.push(
+    { from:'me', text:"hey. random but I think you said something to me earlier and I didn't get a chance to say something back", time:'3:22 AM', read:true },
+    { from:'me', text:"I'm home",                                                                                                 time:'3:31 AM', read:true },
+  );
+  const unNode = SCRIPT['unk_0'];
+  if (unNode?.incoming) {
+    threads.unknown.messages.push({ from:'them', text:unNode.incoming.text, time:unNode.incoming.time, read:false });
     threads.unknown.unread = 1;
   }
-  notes.push({ time:'3:02 AM', body:lateNoteBody() });
-  pushNotif('???', "hey. I think you have my phone");
+  pushNotif('???', unNode?.incoming?.text || '');
+
+  // If morgan connection reached, she sends a quiet goodnight
+  if (flags.has('morgan_connection') && !flags.has('morgan_eve_silence')) {
+    threads.morgan.messages.push({ from:'them', text:'hey. goodnight.', time:'11:42 PM', read:false });
+    threads.morgan.unread += 1;
+    pushNotif('Morgan', 'hey. goodnight.');
+  }
 }
 
 function lateNoteBody() {
-  // This note is written *before* the unknown thread resolves — it's the moment of realization
-  if (flags.has('phone_swap_confirmed'))   return "it wasn't my phone. all night, it wasn't my phone.";
-  if (flags.has('called_morgan_back'))     return "I called morgan back on someone else's phone. I wonder if she knew.";
-  if (flags.has('eve_honest'))             return "told a stranger I wasn't ok before I told anyone else. that's probably fine.";
-  return "someone else's messages. someone else's night. I wonder how much of it I got right.";
+  if (flags.has('morgan_connection'))    return "I don't know who I was last night. but I think I know who I want to be.";
+  if (flags.has('unknown_anchor'))       return "a stranger texted to say I made it home. I didn't know I needed to hear that.";
+  if (flags.has('casey_connection'))     return "casey knew I wasn't ok. I just never asked them to say it out loud before.";
+  if (flags.has('sam_real_talk_started'))return "sam and I have to actually talk. I've been avoiding it for months and last night blew the door open.";
+  if (flags.has('jordan_accountable'))   return "jordan admitted it. that's more than I expected. don't know if it changes anything.";
+  if (flags.has('riley_sees_you'))       return "riley said they see me. I wonder if that's true. I wonder if I want it to be.";
+  if (flags.has('admitted_blackout'))    return "so I was a mess. that's just a fact now. the question is what I do with it.";
+  return "some nights you don't get to understand. you just have to carry them.";
 }
 
 function eveningNoteBody() {
-  if (flags.has('eve_honest'))                                   return "told her I wasn't ok. it was the most honest thing I said all day.";
-  if (flags.has('called_morgan_back'))                           return "called her back. we didn't say much. it was enough.";
-  if (flags.has('morgan_aft_honest_moment')||flags.has('morgan_aft_open')) return "maybe I don't have to figure this all out tonight.";
-  if (flags.has('admitted_rileys')||flags.has('riley_gap_admitted'))       return "I keep playing last night back. I don't know what I was hoping would happen.";
-  if (flags.has('morgan_final_silence')||flags.has('eve_silence'))         return "I didn't answer again. I don't know what that says about me.";
+  if (flags.has('morgan_told_the_truth'))  return "told her I wasn't ok. it was the most honest thing I said all day.";
+  if (flags.has('morgan_connection_started') && flags.has('admitted_drunk_texts'))
+                                           return "maybe the things I said drunk were the things I actually meant.";
+  if (flags.has('riley_sees_you'))         return "riley said they see me. didn't know what to say to that.";
+  if (flags.has('riley_connection'))       return "riley and I are ok. I think. whatever ok means right now.";
+  if (flags.has('jordan_accountable'))     return "jordan admitted something. not sure if I forgive them yet. not sure that's the point.";
+  if (flags.has('eve_silence') || flags.has('morgan_aft_ignored'))
+                                           return "I went quiet again. I don't know if that's self-preservation or something worse.";
   return "the phone's quiet now. probably for the best.";
 }
 
 function getCallBackLines() {
-  if (flags.has('morgan_aft_honest_moment') || flags.has('morgan_aft_open') || flags.has('eve_honest')) {
+  if (flags.has('morgan_connection') || flags.has('morgan_told_the_truth')) {
     return [
       "Morgan: hey.",
       "you: hey. I just... wanted to actually talk.",
@@ -955,7 +1699,7 @@ function getCallBackLines() {
       "Morgan: I'm glad you called.",
     ];
   }
-  if (flags.has('morgan_aft_direct') || flags.has('admitted_rileys')) {
+  if (flags.has('morgan_connection_started') || flags.has('admitted_drunk_texts')) {
     return [
       "Morgan: oh. hey.",
       "you: I know. I'm sorry I didn't pick up.",
@@ -964,7 +1708,7 @@ function getCallBackLines() {
       "Morgan: ok. that's honest.",
     ];
   }
-  if (flags.has('morgan_final_silence') || flags.has('eve_silence')) {
+  if (flags.has('eve_silence') || flags.has('morgan_silence_am')) {
     return [
       "Morgan: ...",
       "Morgan: you called.",
@@ -989,12 +1733,19 @@ let typingActive    = false;
 let typingTimer     = 0;
 let typingNextNode  = null;
 
+// Thread scroll state
+let threadScrollY = 0;                          // pixels scrolled up from bottom
+const threadDrag  = { active:false, startY:0, startScroll:0, totalDelta:0 };
+
 function openThread(key) {
   activeThreadKey = key;
   screen = SCR.THREAD;
   choiceAnim = 0;
   choiceMade = false;
   typingActive = false;
+  threadScrollY = 0;
+  threadDrag.active = false;
+  threadDrag.totalDelta = 0;
   const t = threads[key];
   t.messages.forEach(m => m.read = true);
   t.unread = 0;
@@ -1094,6 +1845,16 @@ function canvasCoords(e) {
   return [(src.clientX-r.left)*(W/r.width), (src.clientY-r.top)*(H/r.height)];
 }
 
+function threadContentBottom() {
+  if (!activeThreadKey) return H - NAV_H;
+  const t = threads[activeThreadKey];
+  const node = t.scriptNode ? SCRIPT[t.scriptNode] : null;
+  const hasChoices = node?.choices && !choiceMade && !typingActive;
+  const choiceH    = hasChoices ? node.choices.length * 26 + 10 : 0;
+  const typingH    = typingActive ? 28 : 0;
+  return H - NAV_H - choiceH - typingH - 4;
+}
+
 canvas.addEventListener('mousedown', e => {
   const [mx, my] = canvasCoords(e);
   if (screen === SCR.LOCK) {
@@ -1109,6 +1870,11 @@ canvas.addEventListener('mousedown', e => {
     if (my>=vy-10&&my<=vy+14&&mx>=vx-4&&mx<=vx+vw+4) {
       musicState.volDragging = true; e.preventDefault();
     }
+  } else if (screen === SCR.THREAD && my < threadContentBottom()) {
+    threadDrag.active      = true;
+    threadDrag.startY      = my;
+    threadDrag.startScroll = threadScrollY;
+    threadDrag.totalDelta  = 0;
   }
 });
 canvas.addEventListener('touchstart', e => {
@@ -1126,6 +1892,11 @@ canvas.addEventListener('touchstart', e => {
     if (my>=vy-10&&my<=vy+14&&mx>=vx-4&&mx<=vx+vw+4) {
       musicState.volDragging = true; e.preventDefault();
     }
+  } else if (screen === SCR.THREAD && my < threadContentBottom()) {
+    threadDrag.active      = true;
+    threadDrag.startY      = my;
+    threadDrag.startScroll = threadScrollY;
+    threadDrag.totalDelta  = 0;
   }
 }, { passive: false });
 
@@ -1139,6 +1910,11 @@ function onSlideMove(mx, my) {
     musicState.volume = Math.max(0, Math.min(1, (mx - vx) / vw));
     if (musicState.audio) musicState.audio.volume = musicState.volume;
   }
+  if (threadDrag.active) {
+    const dy = threadDrag.startY - my;          // drag finger up → dy positive → scroll up
+    threadDrag.totalDelta = Math.abs(dy);
+    threadScrollY = Math.max(0, threadDrag.startScroll + dy);
+  }
 }
 function onSlideEnd() {
   if (lockSlide.dragging) {
@@ -1151,6 +1927,7 @@ function onSlideEnd() {
     }
   }
   musicState.volDragging = false;
+  threadDrag.active = false;
 }
 
 window.addEventListener('mousemove',  e => { const [mx,my]=canvasCoords(e); onSlideMove(mx,my); });
@@ -1219,6 +1996,8 @@ function onClickMessages(mx,my) {
 
 function onClickThread(mx,my) {
   if (!activeThreadKey) return;
+  // If the pointer moved more than 8px it was a scroll gesture, not a tap
+  if (threadDrag.totalDelta > 8) { threadDrag.totalDelta = 0; return; }
   const t=threads[activeThreadKey], node=t.scriptNode?SCRIPT[t.scriptNode]:null;
   if (!node?.choices||choiceMade||typingActive) return;
   const bH=22,gap=4;
@@ -1707,15 +2486,49 @@ function drawThread() {
   const choiceH=hasChoices?node.choices.length*26+10:0;
   const typingH=typingActive?28:0;
   const bubbleBot=H-NAV_H-choiceH-typingH-4;
-  drawBubbles(t,STATUS_H+36,bubbleBot);
+  const bubbleTop=STATUS_H+36;
+  // Clip the bubble area so scrolled content doesn't bleed over header or choices
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, bubbleTop, W, bubbleBot-bubbleTop); ctx.clip();
+  drawBubbles(t, bubbleTop, bubbleBot + threadScrollY);
+  ctx.restore();
   if (typingActive) drawTyping(bubbleBot+4);
   if (hasChoices)   drawChoices(node.choices,bubbleBot+typingH);
+  // Scroll hint: fade + chevron at top of bubble area if there's more history above
+  if (threadScrollY > 0) {
+    const fadeG = ctx.createLinearGradient(0, bubbleTop, 0, bubbleTop+28);
+    fadeG.addColorStop(0,'rgba(13,13,22,0.92)'); fadeG.addColorStop(1,'rgba(13,13,22,0)');
+    ctx.fillStyle = fadeG; ctx.fillRect(0, bubbleTop, W, 28);
+  }
+  if (threadScrollY < 1) {
+    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.fillText('scroll up for history', W/2, bubbleBot - 6);
+    ctx.textAlign='left';
+  }
 }
 
 function drawBubbles(t,top,bottom) {
   let y=bottom-2;
   for (let i=t.messages.length-1;i>=0;i--) {
-    const msg=t.messages[i], isMe=msg.from==='me';
+    const msg=t.messages[i];
+
+    // ── Date separator chip ──────────────────────────────────────
+    if (msg.from==='date') {
+      y-=22;
+      if (y+16>=top) {
+        ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center';
+        const tw=ctx.measureText(msg.text).width+16;
+        ctx.fillStyle='rgba(255,255,255,0.07)';
+        roundRect(W/2-tw/2,y,tw,14,7); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.32)';
+        ctx.fillText(msg.text,W/2,y+10);
+        ctx.textAlign='left';
+      }
+      continue;
+    }
+
+    const isMe=msg.from==='me';
     const maxBW=190,padX=9,padY=7;
     const lines=wrapText(msg.text,maxBW-padX*2,'8px Arial Narrow, Arial, sans-serif');
     const bH=lines.length*12+padY*2;
@@ -1778,11 +2591,21 @@ function drawNotes() {
   let ry=STATUS_H+40;
   for (const note of sorted) {
     if (ry>H-NAV_H-10) break;
-    ctx.fillStyle='rgba(255,220,80,0.04)'; roundRect(8,ry,W-16,52,6); ctx.fill();
-    ctx.strokeStyle='rgba(255,220,80,0.1)'; ctx.lineWidth=1; roundRect(8,ry,W-16,52,6); ctx.stroke();
-    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.25)';
+    const rec = note.recovered;
+    ctx.fillStyle=rec?'rgba(255,80,60,0.04)':'rgba(255,220,80,0.04)';
+    roundRect(8,ry,W-16,52,6); ctx.fill();
+    ctx.strokeStyle=rec?'rgba(255,80,60,0.18)':'rgba(255,220,80,0.1)';
+    ctx.lineWidth=1; roundRect(8,ry,W-16,52,6); ctx.stroke();
+    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right';
+    ctx.fillStyle=rec?'rgba(255,120,80,0.5)':'rgba(255,255,255,0.25)';
     ctx.fillText(note.time,W-16,ry+12);
-    ctx.textAlign='left'; ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,220,0.85)';
+    if (rec) {
+      ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left';
+      ctx.fillStyle='rgba(255,100,60,0.45)';
+      ctx.fillText('recovered',16,ry+12);
+    }
+    ctx.textAlign='left'; ctx.font='8px Arial Narrow, Arial, sans-serif';
+    ctx.fillStyle=rec?'rgba(255,200,180,0.65)':'rgba(255,255,220,0.85)';
     const lines=wrapText(note.body,W-40,'8px Arial Narrow, Arial, sans-serif');
     for (let li=0;li<Math.min(lines.length,3);li++) ctx.fillText(lines[li],16,ry+14+li*12);
     ry+=58;
@@ -1898,6 +2721,10 @@ function drawCalls() {
     ctx.fillText(entry.name,62,ry+16);
     ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
     ctx.fillText(entry.time,62,ry+30);
+    if (entry.note) {
+      ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(220,120,80,0.65)';
+      ctx.fillText(entry.note, 62 + ctx.measureText(entry.time).width + 6, ry+30);
+    }
     ry+=43;
   }
 
@@ -2239,13 +3066,19 @@ function drawEnd() {
   ctx.font='bold 10px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.72)';
   ctx.fillText(endingLine(),W/2,72);
 
-  // Relationship bars
+  // Relationship bars — show core cast always, extras once unlocked
   const rels=[
     { name:'Morgan',  r:rel.morgan  },
-    { name:'Alex',    r:rel.alex    },
+    { name:'Casey',   r:rel.casey   },
+    { name:'Sam',     r:rel.sam,    cond: timePhase>=PHASE.MORNING },
     { name:'Riley',   r:rel.riley   },
-    ...(timePhase>=PHASE.LATE ? [{ name:'???', r:rel.unknown }] : []),
-  ];
+    { name:'Alex',    r:rel.alex    },
+    { name:'Jordan',  r:rel.jordan  },
+    { name:'Taylor',  r:rel.taylor,  cond: timePhase>=PHASE.MORNING },
+    { name:'Drew',    r:rel.drew,    cond: timePhase>=PHASE.AFTERNOON },
+    { name:'Quinn',   r:rel.quinn,   cond: timePhase>=PHASE.AFTERNOON },
+    { name:'???',     r:rel.unknown, cond: timePhase>=PHASE.LATE },
+  ].filter(e => e.cond===undefined || e.cond);
   let ry=106;
   for (const {name,r} of rels) {
     ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
@@ -2286,18 +3119,20 @@ function drawEnd() {
 }
 
 function endingLine() {
-  // Post-twist endings
-  if (flags.has('phone_swap_meet'))     return "you went back.";
-  if (flags.has('phone_swap_confirmed')&&flags.has('phone_swap_arranged')) return "it wasn't your phone.";
-  if (flags.has('phone_denied'))        return "you lied to a stranger.";
-  if (flags.has('phone_ignored'))       return "you didn't answer. again.";
-  // Pre-twist endings
-  if (flags.has('eve_honest'))          return 'you said the true thing.';
-  if (flags.has('called_morgan_back'))  return 'you called.';
-  if (flags.has('morgan_aft_open')||flags.has('morgan_aft_warm_end')) return 'maybe that was enough.';
-  if (flags.has('morgan_final_silence')||flags.has('eve_silence'))    return 'you said nothing.';
-  if (flags.has('admitted_rileys'))     return "you were honest, eventually.";
-  return 'the phone is quiet now.';
+  if (flags.has('morgan_connection'))           return "you let someone in.";
+  if (flags.has('unknown_connection'))          return "a stranger saw you clearly.";
+  if (flags.has('casey_connection'))            return "someone who knew you told you who you were.";
+  if (flags.has('morgan_told_the_truth'))       return "you said the true thing.";
+  if (flags.has('called_morgan_back'))          return "you called.";
+  if (flags.has('riley_sees_you'))              return "someone saw you. you let them.";
+  if (flags.has('sam_real_talk_started'))       return "you left a door open with Sam.";
+  if (flags.has('jordan_accountable'))          return "you got an answer. maybe not the one you wanted.";
+  if (flags.has('morgan_connection_started'))   return "maybe that was enough.";
+  if (flags.has('riley_connection'))            return "you made something right.";
+  if (flags.has('sam_ghosted') && flags.has('casey_pushed_away')) return "you went quiet on everyone. it's a choice.";
+  if (flags.has('eve_silence') || flags.has('morgan_aft_ignored')) return "you said nothing. again.";
+  if (flags.has('admitted_blackout'))           return "at least you were honest about it.";
+  return "the phone is quiet now.";
 }
 
 function onClickEnd(mx, my) {
