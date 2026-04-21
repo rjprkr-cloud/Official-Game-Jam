@@ -106,13 +106,13 @@ const TRACKS = [
   { title:'Rain On Glass',           file:'music/Rain On Glass.mp3',           col:'#4878b0' },
 ];
 
-const musicState = { idx:-1, playing:false, audio:null, view:'list' };
+const musicState = { idx:-1, playing:false, audio:null, view:'list', volume:0.75, volDragging:false };
 
 function musicPlay(idx) {
   if (musicState.audio) { musicState.audio.pause(); musicState.audio.src=''; }
   musicState.idx = idx;
   const audio = new Audio(TRACKS[idx].file);
-  audio.volume = 0.75;
+  audio.volume = musicState.volume;
   audio.addEventListener('ended', ()=>musicPlay((idx+1)%TRACKS.length));
   audio.play().catch(()=>{});
   musicState.audio   = audio;
@@ -1095,47 +1095,67 @@ function canvasCoords(e) {
 }
 
 canvas.addEventListener('mousedown', e => {
-  if (screen !== SCR.LOCK) return;
   const [mx, my] = canvasCoords(e);
-  const tx = lockThumbCX(), cy = SLIDE_Y + SLIDE_H / 2;
-  if (Math.abs(mx - tx) <= SLIDE_TR + 8 && Math.abs(my - cy) <= SLIDE_H) {
-    lockSlide.dragging  = true;
-    lockSlide.snapBack  = false;
-    lockDragOriginX     = mx - lockSlide.progress * (SLIDE_W - SLIDE_TR * 2 - 4);
-    e.preventDefault();
+  if (screen === SCR.LOCK) {
+    const tx = lockThumbCX(), cy = SLIDE_Y + SLIDE_H / 2;
+    if (Math.abs(mx - tx) <= SLIDE_TR + 8 && Math.abs(my - cy) <= SLIDE_H) {
+      lockSlide.dragging  = true;
+      lockSlide.snapBack  = false;
+      lockDragOriginX     = mx - lockSlide.progress * (SLIDE_W - SLIDE_TR * 2 - 4);
+      e.preventDefault();
+    }
+  } else if (screen === SCR.MUSIC && musicState.view === 'player') {
+    const {x:vx,y:vy,w:vw}=musicVolRect();
+    if (my>=vy-10&&my<=vy+14&&mx>=vx-4&&mx<=vx+vw+4) {
+      musicState.volDragging = true; e.preventDefault();
+    }
   }
 });
 canvas.addEventListener('touchstart', e => {
-  if (screen !== SCR.LOCK) return;
   const [mx, my] = canvasCoords(e);
-  const tx = lockThumbCX(), cy = SLIDE_Y + SLIDE_H / 2;
-  if (Math.abs(mx - tx) <= SLIDE_TR + 12 && Math.abs(my - cy) <= SLIDE_H + 4) {
-    lockSlide.dragging  = true;
-    lockSlide.snapBack  = false;
-    lockDragOriginX     = mx - lockSlide.progress * (SLIDE_W - SLIDE_TR * 2 - 4);
-    e.preventDefault();
+  if (screen === SCR.LOCK) {
+    const tx = lockThumbCX(), cy = SLIDE_Y + SLIDE_H / 2;
+    if (Math.abs(mx - tx) <= SLIDE_TR + 12 && Math.abs(my - cy) <= SLIDE_H + 4) {
+      lockSlide.dragging  = true;
+      lockSlide.snapBack  = false;
+      lockDragOriginX     = mx - lockSlide.progress * (SLIDE_W - SLIDE_TR * 2 - 4);
+      e.preventDefault();
+    }
+  } else if (screen === SCR.MUSIC && musicState.view === 'player') {
+    const {x:vx,y:vy,w:vw}=musicVolRect();
+    if (my>=vy-10&&my<=vy+14&&mx>=vx-4&&mx<=vx+vw+4) {
+      musicState.volDragging = true; e.preventDefault();
+    }
   }
 }, { passive: false });
 
-function onSlideMove(mx) {
-  if (!lockSlide.dragging) return;
-  const raw = (mx - lockDragOriginX) / (SLIDE_W - SLIDE_TR * 2 - 4);
-  lockSlide.progress = Math.max(0, Math.min(1, raw));
-}
-function onSlideEnd() {
-  if (!lockSlide.dragging) return;
-  lockSlide.dragging = false;
-  if (lockSlide.progress >= 0.75) {
-    lockSlide.progress = 0;
-    screen = SCR.HOME;
-  } else {
-    lockSlide.snapBack = true;
+function onSlideMove(mx, my) {
+  if (lockSlide.dragging) {
+    const raw = (mx - lockDragOriginX) / (SLIDE_W - SLIDE_TR * 2 - 4);
+    lockSlide.progress = Math.max(0, Math.min(1, raw));
+  }
+  if (musicState.volDragging) {
+    const {x:vx,w:vw}=musicVolRect();
+    musicState.volume = Math.max(0, Math.min(1, (mx - vx) / vw));
+    if (musicState.audio) musicState.audio.volume = musicState.volume;
   }
 }
+function onSlideEnd() {
+  if (lockSlide.dragging) {
+    lockSlide.dragging = false;
+    if (lockSlide.progress >= 0.75) {
+      lockSlide.progress = 0;
+      screen = SCR.HOME;
+    } else {
+      lockSlide.snapBack = true;
+    }
+  }
+  musicState.volDragging = false;
+}
 
-window.addEventListener('mousemove',  e => onSlideMove(canvasCoords(e)[0]));
+window.addEventListener('mousemove',  e => { const [mx,my]=canvasCoords(e); onSlideMove(mx,my); });
 window.addEventListener('mouseup',    () => onSlideEnd());
-window.addEventListener('touchmove',  e => { onSlideMove(canvasCoords(e)[0]); e.preventDefault(); }, { passive: false });
+window.addEventListener('touchmove',  e => { const [mx,my]=canvasCoords(e); onSlideMove(mx,my); e.preventDefault(); }, { passive: false });
 window.addEventListener('touchend',   () => onSlideEnd());
 
 // ── Input ──────────────────────────────────────────────────────────
@@ -1936,6 +1956,15 @@ function drawCalls() {
 }
 
 // ── Music app ──────────────────────────────────────────────────────
+// Returns the volume slider track rect {x,y,w} for both draw and hit-test
+function musicVolRect() {
+  const artY = STATUS_H + 44, artS = 130;
+  const infoY = artY + artS + 16;
+  const progY = infoY + 24;
+  const ctrlY = progY + 28;
+  return { x:26, y:ctrlY + 52, w:W - 52 };
+}
+
 function drawMusic() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   if (musicState.view==='player' && musicState.idx>=0) drawMusicPlayer();
@@ -2056,7 +2085,32 @@ function drawMusicPlayer() {
   // Next
   ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='20px Arial Narrow, Arial, sans-serif';
   ctx.fillText('⏭',cx+52,ctrlY+16);
-  ctx.textAlign='left';
+
+  // ── Volume slider ──────────────────────────────────────────────────
+  const {x:vx, y:vy, w:vw} = musicVolRect();
+  const vol = musicState.volume;
+  const volFill = Math.round(vw * vol);
+  const btnR = 8, btnCY = vy + 2;
+
+  // Label + percentage
+  ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.textAlign='left';  ctx.fillText('VOLUME', vx, vy - 9);
+  ctx.textAlign='right'; ctx.fillText(Math.round(vol*100)+'%', vx+vw, vy - 9);
+
+  // Track (inactive)
+  ctx.fillStyle='rgba(255,255,255,0.10)';
+  roundRect(vx, vy, vw, 4, 2); ctx.fill();
+  // Track (filled)
+  if (volFill > 0) {
+    ctx.fillStyle = t.col;
+    roundRect(vx, vy, volFill, 4, 2); ctx.fill();
+  }
+  // Thumb
+  const thumbX = vx + volFill;
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = t.col; ctx.shadowBlur = 6;
+  ctx.beginPath(); ctx.arc(thumbX, btnCY, 5, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
 }
 
 function onClickMusic(mx,my) {
@@ -2099,6 +2153,12 @@ function onClickMusicPlayer(mx,my) {
   if (Math.hypot(mx-cx,my-(ctrlY+12))<=22) { musicToggle(); return; }
   // Next
   if (mx>=cx+32&&mx<=cx+68&&my>=ctrlY&&my<ctrlY+32) { musicSkip(1); return; }
+  // Volume — tap anywhere on the track area to set
+  const {x:vx,y:vy,w:vw}=musicVolRect();
+  if (my>=vy-10&&my<=vy+14&&mx>=vx&&mx<=vx+vw) {
+    musicState.volume=Math.max(0,Math.min(1,(mx-vx)/vw));
+    if (musicState.audio) musicState.audio.volume=musicState.volume;
+  }
 }
 
 // ── Settings ───────────────────────────────────────────────────────
