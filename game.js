@@ -32,12 +32,9 @@ function returnToLobby() {
   else window.location.href = target;
 }
 
-// ── Lobby confirm overlay ──────────────────────────────────────────
-let lobbyConfirm = false;
-
-// HTML power button — wired up after DOM is ready
-document.getElementById('power-btn')
-  .addEventListener('click', () => { lobbyConfirm = true; });
+// ── Power button ───────────────────────────────────────────────────
+// Physical side button on the right edge of the phone — returns to lobby.
+const PWR = { x:265, y:160, w:5, h:26 };   // logical canvas coordinates
 
 // ── Layout ─────────────────────────────────────────────────────────
 const STATUS_H  = 20;
@@ -1956,11 +1953,9 @@ canvas.addEventListener('click', e => {
 });
 
 function handleClick(mx, my) {
-  // Lobby confirm dialog — intercept all clicks while visible
-  if (lobbyConfirm) {
-    const dw=186, dh=82, dx=(W-dw)/2, dy=(H-dh)/2;
-    if (mx>=dx+12&&mx<=dx+88&&my>=dy+48&&my<=dy+70) { returnToLobby(); return; }
-    lobbyConfirm = false; return; // Stay or outside click dismisses
+  // Power button — right side of phone, works on every screen
+  if (mx >= PWR.x - 10 && my >= PWR.y - 10 && my <= PWR.y + PWR.h + 10) {
+    returnToLobby(); return;
   }
   if (screen===SCR.END) { onClickEnd(mx,my); return; }
   if (screen!==SCR.LOCK && screen!==SCR.HOME && my>=H-NAV_H) { goBack(); return; }
@@ -2141,37 +2136,23 @@ function draw() {
     drawBottomNav();
     if (notifToast&&screen===SCR.HOME) drawNotifToast();
   }
-  if (lobbyConfirm) drawLobbyConfirm();
+  drawPowerButton();
 }
 
-function drawLobbyConfirm() {
-  // Full-canvas dim
-  ctx.fillStyle='rgba(0,0,0,0.62)'; ctx.fillRect(0,0,W,H);
-  // Dialog card
-  const dw=186, dh=82, dx=(W-dw)/2, dy=(H-dh)/2;
-  ctx.fillStyle='#18082e';
-  roundRect(dx,dy,dw,dh,10); ctx.fill();
-  ctx.strokeStyle='rgba(110,60,175,0.7)'; ctx.lineWidth=1;
-  roundRect(dx,dy,dw,dh,10); ctx.stroke();
-  // Title
-  ctx.font='bold 10px Arial Narrow, Arial, sans-serif';
-  ctx.textAlign='center'; ctx.fillStyle='#f0eeff';
-  ctx.fillText('Return to lobby?', W/2, dy+21);
-  // Subtitle
-  ctx.font='7px Arial Narrow, Arial, sans-serif';
-  ctx.fillStyle='rgba(200,180,255,0.38)';
-  ctx.fillText("progress won't be saved", W/2, dy+36);
-  // Leave button
-  ctx.fillStyle='rgba(110,55,180,0.85)';
-  roundRect(dx+12, dy+48, 76, 22, 5); ctx.fill();
-  ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
-  ctx.fillText('Leave', dx+12+38, dy+63);
-  // Stay button
-  ctx.fillStyle='rgba(255,255,255,0.07)';
-  roundRect(dx+98, dy+48, 76, 22, 5); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,0.6)';
-  ctx.fillText('Stay', dx+98+38, dy+63);
-  ctx.textAlign='left';
+function drawPowerButton() {
+  const {x,y,w,h} = PWR;
+  // Drop shadow (offset right+down)
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  roundRect(x+1,y+1,w,h,2); ctx.fill();
+  // Button body
+  ctx.fillStyle='#120820';
+  roundRect(x,y,w,h,2); ctx.fill();
+  // Left-edge highlight to look raised
+  ctx.fillStyle='rgba(255,255,255,0.09)';
+  ctx.fillRect(x,y+3,1,h-6);
+  // Border
+  ctx.strokeStyle='rgba(100,55,160,0.65)'; ctx.lineWidth=0.5;
+  roundRect(x,y,w,h,2); ctx.stroke();
 }
 
 // ── Status bar ─────────────────────────────────────────────────────
