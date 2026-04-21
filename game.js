@@ -1714,8 +1714,15 @@ let typingTimer     = 0;
 let typingNextNode  = null;
 
 // Thread scroll state
-let threadScrollY = 0;                          // pixels scrolled up from bottom
-const threadDrag  = { active:false, startY:0, startScroll:0, totalDelta:0 };
+let threadScrollY  = 0;    // pixels scrolled up from bottom (0 = most recent visible)
+let msgListScrollY = 0;    // pixels scrolled down in the message list (0 = top)
+const threadDrag   = { active:false, startY:0, startScroll:0, totalDelta:0, screen:'' };
+
+function msgListMaxScroll() {
+  const rowH = 56, headerH = STATUS_H + 36, navH = NAV_H;
+  const contentH = Object.keys(threads).length * rowH;
+  return Math.max(0, contentH - (H - headerH - navH));
+}
 
 function openThread(key) {
   activeThreadKey = key;
@@ -1852,8 +1859,15 @@ canvas.addEventListener('mousedown', e => {
     }
   } else if (screen === SCR.THREAD && my < threadContentBottom()) {
     threadDrag.active      = true;
+    threadDrag.screen      = SCR.THREAD;
     threadDrag.startY      = my;
     threadDrag.startScroll = threadScrollY;
+    threadDrag.totalDelta  = 0;
+  } else if (screen === SCR.MESSAGES) {
+    threadDrag.active      = true;
+    threadDrag.screen      = SCR.MESSAGES;
+    threadDrag.startY      = my;
+    threadDrag.startScroll = msgListScrollY;
     threadDrag.totalDelta  = 0;
   }
 });
@@ -1874,8 +1888,15 @@ canvas.addEventListener('touchstart', e => {
     }
   } else if (screen === SCR.THREAD && my < threadContentBottom()) {
     threadDrag.active      = true;
+    threadDrag.screen      = SCR.THREAD;
     threadDrag.startY      = my;
     threadDrag.startScroll = threadScrollY;
+    threadDrag.totalDelta  = 0;
+  } else if (screen === SCR.MESSAGES) {
+    threadDrag.active      = true;
+    threadDrag.screen      = SCR.MESSAGES;
+    threadDrag.startY      = my;
+    threadDrag.startScroll = msgListScrollY;
     threadDrag.totalDelta  = 0;
   }
 }, { passive: false });
@@ -1891,9 +1912,15 @@ function onSlideMove(mx, my) {
     if (musicState.audio) musicState.audio.volume = musicState.volume;
   }
   if (threadDrag.active) {
-    const dy = threadDrag.startY - my;          // drag finger up → dy positive → scroll up
+    const dy = threadDrag.startY - my;
     threadDrag.totalDelta = Math.abs(dy);
-    threadScrollY = Math.max(0, threadDrag.startScroll + dy);
+    if (threadDrag.screen === SCR.MESSAGES) {
+      // Drag up (dy > 0) → scroll list down to see more contacts
+      msgListScrollY = Math.max(0, Math.min(msgListMaxScroll(), threadDrag.startScroll + dy));
+    } else {
+      // Thread: drag up → show older messages
+      threadScrollY = Math.max(0, threadDrag.startScroll + dy);
+    }
   }
 }
 function onSlideEnd() {
@@ -1914,6 +1941,17 @@ window.addEventListener('mousemove',  e => { const [mx,my]=canvasCoords(e); onSl
 window.addEventListener('mouseup',    () => onSlideEnd());
 window.addEventListener('touchmove',  e => { const [mx,my]=canvasCoords(e); onSlideMove(mx,my); e.preventDefault(); }, { passive: false });
 window.addEventListener('touchend',   () => onSlideEnd());
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY;
+  if (screen === SCR.THREAD) {
+    // Scroll up (deltaY < 0) → increase threadScrollY to reveal older messages
+    threadScrollY = Math.max(0, threadScrollY - delta * 0.6);
+  } else if (screen === SCR.MESSAGES) {
+    msgListScrollY = Math.max(0, Math.min(msgListMaxScroll(), msgListScrollY + delta * 0.6));
+  }
+}, { passive: false });
 
 // ── Input ──────────────────────────────────────────────────────────
 canvas.addEventListener('click', e => {
@@ -1958,7 +1996,7 @@ function onClickHome(mx,my) {
   for (const app of APP_GRID) {
     if (mx>=app.x && mx<=app.x+APP_SZ && my>=app.y && my<=app.y+APP_SZ+14) {
       switch(app.id) {
-        case 'messages': screen=SCR.MESSAGES; break;
+        case 'messages': screen=SCR.MESSAGES; msgListScrollY=0; break;
         case 'notes':    screen=SCR.NOTES;    break;
         case 'photos':   screen=SCR.PHOTOS; photoZoom=false; break;
         case 'calls':    screen=SCR.CALLS; callsVoicemailOpen=false; break;
@@ -1971,7 +2009,8 @@ function onClickHome(mx,my) {
 }
 
 function onClickMessages(mx,my) {
-  let ry=CONTENT_Y+36;
+  if (threadDrag.totalDelta > 8) { threadDrag.totalDelta = 0; return; }
+  let ry = CONTENT_Y + 36 - msgListScrollY;
   for (const key of Object.keys(threads)) {
     if (my>=ry && my<ry+56) { openThread(key); return; }
     ry+=56;
@@ -2473,8 +2512,12 @@ function drawAppIcon(app) {
 function drawMsgList() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Messages');
-  let ry=STATUS_H+36;
+  const listTop = STATUS_H+36, listBot = H - NAV_H;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, listTop, W, listBot - listTop); ctx.clip();
+  let ry = listTop - msgListScrollY;
   for (const [key,t] of Object.entries(threads)) { drawThreadRow(key,t,ry); ry+=56; }
+  ctx.restore();
 }
 
 function drawThreadRow(key,t,y) {
