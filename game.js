@@ -720,24 +720,24 @@ const threads = {
 // Each fires once when: correct phase, delay elapsed, condition met, thread free.
 const ambientSeeds = [
   // — Morning —
-  { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_mc',       delay:5,  fired:false, cond:()=>true },
-  { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_coffee',   delay:18, fired:false, cond:()=>!flags.has('morgan_silence')&&!flags.has('morgan_mc_ignored') },
-  { phase:PHASE.MORNING,   thread:'alex',   node:'alex_mutual',     delay:8,  fired:false, cond:()=>!flags.has('alex_ignored') },
-  { phase:PHASE.MORNING,   thread:'alex',   node:'alex_recap',      delay:25, fired:false, cond:()=>true },
-  { phase:PHASE.MORNING,   thread:'riley',  node:'riley_photo',     delay:12, fired:false, cond:()=>!flags.has('riley_ignored') },
+  { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_mc',       delay:10,  fired:false, cond:()=>true },
+  { phase:PHASE.MORNING,   thread:'alex',   node:'alex_mutual',     delay:30,  fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.MORNING,   thread:'riley',  node:'riley_photo',     delay:55,  fired:false, cond:()=>!flags.has('riley_ignored') },
+  { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_coffee',   delay:85,  fired:false, cond:()=>!flags.has('morgan_silence')&&!flags.has('morgan_mc_ignored') },
+  { phase:PHASE.MORNING,   thread:'alex',   node:'alex_recap',      delay:120, fired:false, cond:()=>true },
   // — Afternoon —
-  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_jacket',    delay:6,  fired:false, cond:()=>!flags.has('riley_ignored') },
-  { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_mundane',  delay:14, fired:false, cond:()=>!flags.has('morgan_final_silence') },
-  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_hangout',    delay:20, fired:false, cond:()=>!flags.has('alex_ignored')&&!flags.has('alex_left_hanging') },
-  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_aft_check', delay:28, fired:false, cond:()=>true },
-  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_drama',      delay:38, fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_jacket',    delay:15,  fired:false, cond:()=>!flags.has('riley_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_mundane',  delay:45,  fired:false, cond:()=>!flags.has('morgan_final_silence') },
+  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_hangout',    delay:80,  fired:false, cond:()=>!flags.has('alex_ignored')&&!flags.has('alex_left_hanging') },
+  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_aft_check', delay:120, fired:false, cond:()=>true },
+  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_drama',      delay:165, fired:false, cond:()=>!flags.has('alex_ignored') },
   // — Evening —
-  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_jacket',    delay:0,  fired:false, cond:()=>!flags.has('jacket_located')&&!flags.has('riley_ignored') },
-  { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_song', delay:8,  fired:false, cond:()=>rel.morgan.trust>=35&&!flags.has('morgan_final_silence') },
-  { phase:PHASE.EVENING,   thread:'alex',   node:'alex_eve_check',  delay:12, fired:false, cond:()=>!flags.has('alex_ignored') },
-  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_eve',       delay:18, fired:false, cond:()=>rel.riley.trust>=45 },
-  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_music',     delay:30, fired:false, cond:()=>!flags.has('riley_ignored') },
-  { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_stars',delay:38, fired:false, cond:()=>!flags.has('morgan_final_silence') },
+  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_jacket',    delay:10,  fired:false, cond:()=>!flags.has('jacket_located')&&!flags.has('riley_ignored') },
+  { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_song', delay:40,  fired:false, cond:()=>rel.morgan.trust>=35&&!flags.has('morgan_final_silence') },
+  { phase:PHASE.EVENING,   thread:'alex',   node:'alex_eve_check',  delay:75,  fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_eve',       delay:115, fired:false, cond:()=>rel.riley.trust>=45 },
+  { phase:PHASE.EVENING,   thread:'riley',  node:'riley_music',     delay:160, fired:false, cond:()=>!flags.has('riley_ignored') },
+  { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_stars',delay:210, fired:false, cond:()=>!flags.has('morgan_final_silence') },
 ];
 
 function tickAmbientSeeds() {
