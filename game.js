@@ -1498,24 +1498,32 @@ const threads = {
 // ── Ambient interactions ───────────────────────────────────────────
 // Each fires once when: correct phase, delay elapsed, condition met, thread free.
 const ambientSeeds = [
-  // — Morning —
-  // — Morning —
-  { phase:PHASE.MORNING, thread:'morgan', node:'morgan_am1',    delay:25,  fired:false, cond:()=>!flags.has('morgan_am_closed') },
-  { phase:PHASE.MORNING, thread:'riley',  node:'riley_am1',     delay:50,  fired:false, cond:()=>!flags.has('riley_ignored') },
-  // — Afternoon —
-  { phase:PHASE.AFTERNOON, thread:'jordan', node:'jordan_pm1',  delay:20,  fired:false, cond:()=>!flags.has('jordan_ignored') },
-  { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_pm1',  delay:55,  fired:false, cond:()=>!flags.has('morgan_am_closed') },
-  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_pm1',    delay:100, fired:false, cond:()=>!flags.has('alex_ignored') },
-  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_pm1',   delay:145, fired:false, cond:()=>!flags.has('riley_ignored') },
-  // — Afternoon continued —
-  { phase:PHASE.AFTERNOON, thread:'taylor', node:'taylor_pm1',  delay:120, fired:false, cond:()=>flags.has('taylor_trustworthy')&&!flags.has('taylor_ignored') },
-  { phase:PHASE.AFTERNOON, thread:'casey',  node:'casey_pm1',   delay:80,  fired:false, cond:()=>(flags.has('casey_real_talk')||flags.has('casey_connection'))&&!flags.has('casey_ignored') },
-  // — Evening —
-  { phase:PHASE.EVENING, thread:'riley',  node:'riley_eve',      delay:20,  fired:false, cond:()=>rel.riley.trust>=45&&!flags.has('riley_ignored') },
-  { phase:PHASE.EVENING, thread:'alex',   node:'alex_eve1',      delay:60,  fired:false, cond:()=>!flags.has('alex_ignored') },
-  { phase:PHASE.EVENING, thread:'jordan', node:'jordan_eve1',    delay:100, fired:false, cond:()=>!flags.has('jordan_ignored') },
-  { phase:PHASE.EVENING, thread:'sam',    node:'sam_eve1',       delay:45,  fired:false, cond:()=>flags.has('sam_real_talk_started')&&!flags.has('sam_ghosted') },
-  { phase:PHASE.EVENING, thread:'morgan', node:'morgan_eve_soft',delay:180, fired:false, cond:()=>!flags.has('morgan_connection')&&!flags.has('eve_silence') },
+  // ── Morning: initial texts (staggered so they don't all land at once) ──
+  { phase:PHASE.MORNING, thread:'riley',  node:'riley_0',  delay:8,   fired:false, cond:()=>true },
+  { phase:PHASE.MORNING, thread:'alex',   node:'alex_0',   delay:25,  fired:false, cond:()=>true },
+  { phase:PHASE.MORNING, thread:'sam',    node:'sam_0',    delay:48,  fired:false, cond:()=>true },
+  { phase:PHASE.MORNING, thread:'jordan', node:'jordan_0', delay:75,  fired:false, cond:()=>true },
+  { phase:PHASE.MORNING, thread:'taylor', node:'taylor_0', delay:115, fired:false, cond:()=>true },
+  // ── Morning: follow-ups ──
+  { phase:PHASE.MORNING, thread:'morgan', node:'morgan_am1', delay:35,  fired:false, cond:()=>!flags.has('morgan_am_closed') },
+  { phase:PHASE.MORNING, thread:'riley',  node:'riley_am1',  delay:90,  fired:false, cond:()=>!flags.has('riley_ignored') },
+  // ── Afternoon: initial texts ──
+  { phase:PHASE.AFTERNOON, thread:'morgan', nodeFunc:()=>getMorganAftNode(), delay:15,  fired:false, cond:()=>!!getMorganAftNode() },
+  { phase:PHASE.AFTERNOON, thread:'drew',   node:'drew_0',                   delay:38,  fired:false, cond:()=>true },
+  { phase:PHASE.AFTERNOON, thread:'quinn',  node:'quinn_0',                  delay:72,  fired:false, cond:()=>true },
+  // ── Afternoon: follow-ups ──
+  { phase:PHASE.AFTERNOON, thread:'jordan', node:'jordan_pm1', delay:30,  fired:false, cond:()=>!flags.has('jordan_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_pm1', delay:90,  fired:false, cond:()=>!flags.has('morgan_am_closed') },
+  { phase:PHASE.AFTERNOON, thread:'casey',  node:'casey_pm1',  delay:110, fired:false, cond:()=>(flags.has('casey_real_talk')||flags.has('casey_connection'))&&!flags.has('casey_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'taylor', node:'taylor_pm1', delay:140, fired:false, cond:()=>flags.has('taylor_trustworthy')&&!flags.has('taylor_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_pm1',   delay:165, fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_pm1',  delay:195, fired:false, cond:()=>!flags.has('riley_ignored') },
+  // ── Evening: initial + follow-ups ──
+  { phase:PHASE.EVENING, thread:'morgan', nodeFunc:()=>getMorganEveNode(), delay:20,  fired:false, cond:()=>!!getMorganEveNode() },
+  { phase:PHASE.EVENING, thread:'riley',  node:'riley_eve',                 delay:55,  fired:false, cond:()=>rel.riley.trust>=45&&!flags.has('riley_ignored') },
+  { phase:PHASE.EVENING, thread:'sam',    node:'sam_eve1',                  delay:80,  fired:false, cond:()=>flags.has('sam_real_talk_started')&&!flags.has('sam_ghosted') },
+  { phase:PHASE.EVENING, thread:'alex',   node:'alex_eve1',                 delay:110, fired:false, cond:()=>!flags.has('alex_ignored') },
+  { phase:PHASE.EVENING, thread:'jordan', node:'jordan_eve1',               delay:150, fired:false, cond:()=>!flags.has('jordan_ignored') },
 ];
 
 function tickAmbientSeeds() {
@@ -1529,9 +1537,11 @@ function tickAmbientSeeds() {
     if (!t) { seed.fired = true; continue; }
     if (t.scriptNode !== null) continue; // thread busy — wait
     seed.fired = true;
-    const node = SCRIPT[seed.node];
+    const nodeId = seed.nodeFunc ? seed.nodeFunc() : seed.node;
+    if (!nodeId) continue;
+    const node = SCRIPT[nodeId];
     if (!node) continue;
-    t.scriptNode = seed.node;
+    t.scriptNode = nodeId;
     if (node.incoming) {
       t.messages.push({ from:'them', text:node.incoming.text, time:node.incoming.time||clockStr(), read:false });
       t.unread++;
@@ -1555,48 +1565,14 @@ function seedMorning() {
   timePhase = PHASE.MORNING;
   phaseStartTime = totalTime;
 
-  // Alex thread — heard you were pretty gone
-  threads.alex = { contact:'alex', messages:[...(HISTORY.alex||[])], unread:0, scriptNode:'alex_0' };
-  const aNode = SCRIPT['alex_0'];
-  if (aNode?.incoming) {
-    threads.alex.messages.push({ from:'them', text:aNode.incoming.text, time:aNode.incoming.time, read:false });
-    threads.alex.unread = 1;
-  }
-
-  // Riley thread — just wanted to make sure we're good
-  threads.riley = { contact:'riley', messages:[...(HISTORY.riley||[])], unread:0, scriptNode:'riley_0' };
-  const rNode = SCRIPT['riley_0'];
-  if (rNode?.incoming) {
-    threads.riley.messages.push({ from:'them', text:rNode.incoming.text, time:rNode.incoming.time, read:false });
-    threads.riley.unread = 1;
-  }
-
-  // Jordan thread — last night was actually insane
-  threads.jordan = { contact:'jordan', messages:[...(HISTORY.jordan||[])], unread:0, scriptNode:'jordan_0' };
-  const jNode = SCRIPT['jordan_0'];
-  if (jNode?.incoming) {
-    threads.jordan.messages.push({ from:'them', text:jNode.incoming.text, time:jNode.incoming.time, read:false });
-    threads.jordan.unread = 1;
-  }
-
-  // Sam thread — hostile morning text
-  threads.sam = { contact:'sam', messages:[...(HISTORY.sam||[])], unread:0, scriptNode:'sam_0' };
-  const sNode = SCRIPT['sam_0'];
-  if (sNode?.incoming) {
-    threads.sam.messages.push({ from:'them', text:sNode.incoming.text, time:sNode.incoming.time, read:false });
-    threads.sam.unread = 1;
-  }
-
-  // Taylor thread — camera person, offers footage
-  threads.taylor = { contact:'taylor', messages:[...(HISTORY.taylor||[])], unread:0, scriptNode:'taylor_0' };
-  const tNode = SCRIPT['taylor_0'];
-  if (tNode?.incoming) {
-    threads.taylor.messages.push({ from:'them', text:tNode.incoming.text, time:tNode.incoming.time, read:false });
-    threads.taylor.unread = 1;
-  }
+  // Create threads empty — ambient seeds will deliver the first message at staggered times
+  threads.riley  = { contact:'riley',  messages:[...(HISTORY.riley||[])],  unread:0, scriptNode:null };
+  threads.alex   = { contact:'alex',   messages:[...(HISTORY.alex||[])],   unread:0, scriptNode:null };
+  threads.sam    = { contact:'sam',    messages:[...(HISTORY.sam||[])],    unread:0, scriptNode:null };
+  threads.jordan = { contact:'jordan', messages:[...(HISTORY.jordan||[])], unread:0, scriptNode:null };
+  threads.taylor = { contact:'taylor', messages:[...(HISTORY.taylor||[])], unread:0, scriptNode:null };
 
   notes.push({ time:'8:47 AM', body:morningNoteBody() });
-  pushNotif('Alex', "hey you ok? you were pretty gone last night lol");
 }
 
 function morningNoteBody() {
@@ -1616,35 +1592,12 @@ function seedAfternoon() {
   timePhase = PHASE.AFTERNOON;
   phaseStartTime = totalTime;
 
-  // Advance Morgan to afternoon conversation
-  const maftId = getMorganAftNode();
-  threads.morgan.scriptNode = maftId;
-  const maftNode = SCRIPT[maftId];
-  if (maftNode?.incoming) {
-    threads.morgan.messages.push({ from:'them', text:maftNode.incoming.text, time:maftNode.incoming.time, read:false });
-    threads.morgan.unread += 1;
-  }
-
-  // Drew thread — left early, most reliable timeline witness
-  threads.drew = { contact:'drew', messages:[...(HISTORY.drew||[])], unread:0, scriptNode:'drew_0' };
-  const drNode = SCRIPT['drew_0'];
-  if (drNode?.incoming) {
-    threads.drew.messages.push({ from:'them', text:drNode.incoming.text, time:drNode.incoming.time, read:false });
-    threads.drew.unread = 1;
-  }
-
-  // Quinn thread — friend-of-a-friend, blunt outsider view (fires a bit later)
-  threads.quinn = { contact:'quinn', messages:[...(HISTORY.quinn||[])], unread:0, scriptNode:'quinn_0' };
-  const quNode = SCRIPT['quinn_0'];
-  if (quNode?.incoming) {
-    threads.quinn.messages.push({ from:'them', text:quNode.incoming.text, time:quNode.incoming.time, read:false });
-    threads.quinn.unread = 1;
-  }
+  // Create threads empty — ambient seeds stagger the first messages
+  threads.drew  = { contact:'drew',  messages:[...(HISTORY.drew||[])],  unread:0, scriptNode:null };
+  threads.quinn = { contact:'quinn', messages:[...(HISTORY.quinn||[])], unread:0, scriptNode:null };
 
   // Drunk note — written at 2am, only discovered now
   notes.push({ time:'2:14 AM', body:"wrote this around 2am apparently. can't tell if I was trying to remember or trying to forget.", recovered:true });
-
-  pushNotif('Morgan', maftNode?.incoming?.text || 'hey');
 }
 
 function getMorganAftNode() {
@@ -1662,17 +1615,7 @@ function seedEvening() {
   phaseStartTime = totalTime;
 
   notes.push({ time:'7:22 PM', body:eveningNoteBody() });
-
-  const eveId = getMorganEveNode();
-  if (eveId) {
-    threads.morgan.scriptNode = eveId;
-    const eNode = SCRIPT[eveId];
-    if (eNode?.incoming) {
-      threads.morgan.messages.push({ from:'them', text:eNode.incoming.text, time:eNode.incoming.time, read:false });
-      threads.morgan.unread += 1;
-    }
-    pushNotif('Morgan', eNode?.incoming?.text || '');
-  }
+  // Morgan evening message delivered by ambient seed at delay:20
 }
 
 function getMorganEveNode() {
