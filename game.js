@@ -11,6 +11,43 @@ canvas.height = 480;
 const W = canvas.width, H = canvas.height;
 ctx.imageSmoothingEnabled = false;
 
+// ── Contact photo sprite sheet ────────────────────────────────────
+// contacts.jpg is a 3×3 grid: Morgan/Alex/Riley · Casey/Taylor/Quinn · Drew/Jordan/Sam
+const CONTACTS_GRID = {
+  morgan:[0,0], alex:[1,0], riley:[2,0],
+  casey:[0,1],  taylor:[1,1], quinn:[2,1],
+  drew:[0,2],   jordan:[1,2], sam:[2,2],
+};
+const contactsImg = new Image();
+contactsImg.src = 'contacts.jpg';
+
+function drawContactPhoto(key, cx, cy, radius) {
+  const pos = CONTACTS_GRID[key];
+  const r   = rel[key];
+  if (pos && contactsImg.complete && contactsImg.naturalWidth) {
+    const cw = contactsImg.naturalWidth  / 3;
+    const ch = contactsImg.naturalHeight / 3;
+    const [col, row] = pos;
+    const cropH    = ch * 0.83;           // skip bottom ~17% where name labels are
+    const cropSize = Math.min(cw, cropH);
+    const sx = col * cw + (cw - cropSize) / 2;
+    const sy = row * ch;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(contactsImg, sx, sy, cropSize, cropSize,
+                  cx - radius, cy - radius, radius * 2, radius * 2);
+    ctx.restore();
+  } else {
+    // Fallback: coloured initial circle
+    ctx.fillStyle = r?.color || '#555';
+    ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+    const fs = Math.max(6, Math.round(radius * 0.75));
+    ctx.font = `bold ${fs}px Arial Narrow, Arial, sans-serif`;
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+    ctx.fillText((r?.name || key)[0].toUpperCase(), cx, cy + Math.round(fs * 0.35));
+    ctx.textAlign = 'left';
+  }
+}
 
 // ── Portal ─────────────────────────────────────────────────────────
 const portal = (typeof Portal !== 'undefined')
@@ -2332,7 +2369,7 @@ function drawLock() {
   let cy=170;
   for (const t of Object.values(threads).filter(t=>t.unread>0).slice(0,3)) {
     const msg=t.messages.findLast(m=>!m.read)||t.messages[t.messages.length-1];
-    drawLockCard(8,cy,W-16,rel[t.contact]?.name||t.contact,msg?.text||''); cy+=62;
+    drawLockCard(8,cy,W-16,t.contact,rel[t.contact]?.name||t.contact,msg?.text||''); cy+=62;
   }
   drawLockSlider();
 }
@@ -2375,12 +2412,10 @@ function drawLockSlider() {
   ctx.textAlign = 'left';
 }
 
-function drawLockCard(x,y,w,sender,preview) {
+function drawLockCard(x,y,w,contactKey,sender,preview) {
   ctx.fillStyle='rgba(255,255,255,0.09)'; roundRect(x,y,w,50,10); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.13)'; ctx.lineWidth=1; roundRect(x,y,w,50,10); ctx.stroke();
-  ctx.fillStyle='#3c8c4a'; roundRect(x+8,y+9,28,28,6); ctx.fill();
-  ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('💬',x+22,y+28);
-  ctx.textAlign='left';
+  drawContactPhoto(contactKey, x+22, y+23, 13);
   ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.fillText(sender,x+44,y+20);
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.58)';
   ctx.fillText(preview.length>28?preview.slice(0,27)+'…':preview,x+44,y+34);
@@ -2482,10 +2517,7 @@ function drawThreadRow(key,t,y) {
   ctx.fillStyle=t.unread>0?'rgba(60,140,74,0.07)':'rgba(255,255,255,0.02)';
   ctx.fillRect(0,y,W,55);
   ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(52,y+54,W-52,1);
-  ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(28,y+27,18,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-  ctx.fillText((r?.name||key)[0].toUpperCase(),28,y+32);
-  ctx.textAlign='left';
+  drawContactPhoto(key, 28, y+27, 18);
   ctx.font=t.unread>0?'bold 9px Arial Narrow, Arial, sans-serif':'9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
   ctx.fillText(r?.name||key,54,y+18);
   ctx.font='8px Arial Narrow, Arial, sans-serif';
@@ -2508,9 +2540,7 @@ function drawThread() {
   ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,34);
   ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(0,STATUS_H+33,W,1);
   ctx.font='11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('‹',8,STATUS_H+22);
-  ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(W/2,STATUS_H+11,9,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-  ctx.fillText((r?.name||activeThreadKey)[0].toUpperCase(),W/2,STATUS_H+14);
+  drawContactPhoto(activeThreadKey, W/2, STATUS_H+11, 9);
   ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
   ctx.fillText(r?.name||activeThreadKey,W/2,STATUS_H+30);
   ctx.textAlign='left';
@@ -2737,10 +2767,7 @@ function drawCalls() {
     ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(14,ry+41,W-14,1);
 
     // Avatar
-    const r=rel[entry.key];
-    ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(28,ry+21,14,0,Math.PI*2); ctx.fill();
-    ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-    ctx.fillText(entry.name[0],28,ry+25);
+    drawContactPhoto(entry.key, 28, ry+21, 14);
 
     // Type icon + name
     ctx.textAlign='left';
@@ -2773,9 +2800,7 @@ function drawCalls() {
   roundRect(8,ry,W-16,callsVoicemailOpen?72:34,6); ctx.stroke();
 
   // VM header row
-  ctx.fillStyle=rel.morgan.color; ctx.beginPath(); ctx.arc(26,ry+17,10,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff'; ctx.fillText('M',26,ry+21);
-  ctx.textAlign='left';
+  drawContactPhoto('morgan', 26, ry+17, 10);
   ctx.font=vm.listened?'9px Arial Narrow, Arial, sans-serif':'bold 9px Arial Narrow, Arial, sans-serif';
   ctx.fillStyle=vm.listened?'#aaa':'#fff'; ctx.fillText('Morgan',44,ry+13);
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
@@ -3047,9 +3072,7 @@ function drawCallOverlay() {
   // Full-screen dark overlay
   ctx.fillStyle='rgba(10,8,20,0.96)'; ctx.fillRect(0,0,W,H);
   // Avatar
-  ctx.fillStyle=rel.morgan.color; ctx.beginPath(); ctx.arc(W/2,100,28,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 18px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-  ctx.fillText('M',W/2,108);
+  drawContactPhoto('morgan', W/2, 100, 28);
   ctx.font='bold 11px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.fillText('Morgan',W/2,148);
 
   if (callBack.state==='calling') {
