@@ -2518,15 +2518,16 @@ function drawThreadRow(key,t,y) {
   ctx.fillRect(0,y,W,55);
   ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(52,y+54,W-52,1);
   drawContactPhoto(key, 28, y+27, 18);
+  ctx.textAlign='left';
   ctx.font=t.unread>0?'bold 9px Arial Narrow, Arial, sans-serif':'9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
-  ctx.fillText(r?.name||key,54,y+18);
+  ctx.fillText(r?.name||key,54,y+22);
   ctx.font='8px Arial Narrow, Arial, sans-serif';
   ctx.fillStyle=t.unread>0?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.38)';
   const prev=last?(last.from==='me'?'You: '+last.text:last.text):'';
-  ctx.fillText(prev.length>26?prev.slice(0,25)+'…':prev,54,y+34);
+  ctx.fillText(prev.length>26?prev.slice(0,25)+'…':prev,54,y+37);
   if (last) {
     ctx.textAlign='right'; ctx.font='6px Arial Narrow, Arial, sans-serif';
-    ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillText(last.time,W-10,y+18); ctx.textAlign='left';
+    ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillText(last.time,W-10,y+22); ctx.textAlign='left';
   }
   if (t.unread>0) { ctx.fillStyle='#3c8c4a'; ctx.beginPath(); ctx.arc(W-13,y+33,5,0,Math.PI*2); ctx.fill(); }
 }
