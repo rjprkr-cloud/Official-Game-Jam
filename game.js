@@ -2416,15 +2416,19 @@ function drawLockSlider() {
 function drawLockCard(x,y,w,contactKey,sender,preview) {
   ctx.fillStyle='rgba(255,255,255,0.09)'; roundRect(x,y,w,50,10); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.13)'; ctx.lineWidth=1; roundRect(x,y,w,50,10); ctx.stroke();
-  // Avatar centred vertically in the card (card is 50px tall → centre y+25)
+  // Card centre is y+25. Avatar sits on that centre line.
   drawContactPhoto(contactKey, x+22, y+25, 13);
-  // Name and preview bracketing the card centre
+  // Use textBaseline='middle' so y coords ARE the visual centres — no baseline guesswork.
+  // Two lines tight around centre: name at y+19, preview at y+31 (6px either side).
+  ctx.save();
+  ctx.textBaseline = 'middle';
   ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
-  ctx.fillText(sender, x+44, y+22);
+  ctx.fillText(sender, x+44, y+19);
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.58)';
-  ctx.fillText(preview.length>28?preview.slice(0,27)+'…':preview, x+44, y+36);
+  ctx.fillText(preview.length>28?preview.slice(0,27)+'…':preview, x+44, y+31);
   ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.28)';
-  ctx.textAlign='right'; ctx.fillText('now',x+w-8,y+22); ctx.textAlign='left';
+  ctx.textAlign='right'; ctx.fillText('now', x+w-8, y+19); ctx.textAlign='left';
+  ctx.restore();
 }
 
 // ── Home screen ────────────────────────────────────────────────────
