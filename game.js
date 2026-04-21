@@ -1441,8 +1441,19 @@ const HISTORY = {
 };
 
 // ── Threads ────────────────────────────────────────────────────────
+// All contacts pre-created with history so the message list is populated from
+// the very start. Ambient seeds and seedMorning/Afternoon deliver new messages
+// at the right phase — they won't overwrite existing threads.
 const threads = {
   morgan: { contact:'morgan', messages:[...(HISTORY.morgan||[])], unread:0, scriptNode:'morgan_0' },
+  casey:  { contact:'casey',  messages:[...(HISTORY.casey||[])],  unread:0, scriptNode:null },
+  riley:  { contact:'riley',  messages:[...(HISTORY.riley||[])],  unread:0, scriptNode:null },
+  alex:   { contact:'alex',   messages:[...(HISTORY.alex||[])],   unread:0, scriptNode:null },
+  sam:    { contact:'sam',    messages:[...(HISTORY.sam||[])],    unread:0, scriptNode:null },
+  jordan: { contact:'jordan', messages:[...(HISTORY.jordan||[])], unread:0, scriptNode:null },
+  taylor: { contact:'taylor', messages:[...(HISTORY.taylor||[])], unread:0, scriptNode:null },
+  drew:   { contact:'drew',   messages:[...(HISTORY.drew||[])],   unread:0, scriptNode:null },
+  quinn:  { contact:'quinn',  messages:[...(HISTORY.quinn||[])],  unread:0, scriptNode:null },
 };
 
 (function seedNight() {
@@ -1461,8 +1472,7 @@ const threads = {
   }
   threads.morgan.unread = 3;
 
-  // Casey — full spam run, player sent 8 messages to someone who wasn't even at the party
-  threads.casey = { contact:'casey', messages:[...(HISTORY.casey||[])], unread:0, scriptNode:'casey_0' };
+  // Casey — push the drunk spam into the already-created thread
   threads.casey.messages.push(
     { from:'me', text:"hey are you still up",                                                                       time:'12:52 AM', read:true },
     { from:'me', text:"casey I've been thinking about this for a while and I need to tell you something",            time:'12:53 AM', read:true },
@@ -1473,7 +1483,8 @@ const threads = {
     { from:'me', text:"sorry about the voice note. that was too much",                                              time:'1:09 AM',  read:true },
     { from:'me', text:"I just feel like nobody actually knows me. like they know the version I show them",           time:'1:11 AM',  read:true },
   );
-  const cNode = SCRIPT[threads.casey.scriptNode];
+  threads.casey.scriptNode = 'casey_0';
+  const cNode = SCRIPT['casey_0'];
   if (cNode?.incoming) {
     threads.casey.messages.push({ from:'them', text:cNode.incoming.text, time:cNode.incoming.time, read:false });
   }
@@ -1551,12 +1562,7 @@ function seedMorning() {
   phaseStartTime = totalTime;
 
   // Create threads empty — ambient seeds will deliver the first message at staggered times
-  threads.riley  = { contact:'riley',  messages:[...(HISTORY.riley||[])],  unread:0, scriptNode:null };
-  threads.alex   = { contact:'alex',   messages:[...(HISTORY.alex||[])],   unread:0, scriptNode:null };
-  threads.sam    = { contact:'sam',    messages:[...(HISTORY.sam||[])],    unread:0, scriptNode:null };
-  threads.jordan = { contact:'jordan', messages:[...(HISTORY.jordan||[])], unread:0, scriptNode:null };
-  threads.taylor = { contact:'taylor', messages:[...(HISTORY.taylor||[])], unread:0, scriptNode:null };
-
+  // Threads already exist from init — don't overwrite them
   notes.push({ time:'8:47 AM', body:morningNoteBody() });
 }
 
@@ -1577,9 +1583,7 @@ function seedAfternoon() {
   timePhase = PHASE.AFTERNOON;
   phaseStartTime = totalTime;
 
-  // Create threads empty — ambient seeds stagger the first messages
-  threads.drew  = { contact:'drew',  messages:[...(HISTORY.drew||[])],  unread:0, scriptNode:null };
-  threads.quinn = { contact:'quinn', messages:[...(HISTORY.quinn||[])], unread:0, scriptNode:null };
+  // Threads already exist from init — don't overwrite them
 
   // Drunk note — written at 2am, only discovered now
   notes.push({ time:'2:14 AM', body:"wrote this around 2am apparently. can't tell if I was trying to remember or trying to forget.", recovered:true });
@@ -2373,12 +2377,15 @@ function drawLockSlider() {
 function drawLockCard(x,y,w,contactKey,sender,preview) {
   ctx.fillStyle='rgba(255,255,255,0.09)'; roundRect(x,y,w,50,10); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.13)'; ctx.lineWidth=1; roundRect(x,y,w,50,10); ctx.stroke();
-  drawContactPhoto(contactKey, x+22, y+23, 13);
-  ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff'; ctx.fillText(sender,x+44,y+20);
+  // Avatar centred vertically in the card (card is 50px tall → centre y+25)
+  drawContactPhoto(contactKey, x+22, y+25, 13);
+  // Name and preview bracketing the card centre
+  ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
+  ctx.fillText(sender, x+44, y+22);
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.58)';
-  ctx.fillText(preview.length>28?preview.slice(0,27)+'…':preview,x+44,y+34);
+  ctx.fillText(preview.length>28?preview.slice(0,27)+'…':preview, x+44, y+36);
   ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.28)';
-  ctx.textAlign='right'; ctx.fillText('now',x+w-8,y+20); ctx.textAlign='left';
+  ctx.textAlign='right'; ctx.fillText('now',x+w-8,y+22); ctx.textAlign='left';
 }
 
 // ── Home screen ────────────────────────────────────────────────────
