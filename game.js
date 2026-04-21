@@ -2195,24 +2195,51 @@ const BOKEH_COLS = [
 ];
 
 function drawWallpaper(dimAmt) {
-  // Phase-keyed base gradient
-  const stops = {
-    [PHASE.NIGHT]:     ['#06080f','#0e0619'],
-    [PHASE.MORNING]:   ['#08101c','#100c22'],
-    [PHASE.AFTERNOON]: ['#0d0c1a','#180e20'],
-    [PHASE.EVENING]:   ['#0a0617','#15081b'],
-    [PHASE.LATE]:      ['#040307','#07040d'],
+  // ── 1. Sky gradient — distinct per phase ─────────────────────────
+  // [top, bottom]
+  const skyStops = {
+    [PHASE.NIGHT]:     ['#000308','#0a0422'],   // near-black → deep violet
+    [PHASE.MORNING]:   ['#0b1828','#b84214'],   // dark blue → burnt amber (sunrise)
+    [PHASE.AFTERNOON]: ['#0e1e52','#3464a8'],   // deep navy → open sky blue
+    [PHASE.EVENING]:   ['#06021c','#881e04'],   // dark violet → deep burnt orange (sunset)
+    [PHASE.LATE]:      ['#000102','#03020a'],   // near-absolute black
   };
-  const [c0,c1] = stops[timePhase] || stops[PHASE.NIGHT];
+  const [c0,c1] = skyStops[timePhase] || skyStops[PHASE.NIGHT];
   const bg = ctx.createLinearGradient(0,0,0,H);
   bg.addColorStop(0,c0); bg.addColorStop(1,c1);
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
 
-  // Bokeh — alpha scaled by phase brightness
-  const phMult = {[PHASE.NIGHT]:1,[PHASE.MORNING]:0.75,[PHASE.AFTERNOON]:0.65,[PHASE.EVENING]:0.9,[PHASE.LATE]:0.35}[timePhase]??1;
+  // ── 2. Horizon glow — sunrise / sunset / atmospheric ─────────────
+  // Radial gradient centred at the skyline to simulate light source
+  const hGlow = {
+    [PHASE.MORNING]:   [255,115,30,  0.50, 0.80],   // r,g,b, alpha, y-frac
+    [PHASE.EVENING]:   [255,65, 10,  0.58, 0.78],
+    [PHASE.AFTERNOON]: [100,165,255, 0.18, 0.68],   // subtle atmospheric haze
+  }[timePhase];
+  if (hGlow) {
+    const [hr,hg,hb,ha,hyf] = hGlow;
+    const gy = Math.round(hyf * H);
+    const rg = ctx.createRadialGradient(W/2,gy,0, W/2,gy, W*0.9);
+    rg.addColorStop(0,   `rgba(${hr},${hg},${hb},${ha})`);
+    rg.addColorStop(0.50,`rgba(${hr},${hg},${hb},${(ha*0.28).toFixed(2)})`);
+    rg.addColorStop(1,   `rgba(${hr},${hg},${hb},0)`);
+    ctx.fillStyle = rg; ctx.fillRect(0,0,W,H);
+  }
+
+  // ── 3. Bokeh — colour palette keyed by phase ─────────────────────
+  // Three hue slots per phase: [inner, outer] rgb
+  const phaseBokeh = {
+    [PHASE.NIGHT]:     [[[70,110,255],[40,55,180]],[[150,75,225],[100,35,185]],[[225,140,65],[175,80,25]]],
+    [PHASE.MORNING]:   [[[255,148,45],[200,88,10]],[[255,205,95],[185,125,28]],[[185,95,235],[125,45,190]]],
+    [PHASE.AFTERNOON]: [[[75,148,255],[38,88,210]],[[145,208,255],[85,148,210]],[[255,208,75],[198,148,18]]],
+    [PHASE.EVENING]:   [[[255,78,18],[200,32,4]], [[218,58,178],[148,14,128]],[[255,158,28],[198,78,4]]],
+    [PHASE.LATE]:      [[[32,22,68],[15,10,42]], [[52,16,72],[25,6,45]],   [[68,40,12],[40,18,6]]],
+  };
+  const phMult = {[PHASE.NIGHT]:1.0,[PHASE.MORNING]:0.65,[PHASE.AFTERNOON]:0.45,[PHASE.EVENING]:0.85,[PHASE.LATE]:0.28}[timePhase]??1;
+  const bCols = phaseBokeh[timePhase] || phaseBokeh[PHASE.NIGHT];
   for (const d of BOKEH) {
     const px = d.x*W, py = d.y*H;
-    const [[r1,g1,b1],[r2,g2,b2]] = BOKEH_COLS[d.hue];
+    const [[r1,g1,b1],[r2,g2,b2]] = bCols[d.hue];
     const a = d.a * phMult;
     const rg = ctx.createRadialGradient(px,py,0,px,py,d.rad);
     rg.addColorStop(0,`rgba(${r1},${g1},${b1},${a.toFixed(2)})`);
@@ -2221,26 +2248,29 @@ function drawWallpaper(dimAmt) {
     ctx.beginPath(); ctx.arc(px,py,d.rad,0,Math.PI*2); ctx.fill();
   }
 
-  // Stars (night / late only) — tiny 1px dots above skyline
-  if (timePhase === PHASE.NIGHT || timePhase === PHASE.LATE) {
-    ctx.fillStyle = `rgba(255,255,255,${timePhase===PHASE.LATE?0.25:0.55})`;
+  // ── 4. Stars — night full, late dim, evening just-appearing ──────
+  if (timePhase === PHASE.NIGHT || timePhase === PHASE.LATE || timePhase === PHASE.EVENING) {
+    const starA = timePhase===PHASE.LATE ? 0.22 : timePhase===PHASE.EVENING ? 0.18 : 0.55;
+    ctx.fillStyle = `rgba(255,255,255,${starA})`;
     for (const d of BOKEH) {
       if (d.y < 0.55) ctx.fillRect(Math.round(d.x*W), Math.round(d.y*H*0.65), 1, 1);
     }
   }
 
-  // Skyline silhouette
+  // ── 5. Skyline silhouette ─────────────────────────────────────────
   const hY = Math.round(H * 0.78);
+  // Slightly more opaque against bright afternoon sky so buildings read clearly
+  const silAlpha = timePhase === PHASE.AFTERNOON ? 0.97 : 0.92;
   for (const [fx,fw,fh] of SKYLINE) {
     const bx=Math.round(fx*W), bw=Math.round(fw*W);
     const bh=Math.round(fh*H), by=hY-bh;
-    ctx.fillStyle='rgba(4,3,8,0.92)';
+    ctx.fillStyle=`rgba(4,3,8,${silAlpha})`;
     ctx.fillRect(bx, by, bw, hY-by+1);
   }
-  ctx.fillStyle='rgba(3,2,7,0.96)';
+  ctx.fillStyle='rgba(3,2,7,0.97)';
   ctx.fillRect(0, hY, W, H-hY);
 
-  // Dark overlay so content stays readable
+  // ── 6. Dim overlay — keeps content readable ───────────────────────
   if (dimAmt > 0) {
     ctx.fillStyle = `rgba(0,0,0,${dimAmt})`;
     ctx.fillRect(0,0,W,H);
