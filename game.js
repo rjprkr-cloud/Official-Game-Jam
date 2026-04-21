@@ -40,20 +40,22 @@ const SCR = Object.freeze({
 let screen = SCR.LOCK;
 
 // ── Story phases ───────────────────────────────────────────────────
-const PHASE = Object.freeze({ NIGHT:0, MORNING:1, AFTERNOON:2, EVENING:3 });
+const PHASE = Object.freeze({ NIGHT:0, MORNING:1, AFTERNOON:2, EVENING:3, LATE:4 });
 let timePhase      = PHASE.NIGHT;
 let phaseTimer     = -1;
 let afternoonTimer = -1;
 let eveningTimer   = -1;
+let lateTimer      = -1;
 
 // ── Interpretation profile ─────────────────────────────────────────
 const profile = { defensive:0, trusting:0, avoidant:0 };
 
 // ── Relationships ──────────────────────────────────────────────────
 const rel = {
-  morgan: { name:'Morgan', trust:50, tension:0, tone:'neutral', color:'#7c6cd6' },
-  alex:   { name:'Alex',   trust:60, tension:0, tone:'warm',    color:'#c07050' },
-  riley:  { name:'Riley',  trust:45, tension:0, tone:'neutral', color:'#4a9c7a' },
+  morgan:  { name:'Morgan',  trust:50, tension:0, tone:'neutral', color:'#7c6cd6' },
+  alex:    { name:'Alex',    trust:60, tension:0, tone:'warm',    color:'#c07050' },
+  riley:   { name:'Riley',  trust:45, tension:0, tone:'neutral', color:'#4a9c7a' },
+  unknown: { name:'???',     trust:0,  tension:0, tone:'unknown', color:'#505068' },
 };
 
 // ── Settings ───────────────────────────────────────────────────────
@@ -424,6 +426,63 @@ const SCRIPT = {
   meve_silence: { incoming:null, choices:null,
     onEnd:()=>flags.add('eve_silence') },
 
+  // ── Unknown — the twist ───────────────────────────────────────
+  unknown_0: {
+    incoming: { text:"hey. I think you have my phone", time:'2:47 AM' },
+    choices: [
+      { text:'...what',                        next:'unk_1a', fx:()=>{ rel.unknown.trust+=5; } },
+      { text:'no, this is my phone',           next:'unk_1b', fx:()=>{ profile.defensive++; rel.unknown.tension+=10; } },
+      { text:'(don\'t open it)', silent:true,  next:'unk_1c', fx:()=>{ profile.avoidant++;  rel.unknown.tension+=15; } },
+    ],
+  },
+  unk_1a: {
+    incoming: { text:"we must have grabbed each other's at riley's. mine has a crack across the back", time:'2:47 AM' },
+    choices: [
+      { text:'...yeah. there\'s a crack.',    next:'unk_2a', fx:()=>{ profile.trusting++;  flags.add('phone_swap_confirmed'); } },
+      { text:'I don\'t know what you mean',   next:'unk_2b', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  unk_1b: {
+    incoming: { text:"is the wallpaper a black cat?", time:'2:48 AM' },
+    choices: [
+      { text:'...yeah',                next:'unk_2a', fx:()=>{ profile.trusting++;  flags.add('phone_swap_confirmed'); } },
+      { text:'no',                     next:'unk_2c', fx:()=>{ profile.defensive++; flags.add('phone_denied'); } },
+    ],
+  },
+  unk_1c: { incoming:{ text:"look. I'm not trying to be weird. I just need my phone back.", time:'2:58 AM' }, choices:null,
+    onEnd:()=>{ flags.add('phone_ignored'); rel.unknown.tension+=10; } },
+  unk_2a: {
+    incoming: { text:"I've been looking for it all night", time:'2:49 AM' },
+    choices: [
+      { text:'I\'m sorry. I didn\'t realize', next:'unk_3a', fx:()=>{ profile.trusting++;  rel.unknown.trust+=10; } },
+      { text:'I didn\'t go through it',       next:'unk_3b', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  unk_2b: { incoming:{ text:"ok.", time:'2:49 AM' }, choices:null,
+    onEnd:()=>flags.add('phone_denied') },
+  unk_2c: { incoming:{ text:"ok.", time:'2:49 AM' }, choices:null,
+    onEnd:()=>flags.add('phone_denied') },
+  unk_3a: {
+    incoming: { text:"it's ok. I'm just glad I found it. can we figure out a swap?", time:'2:50 AM' },
+    choices: [
+      { text:'yeah. where are you?', next:'unk_end_meet',  fx:()=>{ rel.unknown.trust+=10; flags.add('phone_swap_arranged'); } },
+      { text:'tomorrow maybe',       next:'unk_end_defer', fx:()=>{ } },
+    ],
+  },
+  unk_3b: {
+    incoming: { text:"...that's all you had to say.", time:'2:50 AM' },
+    choices: [
+      { text:'I know. I\'m sorry.',         next:'unk_end_late', fx:()=>{ profile.trusting++;  rel.unknown.trust+=5;  } },
+      { text:'can we sort the swap first',  next:'unk_end_meet', fx:()=>{ profile.defensive++; } },
+    ],
+  },
+  unk_end_meet:  { incoming:{ text:"riley's street. the bench outside. I'll be there in ten.", time:'2:51 AM' }, choices:null,
+    onEnd:()=>flags.add('phone_swap_meet') },
+  unk_end_defer: { incoming:{ text:"ok. just... don't go through it.", time:'2:51 AM' }, choices:null,
+    onEnd:()=>{ flags.add('phone_swap_deferred'); } },
+  unk_end_late:  { incoming:{ text:"it's late. let's just figure out the swap.", time:'2:51 AM' }, choices:null,
+    onEnd:()=>flags.add('phone_swap_arranged') },
+
 };
 
 // ── Threads ────────────────────────────────────────────────────────
@@ -535,6 +594,33 @@ function getMorganEveNode() {
   if (flags.has('called_morgan_back'))   return null;
   if (rel.morgan.trust < 28)             return null;
   return 'morgan_eve';
+}
+
+function queueLate() {
+  if (timePhase >= PHASE.LATE || lateTimer >= 0) return;
+  lateTimer = 8.0;
+}
+
+function seedLate() {
+  if (timePhase >= PHASE.LATE) return;
+  timePhase = PHASE.LATE;
+
+  threads.unknown = { contact:'unknown', messages:[], unread:0, scriptNode:'unknown_0' };
+  const uNode = SCRIPT['unknown_0'];
+  if (uNode?.incoming) {
+    threads.unknown.messages.push({ from:'them', text:uNode.incoming.text, time:uNode.incoming.time, read:false });
+    threads.unknown.unread = 1;
+  }
+  notes.push({ time:'3:02 AM', body:lateNoteBody() });
+  pushNotif('???', "hey. I think you have my phone");
+}
+
+function lateNoteBody() {
+  // This note is written *before* the unknown thread resolves — it's the moment of realization
+  if (flags.has('phone_swap_confirmed'))   return "it wasn't my phone. all night, it wasn't my phone.";
+  if (flags.has('called_morgan_back'))     return "I called morgan back on someone else's phone. I wonder if she knew.";
+  if (flags.has('eve_honest'))             return "told a stranger I wasn't ok before I told anyone else. that's probably fine.";
+  return "someone else's messages. someone else's night. I wonder how much of it I got right.";
 }
 
 function eveningNoteBody() {
@@ -860,6 +946,7 @@ function update(dt) {
   if (phaseTimer>=0)     { phaseTimer-=dt;     if (phaseTimer<=0)     { phaseTimer=-1;     seedMorning();   } }
   if (afternoonTimer>=0) { afternoonTimer-=dt;  if (afternoonTimer<=0) { afternoonTimer=-1; seedAfternoon(); } }
   if (eveningTimer>=0)   { eveningTimer-=dt;    if (eveningTimer<=0)   { eveningTimer=-1;   seedEvening();   } }
+  if (lateTimer>=0)      { lateTimer-=dt;       if (lateTimer<=0)      { lateTimer=-1;      seedLate();      } }
   // Auto-queue evening once all afternoon threads go quiet
   if (timePhase===PHASE.AFTERNOON && eveningTimer<0) {
     if (Object.values(threads).every(t=>!t.scriptNode)) queueEvening();
@@ -964,8 +1051,20 @@ function drawNotifToast() {
 // ── Lock screen ────────────────────────────────────────────────────
 function drawLock() {
   const g=ctx.createLinearGradient(0,0,W,H);
-  g.addColorStop(0,'#0c1520'); g.addColorStop(1,'#17082a');
+  if (timePhase>=PHASE.LATE) {
+    g.addColorStop(0,'#030206'); g.addColorStop(1,'#08040f');
+  } else {
+    g.addColorStop(0,'#0c1520'); g.addColorStop(1,'#17082a');
+  }
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // Cracked screen overlay — appears in late phase (this isn't your phone)
+  if (timePhase>=PHASE.LATE) {
+    ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(W*0.55,0); ctx.lineTo(W*0.62,H*0.18);
+    ctx.lineTo(W*0.58,H*0.32); ctx.lineTo(W*0.68,H*0.55); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W*0.62,H*0.18); ctx.lineTo(W*0.72,H*0.22); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W*0.58,H*0.32); ctx.lineTo(W*0.48,H*0.38); ctx.stroke();
+  }
   const now=new Date();
   // Notch pill
   ctx.fillStyle='rgba(0,0,0,0.5)';
@@ -1039,7 +1138,9 @@ function drawLockCard(x,y,w,sender,preview) {
 // ── Home screen ────────────────────────────────────────────────────
 function drawHome() {
   const g=ctx.createLinearGradient(0,0,0,H);
-  if (timePhase===PHASE.EVENING) {
+  if (timePhase===PHASE.LATE) {
+    g.addColorStop(0,'#030206'); g.addColorStop(1,'#07040e');
+  } else if (timePhase===PHASE.EVENING) {
     g.addColorStop(0,'#080410'); g.addColorStop(1,'#10061a');
   } else if (timePhase===PHASE.AFTERNOON) {
     g.addColorStop(0,'#1a1020'); g.addColorStop(1,'#2a0f1c');
@@ -1452,7 +1553,7 @@ function drawEnd() {
 
   // Title line
   ctx.font='7px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.2)';
-  ctx.fillText('end of day',W/2,42);
+  ctx.fillText(timePhase>=PHASE.LATE?'end of day  ·  2:47 AM':'end of day',W/2,42);
 
   // Closing line based on final state
   ctx.font='bold 10px monospace'; ctx.fillStyle='rgba(255,255,255,0.72)';
@@ -1460,9 +1561,10 @@ function drawEnd() {
 
   // Relationship bars
   const rels=[
-    { name:'Morgan', r:rel.morgan },
-    { name:'Alex',   r:rel.alex   },
-    { name:'Riley',  r:rel.riley  },
+    { name:'Morgan',  r:rel.morgan  },
+    { name:'Alex',    r:rel.alex    },
+    { name:'Riley',   r:rel.riley   },
+    ...(timePhase>=PHASE.LATE ? [{ name:'???', r:rel.unknown }] : []),
   ];
   let ry=106;
   for (const {name,r} of rels) {
@@ -1504,15 +1606,22 @@ function drawEnd() {
 }
 
 function endingLine() {
-  if (flags.has('eve_honest'))            return 'you said the true thing.';
-  if (flags.has('called_morgan_back'))    return 'you called.';
+  // Post-twist endings
+  if (flags.has('phone_swap_meet'))     return "you went back.";
+  if (flags.has('phone_swap_confirmed')&&flags.has('phone_swap_arranged')) return "it wasn't your phone.";
+  if (flags.has('phone_denied'))        return "you lied to a stranger.";
+  if (flags.has('phone_ignored'))       return "you didn't answer. again.";
+  // Pre-twist endings
+  if (flags.has('eve_honest'))          return 'you said the true thing.';
+  if (flags.has('called_morgan_back'))  return 'you called.';
   if (flags.has('morgan_aft_open')||flags.has('morgan_aft_warm_end')) return 'maybe that was enough.';
   if (flags.has('morgan_final_silence')||flags.has('eve_silence'))    return 'you said nothing.';
-  if (flags.has('admitted_rileys'))       return "you were honest, eventually.";
+  if (flags.has('admitted_rileys'))     return "you were honest, eventually.";
   return 'the phone is quiet now.';
 }
 
 function onClickEnd(mx, my) {
+  if (timePhase >= PHASE.EVENING) queueLate();
   screen = SCR.HOME;
 }
 
