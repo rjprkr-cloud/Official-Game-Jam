@@ -1061,14 +1061,16 @@ const APP_GRID = (function(){
   const rows = Math.ceil(list.length / cols);
   const totalW = cols*APP_SZ+(cols-1)*gX;
   const totalH = rows*(APP_SZ+labelH)+(rows-1)*(gY-labelH);
-  const sX = Math.round((W-totalW)/2);
-  // Vertically centre the grid in content area
   const contentH = H - STATUS_H - NAV_H;
   const sY = STATUS_H + Math.round((contentH - totalH) / 2);
-  return list.map((a,i)=>({ ...a,
-    x: sX+(i%cols)*(APP_SZ+gX),
-    y: sY+Math.floor(i/cols)*rowH,
-  }));
+  // Centre each row independently so partial last rows aren't left-aligned
+  return list.map((a,i)=>{
+    const row = Math.floor(i/cols), col = i%cols;
+    const inRow = Math.min(cols, list.length - row*cols);
+    const rowW  = inRow*APP_SZ + (inRow-1)*gX;
+    const rowX  = Math.round((W - rowW) / 2);
+    return { ...a, x: rowX + col*(APP_SZ+gX), y: sY + row*rowH };
+  });
 })();
 
 const SETTING_ROWS = [
@@ -1575,31 +1577,66 @@ function drawHome() {
 }
 
 function drawAppIcon(app) {
-  ctx.fillStyle=app.col; roundRect(app.x,app.y,APP_SZ,APP_SZ,13); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,0.12)'; roundRect(app.x,app.y,APP_SZ,APP_SZ*0.44,13); ctx.fill();
+  const {x,y} = app;
+
+  // 1 — Drop shadow
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=10; ctx.shadowOffsetY=4;
+  ctx.fillStyle=app.col; roundRect(x,y,APP_SZ,APP_SZ,13); ctx.fill();
+  ctx.restore();
+
+  // 2 — Base colour
+  ctx.fillStyle=app.col; roundRect(x,y,APP_SZ,APP_SZ,13); ctx.fill();
+
+  // 3 — Gradient overlay: bright top, dark bottom
+  ctx.save(); roundRect(x,y,APP_SZ,APP_SZ,13); ctx.clip();
+  const grad=ctx.createLinearGradient(x,y,x,y+APP_SZ);
+  grad.addColorStop(0,'rgba(255,255,255,0.30)');
+  grad.addColorStop(0.45,'rgba(255,255,255,0.05)');
+  grad.addColorStop(1,'rgba(0,0,0,0.28)');
+  ctx.fillStyle=grad; ctx.fillRect(x,y,APP_SZ,APP_SZ);
+  ctx.restore();
+
+  // 4 — Gloss pill at top
+  ctx.save(); roundRect(x,y,APP_SZ,APP_SZ,13); ctx.clip();
+  ctx.fillStyle='rgba(255,255,255,0.20)';
+  roundRect(x+4,y+3,APP_SZ-8,APP_SZ*0.38,8); ctx.fill();
+  ctx.restore();
+
+  // 5 — Outer highlight border + inner shadow line
+  ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=1.5;
+  roundRect(x,y,APP_SZ,APP_SZ,13); ctx.stroke();
+  ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1;
+  roundRect(x+1,y+1,APP_SZ-2,APP_SZ-2,12); ctx.stroke();
+
+  // 6 — Emoji
   ctx.font='24px sans-serif'; ctx.textAlign='center';
-  ctx.fillText(app.icon,app.x+APP_SZ/2,app.y+APP_SZ/2+9);
-  // Badges
+  ctx.fillText(app.icon,x+APP_SZ/2,y+APP_SZ/2+9);
+
+  // 7 — Badges
   let badge=0;
   if (app.id==='messages') badge=Object.values(threads).reduce((s,t)=>s+(t.unread||0),0);
   if (app.id==='calls'&&timePhase>=PHASE.AFTERNOON&&!voicemails[0].listened) badge=1;
   if (app.id==='music'&&musicState.playing) {
-    // Animated music note instead of number badge
     ctx.fillStyle=TRACKS[musicState.idx]?.col||'#8030a0';
-    ctx.beginPath(); ctx.arc(app.x+APP_SZ-5,app.y+5,7,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+APP_SZ-5,y+5,7,0,Math.PI*2); ctx.fill();
     ctx.font='bold 8px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
-    ctx.fillText('â™«',app.x+APP_SZ-5,app.y+9);
-    ctx.textAlign='left';
-    badge=-1; // already drawn, skip default badge
+    ctx.fillText('\u266b',x+APP_SZ-5,y+9);
+    badge=-1;
   }
   if (badge>0) {
     ctx.fillStyle='#e53935'; ctx.beginPath();
-    ctx.arc(app.x+APP_SZ-5,app.y+5,7,0,Math.PI*2); ctx.fill();
+    ctx.arc(x+APP_SZ-5,y+5,7,0,Math.PI*2); ctx.fill();
     ctx.font='bold 7px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
-    ctx.fillText(String(badge),app.x+APP_SZ-5,app.y+8); ctx.textAlign='left';
+    ctx.fillText(String(badge),x+APP_SZ-5,y+8);
   }
-  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.75)';
-  ctx.fillText(app.label,app.x+APP_SZ/2,app.y+APP_SZ+13);
+
+  // 8 — Label with shadow so it reads over wallpaper
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=5;
+  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(app.label,x+APP_SZ/2,y+APP_SZ+13);
+  ctx.restore();
   ctx.textAlign='left';
 }
 
