@@ -35,7 +35,7 @@ const SCR = Object.freeze({
   MESSAGES:'messages', THREAD:'thread',
   NOTES:'notes', PHOTOS:'photos',
   CALLS:'calls', SETTINGS:'settings',
-  END:'end',
+  MUSIC:'music', END:'end',
 });
 let screen = SCR.LOCK;
 
@@ -89,6 +89,48 @@ const voicemails = [
   },
 ];
 let callsVoicemailOpen = false;
+
+// ── Music ──────────────────────────────────────────────────────────
+const TRACKS = [
+  { title:'Sunlit Strum',            file:'music/Sunlit Strum.mp3',            col:'#c8a030' },
+  { title:'Arcade Corsage',          file:'music/Arcade Corsage.mp3',          col:'#c040a0' },
+  { title:'Arcade Corsage 2',        file:'music/Arcade Corsage 2.mp3',        col:'#a020c0' },
+  { title:'Brass Subwave',           file:'music/Brass Subwave.mp3',           col:'#c06820' },
+  { title:'Tin-Kiss Harmony',        file:'music/Tin-Kiss Harmony.mp3',        col:'#30a080' },
+  { title:'Valve Fireworks',         file:'music/Valve Fireworks.mp3',         col:'#c03040' },
+  { title:'Neon Overdrive',          file:'music/Neon Overdrive.mp3',          col:'#3060e0' },
+  { title:'Midnight Loop in Tokyo',  file:'music/Midnight Loop in Tokyo.mp3',  col:'#6040c0' },
+  { title:'Paper Cup Afternoon',     file:'music/Paper Cup Afternoon.mp3',     col:'#70a030' },
+  { title:'Quest Start',             file:'music/Quest Start.mp3',             col:'#3090c0' },
+  { title:'Rain On Glass',           file:'music/Rain On Glass.mp3',           col:'#4878b0' },
+];
+
+const musicState = { idx:-1, playing:false, audio:null, view:'list' };
+
+function musicPlay(idx) {
+  if (musicState.audio) { musicState.audio.pause(); musicState.audio.src=''; }
+  musicState.idx = idx;
+  const audio = new Audio(TRACKS[idx].file);
+  audio.volume = 0.75;
+  audio.addEventListener('ended', ()=>musicPlay((idx+1)%TRACKS.length));
+  audio.play().catch(()=>{});
+  musicState.audio   = audio;
+  musicState.playing = true;
+  musicState.view    = 'player';
+}
+function musicToggle() {
+  if (!musicState.audio) return;
+  if (musicState.playing) { musicState.audio.pause(); musicState.playing=false; }
+  else { musicState.audio.play().catch(()=>{}); musicState.playing=true; }
+}
+function musicSkip(dir) {
+  if (musicState.idx<0) return;
+  musicPlay((musicState.idx+dir+TRACKS.length)%TRACKS.length);
+}
+function fmtTime(s) {
+  if (!s||isNaN(s)) return '0:00';
+  return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
 
 // ── Call-back overlay ──────────────────────────────────────────────
 let callBack = {
@@ -1008,6 +1050,7 @@ const APP_GRID = (function(){
     { id:'photos',   label:'Photos',   col:'#b87020', icon:'🖼️'  },
     { id:'notes',    label:'Notes',    col:'#b8a020', icon:'📝'  },
     { id:'calls',    label:'Calls',    col:'#2878c0', icon:'📞'  },
+    { id:'music',    label:'Music',    col:'#8030a0', icon:'🎵'  },
     { id:'settings', label:'Settings', col:'#607080', icon:'⚙️'  },
   ];
   const cols=4, gX=10, gY=22, labelH=14;
@@ -1108,6 +1151,7 @@ function handleClick(mx, my) {
     case SCR.THREAD:   onClickThread(mx,my);    break;
     case SCR.CALLS:    onClickCalls(mx,my);     break;
     case SCR.PHOTOS:   onClickPhotos(mx,my);    break;
+    case SCR.MUSIC:    onClickMusic(mx,my);     break;
     case SCR.SETTINGS: onClickSettings(mx,my);  break;
   }
 }
@@ -1115,6 +1159,7 @@ function handleClick(mx, my) {
 function goBack() {
   if      (screen===SCR.THREAD) { screen=SCR.MESSAGES; activeThreadKey=null; }
   else if (screen===SCR.PHOTOS) { photoZoom=false; screen=SCR.HOME; }
+  else if (screen===SCR.MUSIC && musicState.view==='player') { musicState.view='list'; }
   else                          { screen=SCR.HOME; }
 }
 
@@ -1133,6 +1178,7 @@ function onClickHome(mx,my) {
         case 'notes':    screen=SCR.NOTES;    break;
         case 'photos':   screen=SCR.PHOTOS; photoZoom=false; break;
         case 'calls':    screen=SCR.CALLS; callsVoicemailOpen=false; break;
+        case 'music':    screen=SCR.MUSIC; break;
         case 'settings': screen=SCR.SETTINGS; break;
       }
       return;
@@ -1264,6 +1310,7 @@ function draw() {
     case SCR.NOTES:    drawNotes();    break;
     case SCR.PHOTOS:   drawPhotos();   break;
     case SCR.CALLS:    drawCalls();    break;
+    case SCR.MUSIC:    drawMusic();    break;
     case SCR.SETTINGS: drawSettings(); break;
     case SCR.END:      drawEnd();      break;
   }
@@ -1508,11 +1555,20 @@ function drawAppIcon(app) {
   let badge=0;
   if (app.id==='messages') badge=Object.values(threads).reduce((s,t)=>s+(t.unread||0),0);
   if (app.id==='calls'&&timePhase>=PHASE.AFTERNOON&&!voicemails[0].listened) badge=1;
+  if (app.id==='music'&&musicState.playing) {
+    // Animated music note instead of number badge
+    ctx.fillStyle=TRACKS[musicState.idx]?.col||'#8030a0';
+    ctx.beginPath(); ctx.arc(app.x+APP_SZ-5,app.y+5,7,0,Math.PI*2); ctx.fill();
+    ctx.font='bold 8px monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+    ctx.fillText('♫',app.x+APP_SZ-5,app.y+9);
+    ctx.textAlign='left';
+    badge=-1; // already drawn, skip default badge
+  }
   if (badge>0) {
     ctx.fillStyle='#e53935'; ctx.beginPath();
     ctx.arc(app.x+APP_SZ-5,app.y+5,7,0,Math.PI*2); ctx.fill();
-    ctx.font='bold 7px monospace'; ctx.fillStyle='#fff';
-    ctx.fillText(String(badge),app.x+APP_SZ-5,app.y+8);
+    ctx.font='bold 7px monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+    ctx.fillText(String(badge),app.x+APP_SZ-5,app.y+8); ctx.textAlign='left';
   }
   ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.75)';
   ctx.fillText(app.label,app.x+APP_SZ/2,app.y+APP_SZ+13);
@@ -1814,6 +1870,172 @@ function drawCalls() {
 
   // Call-back overlay
   if (callBack.active) drawCallOverlay();
+}
+
+// ── Music app ──────────────────────────────────────────────────────
+function drawMusic() {
+  ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
+  if (musicState.view==='player' && musicState.idx>=0) drawMusicPlayer();
+  else drawMusicList();
+}
+
+function drawMusicList() {
+  appHeader('Music');
+  let ry = STATUS_H+36;
+
+  // Mini now-playing bar
+  if (musicState.idx>=0) {
+    const t=TRACKS[musicState.idx];
+    ctx.fillStyle=t.col+'28'; ctx.fillRect(0,ry,W,38);
+    ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(0,ry+37,W,1);
+    ctx.fillStyle=t.col; roundRect(10,ry+7,24,24,5); ctx.fill();
+    ctx.font='13px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+    ctx.fillText(musicState.playing?'⏸':'▶',22,ry+25);
+    ctx.textAlign='left';
+    ctx.font='bold 8px monospace'; ctx.fillStyle='#fff';
+    const titleStr = t.title.length>22 ? t.title.slice(0,21)+'…' : t.title;
+    ctx.fillText(titleStr,42,ry+17);
+    ctx.font='7px monospace'; ctx.fillStyle=t.col;
+    ctx.fillText(musicState.playing?'♫ now playing':'paused',42,ry+30);
+    ry+=42;
+  }
+
+  for (let i=0;i<TRACKS.length;i++) {
+    if (ry+34>H-NAV_H) break;
+    const t=TRACKS[i], active=i===musicState.idx;
+    ctx.fillStyle=active?t.col+'20':'rgba(255,255,255,0.015)';
+    ctx.fillRect(0,ry,W,34);
+    ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(44,ry+33,W-44,1);
+    // Color swatch
+    ctx.fillStyle=t.col; roundRect(10,ry+7,20,20,4); ctx.fill();
+    ctx.font='bold 8px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.fillText(i+1,20,ry+21);
+    ctx.textAlign='left';
+    ctx.font=active?'bold 8px monospace':'8px monospace';
+    ctx.fillStyle=active?'#fff':'rgba(255,255,255,0.75)';
+    ctx.fillText(t.title.length>26?t.title.slice(0,25)+'…':t.title,40,ry+22);
+    // Playing dots animation
+    if (active&&musicState.playing) {
+      const d='.'.repeat(Math.floor(totalTime*3)%4);
+      ctx.font='8px monospace'; ctx.textAlign='right'; ctx.fillStyle=t.col;
+      ctx.fillText('♫'+d,W-10,ry+22); ctx.textAlign='left';
+    }
+    ry+=34;
+  }
+}
+
+function drawMusicPlayer() {
+  appHeader('Music');
+  const t=TRACKS[musicState.idx];
+  const audio=musicState.audio;
+
+  // Album art
+  const artX=Math.round((W-130)/2), artY=STATUS_H+44, artS=130, artR=14;
+  // Glow
+  const glow=ctx.createRadialGradient(artX+artS/2,artY+artS/2,0,artX+artS/2,artY+artS/2,artS*0.9);
+  glow.addColorStop(0,t.col+'44'); glow.addColorStop(1,t.col+'00');
+  ctx.fillStyle=glow; ctx.fillRect(artX-20,artY-20,artS+40,artS+40);
+  // Art background
+  const artG=ctx.createLinearGradient(artX,artY,artX+artS,artY+artS);
+  artG.addColorStop(0,t.col+'cc'); artG.addColorStop(1,t.col+'55');
+  ctx.save(); roundRect(artX,artY,artS,artS,artR); ctx.clip();
+  ctx.fillStyle=artG; ctx.fillRect(artX,artY,artS,artS);
+  // Abstract shapes
+  ctx.globalAlpha=0.18; ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(artX+artS*0.28,artY+artS*0.32,artS*0.22,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(artX+artS*0.76,artY+artS*0.70,artS*0.16,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=1;
+  // Spinning vinyl grooves
+  const cx2=artX+artS/2, cy2=artY+artS/2;
+  const spin=musicState.playing?totalTime*1.2:0;
+  ctx.save(); ctx.translate(cx2,cy2); ctx.rotate(spin);
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.arc(0,0,artS*0.35,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  for (let r=artS*0.12;r<artS*0.34;r+=5) { ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke(); }
+  ctx.fillStyle='rgba(20,16,30,0.9)';
+  ctx.beginPath(); ctx.arc(0,0,artS*0.07,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=t.col+'cc';
+  ctx.beginPath(); ctx.arc(0,0,artS*0.04,0,Math.PI*2); ctx.fill();
+  ctx.restore(); ctx.restore();
+
+  // Track info
+  const infoY=artY+artS+16;
+  ctx.font='bold 10px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  const displayTitle = t.title.length>24 ? t.title.slice(0,23)+'…' : t.title;
+  ctx.fillText(displayTitle,W/2,infoY);
+  ctx.font='6px monospace'; ctx.fillStyle='rgba(255,255,255,0.3)';
+  ctx.fillText(`${musicState.idx+1}  /  ${TRACKS.length}`,W/2,infoY+13);
+
+  // Progress bar
+  const progX=16, progY=infoY+24, progW=W-32;
+  const dur=audio?.duration, cur=audio?.currentTime||0;
+  const pct=(dur&&!isNaN(dur))?cur/dur:0;
+  ctx.fillStyle='rgba(255,255,255,0.1)'; roundRect(progX,progY,progW,4,2); ctx.fill();
+  if (pct>0) { ctx.fillStyle=t.col; roundRect(progX,progY,Math.round(progW*pct),4,2); ctx.fill(); }
+  // Scrubber thumb
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(progX+Math.round(progW*pct),progY+2,5,0,Math.PI*2); ctx.fill();
+  // Times
+  ctx.font='6px monospace'; ctx.fillStyle='rgba(255,255,255,0.28)';
+  ctx.textAlign='left';  ctx.fillText(fmtTime(cur),progX,progY+14);
+  ctx.textAlign='right'; ctx.fillText(fmtTime(dur),progX+progW,progY+14);
+
+  // Controls
+  const ctrlY=progY+28, cx=W/2;
+  // Prev
+  ctx.font='20px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.65)';
+  ctx.fillText('⏮',cx-52,ctrlY+16);
+  // Play/Pause button
+  ctx.fillStyle=t.col; ctx.beginPath(); ctx.arc(cx,ctrlY+12,20,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(cx,ctrlY+12,20,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='18px monospace';
+  ctx.fillText(musicState.playing?'⏸':'▶',cx+(musicState.playing?0:1),ctrlY+18);
+  // Next
+  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='20px monospace';
+  ctx.fillText('⏭',cx+52,ctrlY+16);
+  ctx.textAlign='left';
+}
+
+function onClickMusic(mx,my) {
+  if (musicState.view==='player') { onClickMusicPlayer(mx,my); return; }
+  // List view
+  let ry=STATUS_H+36;
+  if (musicState.idx>=0) {
+    if (my>=ry&&my<ry+42) {
+      if (mx>=10&&mx<=34) { musicToggle(); return; }
+      musicState.view='player'; return;
+    }
+    ry+=42;
+  }
+  for (let i=0;i<TRACKS.length;i++) {
+    if (my>=ry&&my<ry+34) {
+      if (i===musicState.idx) { musicState.view='player'; }
+      else musicPlay(i);
+      return;
+    }
+    ry+=34;
+    if (ry>H-NAV_H) break;
+  }
+}
+
+function onClickMusicPlayer(mx,my) {
+  const artS=130, artY=STATUS_H+44;
+  const infoY=artY+artS+16;
+  const progX=16, progY=infoY+24, progW=W-32;
+  const ctrlY=progY+28, cx=W/2;
+  const audio=musicState.audio;
+
+  // Seek — tap on progress bar
+  if (my>=progY-6&&my<=progY+16&&audio?.duration) {
+    const t=Math.max(0,Math.min(1,(mx-progX)/progW));
+    audio.currentTime=t*audio.duration; return;
+  }
+  // Prev
+  if (mx>=cx-68&&mx<=cx-32&&my>=ctrlY&&my<ctrlY+32) { musicSkip(-1); return; }
+  // Play/Pause
+  if (Math.hypot(mx-cx,my-(ctrlY+12))<=22) { musicToggle(); return; }
+  // Next
+  if (mx>=cx+32&&mx<=cx+68&&my>=ctrlY&&my<ctrlY+32) { musicSkip(1); return; }
 }
 
 // ── Settings ───────────────────────────────────────────────────────
