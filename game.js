@@ -1467,6 +1467,31 @@ function drawLock() {
   ctx.fillStyle='rgba(0,0,0,0.5)';
   roundRect(W/2-18,6,36,8,4); ctx.fill();
 
+  // ── Game title ───────────────────────────────────────────────
+  ctx.save();
+  ctx.textAlign='center';
+  ctx.lineJoin='round';
+  ctx.miterLimit=2;
+  ctx.font='22px Buzzer11, monospace';
+  // Outer glow
+  ctx.shadowColor='#7040c0';
+  ctx.shadowBlur=10;
+  ctx.strokeStyle='#7040c0';
+  ctx.lineWidth=5;
+  ctx.strokeText('Read',W/2,44);
+  ctx.strokeText('Receipts',W/2,68);
+  // Crisp purple outline
+  ctx.shadowBlur=0;
+  ctx.lineWidth=3;
+  ctx.strokeStyle='#9050e0';
+  ctx.strokeText('Read',W/2,44);
+  ctx.strokeText('Receipts',W/2,68);
+  // White fill
+  ctx.fillStyle='#ffffff';
+  ctx.fillText('Read',W/2,44);
+  ctx.fillText('Receipts',W/2,68);
+  ctx.restore();
+
   ctx.font='bold 52px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText(`${now.getHours()%12||12}:${String(now.getMinutes()).padStart(2,'0')}`,W/2,130);
   const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
