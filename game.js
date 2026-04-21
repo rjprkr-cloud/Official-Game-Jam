@@ -1,8 +1,8 @@
-'use strict';
-// ═══════════════════════════════════════════════════════════════════
-//  READ RECEIPTS  —  Ordinary Game Jam #1
+﻿'use strict';
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  READ RECEIPTS  â€”  Ordinary Game Jam #1
 //  A narrative game played entirely on a simulated smartphone.
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
@@ -11,7 +11,10 @@ canvas.height = 480;
 const W = canvas.width, H = canvas.height;
 ctx.imageSmoothingEnabled = false;
 
-// ── Portal ─────────────────────────────────────────────────────────
+// Pre-load Buzzer11 so canvas uses it from the first frame
+document.fonts.load('9px Buzzer11');
+
+// â”€â”€ Portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const portal = (typeof Portal !== 'undefined')
   ? Portal.readPortalParams()
   : { fromPortal: false, username: 'Guest', color: 'ff88cc', speed: 5, ref: null };
@@ -24,12 +27,12 @@ if (typeof Portal !== 'undefined') {
   ]).then(t => { portalTarget = t; }).catch(() => {});
 }
 
-// ── Layout ─────────────────────────────────────────────────────────
+// â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const STATUS_H  = 20;
 const NAV_H     = 30;
 const CONTENT_Y = STATUS_H;
 
-// ── Screens ────────────────────────────────────────────────────────
+// â”€â”€ Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SCR = Object.freeze({
   LOCK:'lock', HOME:'home',
   MESSAGES:'messages', THREAD:'thread',
@@ -39,7 +42,7 @@ const SCR = Object.freeze({
 });
 let screen = SCR.LOCK;
 
-// ── Story phases ───────────────────────────────────────────────────
+// â”€â”€ Story phases â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PHASE = Object.freeze({ NIGHT:0, MORNING:1, AFTERNOON:2, EVENING:3, LATE:4 });
 let timePhase      = PHASE.NIGHT;
 let phaseTimer     = -1;
@@ -48,10 +51,10 @@ let eveningTimer   = -1;
 let lateTimer      = -1;
 let phaseStartTime = 0;
 
-// ── Interpretation profile ─────────────────────────────────────────
+// â”€â”€ Interpretation profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const profile = { defensive:0, trusting:0, avoidant:0 };
 
-// ── Relationships ──────────────────────────────────────────────────
+// â”€â”€ Relationships â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const rel = {
   morgan:  { name:'Morgan',  trust:50, tension:0, tone:'neutral', color:'#7c6cd6' },
   alex:    { name:'Alex',    trust:60, tension:0, tone:'warm',    color:'#c07050' },
@@ -59,28 +62,28 @@ const rel = {
   unknown: { name:'???',     trust:0,  tension:0, tone:'unknown', color:'#505068' },
 };
 
-// ── Settings ───────────────────────────────────────────────────────
+// â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const settings = { readReceipts:true, doNotDisturb:false, locationSharing:true };
 
-// ── Flags ──────────────────────────────────────────────────────────
+// â”€â”€ Flags â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const flags = new Set();
 
-// ── Notification toast ─────────────────────────────────────────────
+// â”€â”€ Notification toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let notifToast = null;
 function pushNotif(sender, text) {
   if (settings.doNotDisturb) return;
   notifToast = { sender, text, timer:3.5 };
 }
 
-// ── Notes ──────────────────────────────────────────────────────────
+// â”€â”€ Notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const notes = [
   { time:'11:12 PM', body:"can't keep doing this. riley's was a mistake probably. but I stayed anyway." },
 ];
 
-// ── Photos ─────────────────────────────────────────────────────────
+// â”€â”€ Photos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let photoZoom = false;
 
-// ── Voicemail ──────────────────────────────────────────────────────
+// â”€â”€ Voicemail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const voicemails = [
   {
     from: 'morgan', name: 'Morgan', time: '1:07 AM', duration: '0:14',
@@ -90,7 +93,7 @@ const voicemails = [
 ];
 let callsVoicemailOpen = false;
 
-// ── Music ──────────────────────────────────────────────────────────
+// â”€â”€ Music â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TRACKS = [
   { title:'Sunlit Strum',            file:'music/Sunlit Strum.mp3',            col:'#c8a030' },
   { title:'Arcade Corsage',          file:'music/Arcade Corsage.mp3',          col:'#c040a0' },
@@ -132,7 +135,7 @@ function fmtTime(s) {
   return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 }
 
-// ── Call-back overlay ──────────────────────────────────────────────
+// â”€â”€ Call-back overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let callBack = {
   active: false,
   state: 'idle',   // 'calling' | 'connected' | 'ended'
@@ -151,14 +154,14 @@ const callLog = [
   { type:'incoming', name:'Riley',  time:'10:18 AM', key:'riley'  },
 ];
 
-// ── Conversation script ────────────────────────────────────────────
+// â”€â”€ Conversation script â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SCRIPT = {
 
-  // ── Morgan — night ────────────────────────────────────────────
+  // â”€â”€ Morgan â€” night â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   morgan_0: {
     incoming: { text:'hey did you get home ok last night', time:'11:42 PM' },
     choices: [
-      { text:'Yeah all good 👍',           next:'morgan_1a', fx:()=>{ rel.morgan.trust+=5;  profile.trusting++;  } },
+      { text:'Yeah all good ðŸ‘',           next:'morgan_1a', fx:()=>{ rel.morgan.trust+=5;  profile.trusting++;  } },
       { text:'why are you asking',          next:'morgan_1b', fx:()=>{ rel.morgan.tension+=10; profile.defensive++; } },
       { text:'(leave on read)',silent:true, next:'morgan_1c', fx:()=>{ rel.morgan.tension+=15; profile.avoidant++;  } },
     ],
@@ -206,12 +209,12 @@ const SCRIPT = {
   },
   morgan_2f: { incoming:{ text:'ok.', time:'11:46 PM' }, choices:null,
     onEnd:()=>{ flags.add('morgan_night_tense'); queueMorning(); } },
-  morgan_end_warm: { incoming:{ text:'❤️', time:'11:48 PM' }, choices:null,
+  morgan_end_warm: { incoming:{ text:'â¤ï¸', time:'11:48 PM' }, choices:null,
     onEnd:()=>{ flags.add('morgan_connected'); rel.morgan.trust+=5; queueMorning(); } },
   morgan_end_flat: { incoming:{ text:'ok. night', time:'11:48 PM' }, choices:null,
     onEnd:()=>{ flags.add('morgan_night_flat'); queueMorning(); } },
 
-  // ── Morgan — afternoon (3 entry variants) ────────────────────
+  // â”€â”€ Morgan â€” afternoon (3 entry variants) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   morgan_aft_warm: {
     incoming: { text:'hey. sorry if I was weird last night', time:'2:14 PM' },
     choices: [
@@ -230,7 +233,7 @@ const SCRIPT = {
   maw_1b: {
     incoming: { text:'I don\'t know. I called you and... yeah. forget it.', time:'2:15 PM' },
     choices: [
-      { text:'wait — you called?',       next:'maw_call_reveal', fx:()=>{ profile.trusting++;  flags.add('morgan_call_mentioned'); } },
+      { text:'wait â€” you called?',       next:'maw_call_reveal', fx:()=>{ profile.trusting++;  flags.add('morgan_call_mentioned'); } },
       { text:'it\'s fine. really.',      next:'maw_2b',          fx:()=>{ profile.defensive++; } },
     ],
   },
@@ -349,7 +352,7 @@ const SCRIPT = {
   mad_silence: { incoming:null, choices:null,
     onEnd:()=>{ flags.add('morgan_final_silence'); rel.morgan.trust-=20; } },
 
-  // ── Alex — morning ────────────────────────────────────────────
+  // â”€â”€ Alex â€” morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   alex_0: {
     incoming: { text:'hey you left your jacket at riley\'s last night lol', time:'9:03 AM' },
     choices: [
@@ -419,7 +422,7 @@ const SCRIPT = {
   alex_cross_2b: { incoming:{ text:'yeah. anyway. jacket\'s at mine whenever.', time:'9:10 AM' }, choices:null,
     onEnd:()=>{ flags.add('alex_end_neutral'); queueAfternoon(); } },
 
-  // ── Riley ─────────────────────────────────────────────────────
+  // â”€â”€ Riley â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   riley_0: {
     incoming: { text:'hey fun last night :) you seemed a little out of it toward the end though', time:'10:22 AM' },
     choices: [
@@ -448,12 +451,12 @@ const SCRIPT = {
     onEnd:()=>flags.add('riley_end_ok') },
   riley_2b: { incoming:{ text:'lol valid. same honestly', time:'10:25 AM' }, choices:null,
     onEnd:()=>{ flags.add('riley_end_honest'); rel.riley.trust+=5; } },
-  riley_2c: { incoming:{ text:'ok. 🙂', time:'10:25 AM' }, choices:null,
+  riley_2c: { incoming:{ text:'ok. ðŸ™‚', time:'10:25 AM' }, choices:null,
     onEnd:()=>flags.add('riley_end_closed') },
   riley_2d: { incoming:{ text:'yeah. I figured.', time:'10:26 AM' }, choices:null,
     onEnd:()=>{ flags.add('riley_end_known'); rel.riley.trust+=8; } },
 
-  // ── Morgan — evening ──────────────────────────────────────────
+  // â”€â”€ Morgan â€” evening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   morgan_eve: {
     incoming: { text:'you doing ok?', time:'6:48 PM' },
     choices: [
@@ -469,7 +472,7 @@ const SCRIPT = {
   meve_silence: { incoming:null, choices:null,
     onEnd:()=>flags.add('eve_silence') },
 
-  // ── Unknown — the twist ───────────────────────────────────────
+  // â”€â”€ Unknown â€” the twist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   unknown_0: {
     incoming: { text:"hey. I think you have my phone", time:'2:47 AM' },
     choices: [
@@ -526,7 +529,7 @@ const SCRIPT = {
   unk_end_late:  { incoming:{ text:"it's late. let's just figure out the swap.", time:'2:51 AM' }, choices:null,
     onEnd:()=>flags.add('phone_swap_arranged') },
 
-  // ── Morgan — ambient morning ──────────────────────────────────
+  // â”€â”€ Morgan â€” ambient morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   morgan_mc: {
     incoming: { text:'lol sorry for the late texts btw. I was in my head', time:'9:14 AM' },
     choices: [
@@ -551,7 +554,7 @@ const SCRIPT = {
   mco_1b:      { incoming:{ text:'ok. another time', time:'10:09 AM' }, choices:null, onEnd:()=>{} },
   mco_silence: { incoming:null, choices:null, onEnd:()=>flags.add('morgan_coffee_ignored') },
 
-  // ── Morgan — ambient afternoon ────────────────────────────────
+  // â”€â”€ Morgan â€” ambient afternoon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   morgan_mundane: {
     incoming: { text:'have you seen yellowjackets. I\'ve been watching it for three days straight', time:'3:11 PM' },
     choices: [
@@ -564,7 +567,7 @@ const SCRIPT = {
   mmun_1b:      { incoming:{ text:'survival drama but make it unhinged. you\'d love it', time:'3:12 PM' }, choices:null, onEnd:()=>{} },
   mmun_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // ── Morgan — ambient evening ──────────────────────────────────
+  // â”€â”€ Morgan â€” ambient evening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   morgan_eve_song: {
     incoming: { text:'this song keeps making me think of last year for some reason', time:'7:04 PM' },
     choices: [
@@ -589,7 +592,7 @@ const SCRIPT = {
   mst_1b:      { incoming:{ text:'you should try it. it\'s weird in a good way', time:'8:33 PM' }, choices:null, onEnd:()=>{} },
   mst_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // ── Alex — ambient morning ────────────────────────────────────
+  // â”€â”€ Alex â€” ambient morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   alex_mutual: {
     incoming: { text:'btw did you talk to cam at all last night? they seemed off', time:'9:22 AM' },
     choices: [
@@ -614,7 +617,7 @@ const SCRIPT = {
   ar_1b:      { incoming:{ text:'good!! me too mostly', time:'10:45 AM' }, choices:null, onEnd:()=>flags.add('alex_fun_confirmed') },
   ar_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // ── Alex — ambient afternoon ──────────────────────────────────
+  // â”€â”€ Alex â€” ambient afternoon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   alex_hangout: {
     incoming: { text:'do you want to come over later? we could watch something. I have snacks', time:'2:48 PM' },
     choices: [
@@ -641,7 +644,7 @@ const SCRIPT = {
   ad_1b:      { incoming:{ text:'fair. probably smart.', time:'4:03 PM' }, choices:null, onEnd:()=>{} },
   ad_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // ── Alex — ambient evening ────────────────────────────────────
+  // â”€â”€ Alex â€” ambient evening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   alex_eve_check: {
     incoming: { text:'hey. you\'ve been quiet today. everything ok?', time:'7:38 PM' },
     choices: [
@@ -654,7 +657,7 @@ const SCRIPT = {
   aec_1b:      { incoming:{ text:'yeah I figured. I\'m here if you want to talk', time:'7:39 PM' }, choices:null, onEnd:()=>flags.add('alex_available') },
   aec_silence: { incoming:null, choices:null, onEnd:()=>flags.add('alex_eve_ignored') },
 
-  // ── Riley — ambient morning ───────────────────────────────────
+  // â”€â”€ Riley â€” ambient morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   riley_photo: {
     incoming: { text:'also I found a photo from last night if you want it lol', time:'9:41 AM' },
     choices: [
@@ -667,7 +670,7 @@ const SCRIPT = {
   rp_1b:      { incoming:{ text:'ok lol. just thought it was cute', time:'9:42 AM' }, choices:null, onEnd:()=>{} },
   rp_silence: { incoming:null, choices:null, onEnd:()=>{} },
 
-  // ── Riley — ambient afternoon ─────────────────────────────────
+  // â”€â”€ Riley â€” ambient afternoon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   riley_jacket: {
     incoming: { text:'I think I found your jacket btw. brown? or like. burnt orange?', time:'1:33 PM' },
     choices: [
@@ -700,7 +703,7 @@ const SCRIPT = {
   rac_3:      { incoming:{ text:'...yeah.', time:'3:49 PM' }, choices:null, onEnd:()=>{} },
   rac_silence:{ incoming:null, choices:null, onEnd:()=>{} },
 
-  // ── Riley — ambient evening ───────────────────────────────────
+  // â”€â”€ Riley â€” ambient evening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   riley_eve: {
     incoming: { text:'can I tell you something kind of embarrassing', time:'7:14 PM' },
     choices: [
@@ -745,7 +748,7 @@ const SCRIPT = {
 
 };
 
-// ── Threads ────────────────────────────────────────────────────────
+// â”€â”€ Threads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const threads = {
   morgan: { contact:'morgan', messages:[], unread:0, scriptNode:'morgan_0' },
 };
@@ -758,22 +761,22 @@ const threads = {
   }
 })();
 
-// ── Ambient interactions ───────────────────────────────────────────
+// â”€â”€ Ambient interactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Each fires once when: correct phase, delay elapsed, condition met, thread free.
 const ambientSeeds = [
-  // — Morning —
+  // â€” Morning â€”
   { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_mc',       delay:10,  fired:false, cond:()=>true },
   { phase:PHASE.MORNING,   thread:'alex',   node:'alex_mutual',     delay:30,  fired:false, cond:()=>!flags.has('alex_ignored') },
   { phase:PHASE.MORNING,   thread:'riley',  node:'riley_photo',     delay:55,  fired:false, cond:()=>!flags.has('riley_ignored') },
   { phase:PHASE.MORNING,   thread:'morgan', node:'morgan_coffee',   delay:85,  fired:false, cond:()=>!flags.has('morgan_silence')&&!flags.has('morgan_mc_ignored') },
   { phase:PHASE.MORNING,   thread:'alex',   node:'alex_recap',      delay:120, fired:false, cond:()=>true },
-  // — Afternoon —
+  // â€” Afternoon â€”
   { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_jacket',    delay:15,  fired:false, cond:()=>!flags.has('riley_ignored') },
   { phase:PHASE.AFTERNOON, thread:'morgan', node:'morgan_mundane',  delay:45,  fired:false, cond:()=>!flags.has('morgan_final_silence') },
   { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_hangout',    delay:80,  fired:false, cond:()=>!flags.has('alex_ignored')&&!flags.has('alex_left_hanging') },
   { phase:PHASE.AFTERNOON, thread:'riley',  node:'riley_aft_check', delay:120, fired:false, cond:()=>true },
   { phase:PHASE.AFTERNOON, thread:'alex',   node:'alex_drama',      delay:165, fired:false, cond:()=>!flags.has('alex_ignored') },
-  // — Evening —
+  // â€” Evening â€”
   { phase:PHASE.EVENING,   thread:'riley',  node:'riley_jacket',    delay:10,  fired:false, cond:()=>!flags.has('jacket_located')&&!flags.has('riley_ignored') },
   { phase:PHASE.EVENING,   thread:'morgan', node:'morgan_eve_song', delay:40,  fired:false, cond:()=>rel.morgan.trust>=35&&!flags.has('morgan_final_silence') },
   { phase:PHASE.EVENING,   thread:'alex',   node:'alex_eve_check',  delay:75,  fired:false, cond:()=>!flags.has('alex_ignored') },
@@ -788,10 +791,10 @@ function tickAmbientSeeds() {
     if (seed.fired) continue;
     if (seed.phase !== timePhase) continue;
     if (elapsed < seed.delay) continue;
-    if (seed.cond && !seed.cond()) { seed.fired = true; continue; } // condition failed — skip
+    if (seed.cond && !seed.cond()) { seed.fired = true; continue; } // condition failed â€” skip
     const t = threads[seed.thread];
     if (!t) { seed.fired = true; continue; }
-    if (t.scriptNode !== null) continue; // thread busy — wait
+    if (t.scriptNode !== null) continue; // thread busy â€” wait
     seed.fired = true;
     const node = SCRIPT[seed.node];
     if (!node) continue;
@@ -808,7 +811,7 @@ function tickAmbientSeeds() {
   }
 }
 
-// ── Phase transitions ──────────────────────────────────────────────
+// â”€â”€ Phase transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function queueMorning() {
   if (timePhase >= PHASE.MORNING || phaseTimer >= 0) return;
   phaseTimer = 3.0;
@@ -863,7 +866,7 @@ function seedAfternoon() {
     threads.morgan.unread += 1;
   }
 
-  // 2:14 AM note — written after the photo, after leaving, after everything
+  // 2:14 AM note â€” written after the photo, after leaving, after everything
   notes.push({ time:'2:14 AM', body:"I should tell them. I keep not telling them and it keeps being the wrong call." });
 
   // Missed call badge notification
@@ -929,7 +932,7 @@ function seedLate() {
 }
 
 function lateNoteBody() {
-  // This note is written *before* the unknown thread resolves — it's the moment of realization
+  // This note is written *before* the unknown thread resolves â€” it's the moment of realization
   if (flags.has('phone_swap_confirmed'))   return "it wasn't my phone. all night, it wasn't my phone.";
   if (flags.has('called_morgan_back'))     return "I called morgan back on someone else's phone. I wonder if she knew.";
   if (flags.has('eve_honest'))             return "told a stranger I wasn't ok before I told anyone else. that's probably fine.";
@@ -980,7 +983,7 @@ function getCallBackLines() {
   ];
 }
 
-// ── Active thread state ────────────────────────────────────────────
+// â”€â”€ Active thread state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let activeThreadKey = null;
 let choiceAnim      = 0;
 let choiceMade      = false;
@@ -1042,16 +1045,16 @@ function refreshTone(key) {
   else if (p.trusting >=3)                                                          r.tone='warm';
 }
 
-// ── App grid ───────────────────────────────────────────────────────
+// â”€â”€ App grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const APP_SZ = 52;
 const APP_GRID = (function(){
   const list = [
-    { id:'messages', label:'Messages', col:'#3c8c4a', icon:'💬' },
-    { id:'photos',   label:'Photos',   col:'#b87020', icon:'🖼️'  },
-    { id:'notes',    label:'Notes',    col:'#b8a020', icon:'📝'  },
-    { id:'calls',    label:'Calls',    col:'#2878c0', icon:'📞'  },
-    { id:'music',    label:'Music',    col:'#8030a0', icon:'🎵'  },
-    { id:'settings', label:'Settings', col:'#607080', icon:'⚙️'  },
+    { id:'messages', label:'Messages', col:'#3c8c4a', icon:'ðŸ’¬' },
+    { id:'photos',   label:'Photos',   col:'#b87020', icon:'ðŸ–¼ï¸'  },
+    { id:'notes',    label:'Notes',    col:'#b8a020', icon:'ðŸ“'  },
+    { id:'calls',    label:'Calls',    col:'#2878c0', icon:'ðŸ“ž'  },
+    { id:'music',    label:'Music',    col:'#8030a0', icon:'ðŸŽµ'  },
+    { id:'settings', label:'Settings', col:'#607080', icon:'âš™ï¸'  },
   ];
   const cols=4, gX=10, gY=22, labelH=14;
   const rowH = APP_SZ + gY;
@@ -1074,7 +1077,7 @@ const SETTING_ROWS = [
   { key:'locationSharing', label:'Location Sharing', sub:'Share your location with contacts'               },
 ];
 
-// ── Slide-to-unlock ────────────────────────────────────────────────
+// â”€â”€ Slide-to-unlock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SLIDE_W  = 200, SLIDE_H = 28, SLIDE_TR = 12;
 const SLIDE_X  = Math.round((W - SLIDE_W) / 2);
 const SLIDE_Y  = H - 52;
@@ -1135,7 +1138,7 @@ window.addEventListener('mouseup',    () => onSlideEnd());
 window.addEventListener('touchmove',  e => { onSlideMove(canvasCoords(e)[0]); e.preventDefault(); }, { passive: false });
 window.addEventListener('touchend',   () => onSlideEnd());
 
-// ── Input ──────────────────────────────────────────────────────────
+// â”€â”€ Input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 canvas.addEventListener('click', e => {
   const r = canvas.getBoundingClientRect();
   handleClick((e.clientX-r.left)*(W/r.width), (e.clientY-r.top)*(H/r.height));
@@ -1255,7 +1258,7 @@ function onClickSettings(mx,my) {
   }
 }
 
-// ── Update ─────────────────────────────────────────────────────────
+// â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let totalTime=0, lastTs=0;
 
 function update(dt) {
@@ -1298,7 +1301,7 @@ function update(dt) {
   }
 }
 
-// ── Draw ───────────────────────────────────────────────────────────
+// â”€â”€ Draw â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function draw() {
   ctx.clearRect(0,0,W,H);
   ctx.imageSmoothingEnabled=false;
@@ -1321,35 +1324,35 @@ function draw() {
   }
 }
 
-// ── Status bar ─────────────────────────────────────────────────────
+// â”€â”€ Status bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawStatusBar() {
   ctx.fillStyle='rgba(5,5,12,0.78)'; ctx.fillRect(0,0,W,STATUS_H);
-  ctx.font='bold 9px monospace'; ctx.textAlign='left'; ctx.fillStyle='#ddd';
+  ctx.font='bold 9px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='#ddd';
   ctx.fillText(clockStr(),8,13);
-  ctx.textAlign='right'; ctx.font='8px monospace'; ctx.fillStyle='#aaa';
-  let rx=W-6; ctx.fillText('▮▮▮▯',rx,13); rx-=34;
-  if (settings.doNotDisturb) ctx.fillText('🌙',rx,13);
+  ctx.textAlign='right'; ctx.font='8px Buzzer11, monospace'; ctx.fillStyle='#aaa';
+  let rx=W-6; ctx.fillText('â–®â–®â–®â–¯',rx,13); rx-=34;
+  if (settings.doNotDisturb) ctx.fillText('ðŸŒ™',rx,13);
   // Missed call indicator
   if (timePhase>=PHASE.AFTERNOON && !voicemails[0].listened) {
-    rx-=20; ctx.fillStyle='#e53935'; ctx.fillText('📵',rx,13);
+    rx-=20; ctx.fillStyle='#e53935'; ctx.fillText('ðŸ“µ',rx,13);
   }
   ctx.textAlign='left';
 }
 
-// ── Bottom nav ─────────────────────────────────────────────────────
+// â”€â”€ Bottom nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawBottomNav() {
   const y=H-NAV_H;
   ctx.fillStyle='rgba(8,8,16,0.93)'; ctx.fillRect(0,y,W,NAV_H);
   ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,y,W,1);
   if (screen!==SCR.HOME) {
-    ctx.font='10px monospace'; ctx.textAlign='left';
-    ctx.fillStyle='#6aacff'; ctx.fillText('‹  back',12,y+17);
+    ctx.font='10px Buzzer11, monospace'; ctx.textAlign='left';
+    ctx.fillStyle='#6aacff'; ctx.fillText('â€¹  back',12,y+17);
   }
   ctx.fillStyle='rgba(255,255,255,0.3)';
   roundRect(W/2-22,y+8,44,5,3); ctx.fill();
 }
 
-// ── Notification toast ─────────────────────────────────────────────
+// â”€â”€ Notification toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawNotifToast() {
   if (!notifToast) return;
   const fade=Math.min(1,notifToast.timer/0.4);
@@ -1358,16 +1361,16 @@ function drawNotifToast() {
   ctx.fillStyle='rgba(30,30,45,0.97)'; roundRect(tx,ty,tw,th,8); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1; roundRect(tx,ty,tw,th,8); ctx.stroke();
   ctx.fillStyle='#3c8c4a'; roundRect(tx+6,ty+6,22,22,5); ctx.fill();
-  ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.fillText('💬',tx+17,ty+22);
+  ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.fillText('ðŸ’¬',tx+17,ty+22);
   ctx.textAlign='left';
-  ctx.font='bold 7px monospace'; ctx.fillStyle='#fff'; ctx.fillText(notifToast.sender,tx+34,ty+13);
-  ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.6)';
-  const pv=notifToast.text.length>46?notifToast.text.slice(0,45)+'…':notifToast.text;
+  ctx.font='bold 7px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.fillText(notifToast.sender,tx+34,ty+13);
+  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.6)';
+  const pv=notifToast.text.length>46?notifToast.text.slice(0,45)+'â€¦':notifToast.text;
   ctx.fillText(pv,tx+34,ty+25);
   ctx.restore();
 }
 
-// ── Wallpaper ──────────────────────────────────────────────────────
+// â”€â”€ Wallpaper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Pre-baked bokeh dots using a simple xorshift so positions are
 // identical every run (no asset loading required).
 const BOKEH = (function() {
@@ -1409,7 +1412,7 @@ function drawWallpaper(dimAmt) {
   bg.addColorStop(0,c0); bg.addColorStop(1,c1);
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
 
-  // Bokeh — alpha scaled by phase brightness
+  // Bokeh â€” alpha scaled by phase brightness
   const phMult = {[PHASE.NIGHT]:1,[PHASE.MORNING]:0.75,[PHASE.AFTERNOON]:0.65,[PHASE.EVENING]:0.9,[PHASE.LATE]:0.35}[timePhase]??1;
   for (const d of BOKEH) {
     const px = d.x*W, py = d.y*H;
@@ -1422,7 +1425,7 @@ function drawWallpaper(dimAmt) {
     ctx.beginPath(); ctx.arc(px,py,d.rad,0,Math.PI*2); ctx.fill();
   }
 
-  // Stars (night / late only) — tiny 1px dots above skyline
+  // Stars (night / late only) â€” tiny 1px dots above skyline
   if (timePhase === PHASE.NIGHT || timePhase === PHASE.LATE) {
     ctx.fillStyle = `rgba(255,255,255,${timePhase===PHASE.LATE?0.25:0.55})`;
     for (const d of BOKEH) {
@@ -1448,10 +1451,10 @@ function drawWallpaper(dimAmt) {
   }
 }
 
-// ── Lock screen ────────────────────────────────────────────────────
+// â”€â”€ Lock screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawLock() {
-  drawWallpaper(0.10);   // light dim — wallpaper shows through behind clock
-  // Cracked screen overlay — appears in late phase (this isn't your phone)
+  drawWallpaper(0.10);   // light dim â€” wallpaper shows through behind clock
+  // Cracked screen overlay â€” appears in late phase (this isn't your phone)
   if (timePhase>=PHASE.LATE) {
     ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(W*0.55,0); ctx.lineTo(W*0.62,H*0.18);
@@ -1464,11 +1467,11 @@ function drawLock() {
   ctx.fillStyle='rgba(0,0,0,0.5)';
   roundRect(W/2-18,6,36,8,4); ctx.fill();
 
-  ctx.font='bold 52px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 52px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText(`${now.getHours()%12||12}:${String(now.getMinutes()).padStart(2,'0')}`,W/2,130);
   const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  ctx.font='9px monospace'; ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.font='9px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.5)';
   ctx.fillText(`${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`,W/2,148);
   let cy=170;
   for (const t of Object.values(threads).filter(t=>t.unread>0).slice(0,3)) {
@@ -1500,10 +1503,10 @@ function drawLockSlider() {
     ctx.restore();
   }
 
-  // Label — fades as thumb moves right
+  // Label â€” fades as thumb moves right
   ctx.globalAlpha = Math.max(0, 1 - lockSlide.progress * 2.5);
-  ctx.font = '8px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.38)';
-  ctx.fillText('slide to unlock  ›', SLIDE_X + SLIDE_W / 2 + SLIDE_TR, cy + 3);
+  ctx.font = '8px Buzzer11, monospace'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.38)';
+  ctx.fillText('slide to unlock  â€º', SLIDE_X + SLIDE_W / 2 + SLIDE_TR, cy + 3);
   ctx.globalAlpha = 1;
 
   // Thumb
@@ -1511,8 +1514,8 @@ function drawLockSlider() {
   ctx.beginPath(); ctx.arc(tx, cy, SLIDE_TR, 0, Math.PI * 2); ctx.fill();
   // Arrow chevron on thumb
   ctx.fillStyle = 'rgba(30,30,50,0.6)';
-  ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
-  ctx.fillText('›', tx + 1, cy + 4);
+  ctx.font = 'bold 11px Buzzer11, monospace'; ctx.textAlign = 'center';
+  ctx.fillText('â€º', tx + 1, cy + 4);
   ctx.textAlign = 'left';
 }
 
@@ -1520,16 +1523,16 @@ function drawLockCard(x,y,w,sender,preview) {
   ctx.fillStyle='rgba(255,255,255,0.09)'; roundRect(x,y,w,50,10); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.13)'; ctx.lineWidth=1; roundRect(x,y,w,50,10); ctx.stroke();
   ctx.fillStyle='#3c8c4a'; roundRect(x+8,y+9,28,28,6); ctx.fill();
-  ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('💬',x+22,y+28);
+  ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('ðŸ’¬',x+22,y+28);
   ctx.textAlign='left';
-  ctx.font='bold 8px monospace'; ctx.fillStyle='#fff'; ctx.fillText(sender,x+44,y+20);
-  ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.58)';
-  ctx.fillText(preview.length>28?preview.slice(0,27)+'…':preview,x+44,y+34);
-  ctx.font='6px monospace'; ctx.fillStyle='rgba(255,255,255,0.28)';
+  ctx.font='bold 8px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.fillText(sender,x+44,y+20);
+  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.58)';
+  ctx.fillText(preview.length>28?preview.slice(0,27)+'â€¦':preview,x+44,y+34);
+  ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.28)';
   ctx.textAlign='right'; ctx.fillText('now',x+w-8,y+20); ctx.textAlign='left';
 }
 
-// ── Home screen ────────────────────────────────────────────────────
+// â”€â”€ Home screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawHome() {
   drawWallpaper(0.42);   // heavier dim so app icons stay readable
   // Notch pill
@@ -1540,8 +1543,8 @@ function drawHome() {
   if (timePhase>=PHASE.EVENING && Object.values(threads).every(t=>!t.scriptNode)) {
     const qy=H-NAV_H-30;
     ctx.fillStyle='rgba(255,255,255,0.05)'; roundRect(8,qy,W-16,22,6); ctx.fill();
-    ctx.font='7px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.28)';
-    ctx.fillText('the phone goes quiet  ·  tap to reflect',W/2,qy+14);
+    ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.28)';
+    ctx.fillText('the phone goes quiet  Â·  tap to reflect',W/2,qy+14);
     ctx.textAlign='left';
   }
 }
@@ -1559,23 +1562,23 @@ function drawAppIcon(app) {
     // Animated music note instead of number badge
     ctx.fillStyle=TRACKS[musicState.idx]?.col||'#8030a0';
     ctx.beginPath(); ctx.arc(app.x+APP_SZ-5,app.y+5,7,0,Math.PI*2); ctx.fill();
-    ctx.font='bold 8px monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
-    ctx.fillText('♫',app.x+APP_SZ-5,app.y+9);
+    ctx.font='bold 8px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+    ctx.fillText('â™«',app.x+APP_SZ-5,app.y+9);
     ctx.textAlign='left';
     badge=-1; // already drawn, skip default badge
   }
   if (badge>0) {
     ctx.fillStyle='#e53935'; ctx.beginPath();
     ctx.arc(app.x+APP_SZ-5,app.y+5,7,0,Math.PI*2); ctx.fill();
-    ctx.font='bold 7px monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+    ctx.font='bold 7px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.textAlign='center';
     ctx.fillText(String(badge),app.x+APP_SZ-5,app.y+8); ctx.textAlign='left';
   }
-  ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.75)';
+  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.75)';
   ctx.fillText(app.label,app.x+APP_SZ/2,app.y+APP_SZ+13);
   ctx.textAlign='left';
 }
 
-// ── Messages list ──────────────────────────────────────────────────
+// â”€â”€ Messages list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawMsgList() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Messages');
@@ -1589,23 +1592,23 @@ function drawThreadRow(key,t,y) {
   ctx.fillRect(0,y,W,55);
   ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(52,y+54,W-52,1);
   ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(28,y+27,18,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 11px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 11px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText((r?.name||key)[0].toUpperCase(),28,y+32);
   ctx.textAlign='left';
-  ctx.font=t.unread>0?'bold 9px monospace':'9px monospace'; ctx.fillStyle='#fff';
+  ctx.font=t.unread>0?'bold 9px Buzzer11, monospace':'9px Buzzer11, monospace'; ctx.fillStyle='#fff';
   ctx.fillText(r?.name||key,54,y+18);
-  ctx.font='8px monospace';
+  ctx.font='8px Buzzer11, monospace';
   ctx.fillStyle=t.unread>0?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.38)';
   const prev=last?(last.from==='me'?'You: '+last.text:last.text):'';
-  ctx.fillText(prev.length>26?prev.slice(0,25)+'…':prev,54,y+34);
+  ctx.fillText(prev.length>26?prev.slice(0,25)+'â€¦':prev,54,y+34);
   if (last) {
-    ctx.textAlign='right'; ctx.font='6px monospace';
+    ctx.textAlign='right'; ctx.font='6px Buzzer11, monospace';
     ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillText(last.time,W-10,y+18); ctx.textAlign='left';
   }
   if (t.unread>0) { ctx.fillStyle='#3c8c4a'; ctx.beginPath(); ctx.arc(W-13,y+33,5,0,Math.PI*2); ctx.fill(); }
 }
 
-// ── Thread view ────────────────────────────────────────────────────
+// â”€â”€ Thread view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawThread() {
   if (!activeThreadKey) return;
   const t=threads[activeThreadKey], r=rel[activeThreadKey];
@@ -1613,11 +1616,11 @@ function drawThread() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,34);
   ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(0,STATUS_H+33,W,1);
-  ctx.font='11px monospace'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('‹',8,STATUS_H+22);
+  ctx.font='11px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('â€¹',8,STATUS_H+22);
   ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(W/2,STATUS_H+11,9,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 7px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText((r?.name||activeThreadKey)[0].toUpperCase(),W/2,STATUS_H+14);
-  ctx.font='bold 9px monospace'; ctx.fillStyle='#fff';
+  ctx.font='bold 9px Buzzer11, monospace'; ctx.fillStyle='#fff';
   ctx.fillText(r?.name||activeThreadKey,W/2,STATUS_H+30);
   ctx.textAlign='left';
   const hasChoices=node?.choices&&!choiceMade&&!typingActive;
@@ -1634,9 +1637,9 @@ function drawBubbles(t,top,bottom) {
   for (let i=t.messages.length-1;i>=0;i--) {
     const msg=t.messages[i], isMe=msg.from==='me';
     const maxBW=190,padX=9,padY=7;
-    const lines=wrapText(msg.text,maxBW-padX*2,'8px monospace');
+    const lines=wrapText(msg.text,maxBW-padX*2,'8px Buzzer11, monospace');
     const bH=lines.length*12+padY*2;
-    const bW=Math.min(maxBW,Math.ceil(longestLine(lines,'8px monospace'))+padX*2+4);
+    const bW=Math.min(maxBW,Math.ceil(longestLine(lines,'8px Buzzer11, monospace'))+padX*2+4);
     y-=bH+7;
     if (y+bH<top) break;
     const bX=isMe?W-bW-10:10;
@@ -1646,14 +1649,14 @@ function drawBubbles(t,top,bottom) {
     else       { ctx.moveTo(bX,y+bH-10);    ctx.lineTo(bX-6,y+bH-4);    ctx.lineTo(bX+4,y+bH-4);    }
     ctx.fill();
     ctx.fillStyle=isMe?'#1d5fa8':'#252535'; roundRect(bX,y,bW,bH,10); ctx.fill();
-    ctx.font='8px monospace'; ctx.fillStyle='#f0f0f0'; ctx.textAlign='left';
+    ctx.font='8px Buzzer11, monospace'; ctx.fillStyle='#f0f0f0'; ctx.textAlign='left';
     for (let li=0;li<lines.length;li++) ctx.fillText(lines[li],bX+padX,y+padY+10+li*12);
     if (isMe&&i===t.messages.length-1) {
-      ctx.font='6px monospace'; ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.textAlign='right';
+      ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.textAlign='right';
       ctx.fillText(settings.readReceipts?'Read':'Delivered',W-10,y+bH+8);
     }
     if (i===0||i%4===0) {
-      ctx.font='6px monospace'; ctx.fillStyle='rgba(255,255,255,0.2)';
+      ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.2)';
       ctx.textAlign='center'; ctx.fillText(msg.time,W/2,y-3);
     }
     ctx.textAlign='left';
@@ -1679,14 +1682,14 @@ function drawChoices(choices,startY) {
     ctx.fillStyle=silent?'rgba(45,45,55,0.92)':'rgba(22,70,140,0.92)'; roundRect(8,by,W-16,bH,6); ctx.fill();
     ctx.strokeStyle=silent?'rgba(130,130,150,0.3)':'rgba(80,140,255,0.4)'; ctx.lineWidth=1;
     roundRect(8,by,W-16,bH,6); ctx.stroke();
-    ctx.font='8px monospace'; ctx.fillStyle=silent?'rgba(255,255,255,0.45)':'#fff';
+    ctx.font='8px Buzzer11, monospace'; ctx.fillStyle=silent?'rgba(255,255,255,0.45)':'#fff';
     ctx.textAlign='left'; ctx.fillText(c.text,16,by+bH/2+3);
     by+=bH+gap;
   }
   ctx.globalAlpha=1; ctx.textAlign='left';
 }
 
-// ── Notes app ──────────────────────────────────────────────────────
+// â”€â”€ Notes app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawNotes() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Notes');
@@ -1697,22 +1700,22 @@ function drawNotes() {
     if (ry>H-NAV_H-10) break;
     ctx.fillStyle='rgba(255,220,80,0.04)'; roundRect(8,ry,W-16,52,6); ctx.fill();
     ctx.strokeStyle='rgba(255,220,80,0.1)'; ctx.lineWidth=1; roundRect(8,ry,W-16,52,6); ctx.stroke();
-    ctx.font='6px monospace'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.25)';
+    ctx.font='6px Buzzer11, monospace'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.25)';
     ctx.fillText(note.time,W-16,ry+12);
-    ctx.textAlign='left'; ctx.font='8px monospace'; ctx.fillStyle='rgba(255,255,220,0.85)';
-    const lines=wrapText(note.body,W-40,'8px monospace');
+    ctx.textAlign='left'; ctx.font='8px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,220,0.85)';
+    const lines=wrapText(note.body,W-40,'8px Buzzer11, monospace');
     for (let li=0;li<Math.min(lines.length,3);li++) ctx.fillText(lines[li],16,ry+14+li*12);
     ry+=58;
   }
 }
 
-// ── Photos app ─────────────────────────────────────────────────────
+// â”€â”€ Photos app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawPhotos() {
   ctx.fillStyle='#080810'; ctx.fillRect(0,0,W,H);
   appHeader('Photos');
   const py=STATUS_H+32, ph=H-NAV_H-py-24, pw=W-16;
   drawNightScene(8,py,pw,ph,photoZoom);
-  ctx.font='7px monospace'; ctx.textAlign='center';
+  ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center';
   ctx.fillStyle='rgba(255,255,255,0.28)';
   ctx.fillText(photoZoom?'tap to zoom out':'tap to zoom',W/2,H-NAV_H-6);
   ctx.textAlign='left';
@@ -1761,18 +1764,18 @@ function drawNightScene(x,y,w,h,zoomed) {
     ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(f1X+6*fS,gY-14*fS); ctx.lineTo(f2X-2*fS,gY-12*fS); ctx.stroke();
   }
-  // Timestamp — the anomaly
+  // Timestamp â€” the anomaly
   ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(x+w-66,y+h-18,62,14);
-  ctx.font='bold 7px monospace'; ctx.textAlign='right';
+  ctx.font='bold 7px Buzzer11, monospace'; ctx.textAlign='right';
   ctx.fillStyle=zoomed?'#ffcc44':'rgba(255,255,255,0.6)';
   ctx.fillText('12:31 AM',x+w-6,y+h-6);
-  // Location tag — only after timeline revealed
+  // Location tag â€” only after timeline revealed
   if (flags.has('alex_timeline_revealed')) {
-    ctx.font='6px monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.font='6px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
     ctx.fillText('near Riley St',x+8,y+h-6);
   }
   if (zoomed && flags.has('morgan_night_ok')) {
-    ctx.font='6px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,90,90,0.55)';
+    ctx.font='6px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,90,90,0.55)';
     ctx.fillText('Morgan texted at 11:42 PM',x+w/2,y+h-22);
   }
   ctx.restore();
@@ -1786,7 +1789,7 @@ function drawFigure(cx,gY,s,col) {
   ctx.fillRect(Math.round(cx+1*s),Math.round(gY-6*s),Math.round(2*s),Math.round(6*s));
 }
 
-// ── Calls app ──────────────────────────────────────────────────────
+// â”€â”€ Calls app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawCalls() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Calls');
@@ -1801,26 +1804,26 @@ function drawCalls() {
     // Avatar
     const r=rel[entry.key];
     ctx.fillStyle=r?.color||'#555'; ctx.beginPath(); ctx.arc(28,ry+21,14,0,Math.PI*2); ctx.fill();
-    ctx.font='bold 9px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+    ctx.font='bold 9px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
     ctx.fillText(entry.name[0],28,ry+25);
 
     // Type icon + name
     ctx.textAlign='left';
     const typeCol = entry.type==='missed'?'#e53935': entry.type==='outgoing'?'#6aacff':'rgba(255,255,255,0.5)';
-    const typeIcon = entry.type==='missed'?'↙':'↗';
-    ctx.font='8px monospace'; ctx.fillStyle=typeCol;
+    const typeIcon = entry.type==='missed'?'â†™':'â†—';
+    ctx.font='8px Buzzer11, monospace'; ctx.fillStyle=typeCol;
     ctx.fillText(typeIcon,50,ry+16);
-    ctx.font=entry.type==='missed'?'bold 9px monospace':'9px monospace';
+    ctx.font=entry.type==='missed'?'bold 9px Buzzer11, monospace':'9px Buzzer11, monospace';
     ctx.fillStyle=entry.type==='missed'?'#e87070':'#fff';
     ctx.fillText(entry.name,62,ry+16);
-    ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.35)';
     ctx.fillText(entry.time,62,ry+30);
     ry+=43;
   }
 
   // Voicemail section
   ry+=8;
-  ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.textAlign='left';
+  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.textAlign='left';
   ctx.fillText('VOICEMAIL',14,ry);
   ry+=10;
 
@@ -1832,12 +1835,12 @@ function drawCalls() {
 
   // VM header row
   ctx.fillStyle=rel.morgan.color; ctx.beginPath(); ctx.arc(26,ry+17,10,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 7px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff'; ctx.fillText('M',26,ry+21);
+  ctx.font='bold 7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff'; ctx.fillText('M',26,ry+21);
   ctx.textAlign='left';
-  ctx.font=vm.listened?'9px monospace':'bold 9px monospace';
+  ctx.font=vm.listened?'9px Buzzer11, monospace':'bold 9px Buzzer11, monospace';
   ctx.fillStyle=vm.listened?'#aaa':'#fff'; ctx.fillText('Morgan',44,ry+13);
-  ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.35)';
-  ctx.fillText(`${vm.time}  ·  ${vm.duration}`,44,ry+26);
+  ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.fillText(`${vm.time}  Â·  ${vm.duration}`,44,ry+26);
   if (!vm.listened) {
     ctx.fillStyle='#e53935'; ctx.beginPath(); ctx.arc(W-18,ry+17,5,0,Math.PI*2); ctx.fill();
   }
@@ -1847,24 +1850,24 @@ function drawCalls() {
     ry+=36;
     ctx.fillStyle='rgba(0,0,0,0)';
     if (vm.listened) {
-      ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,220,0.75)';
-      const lines=wrapText(vm.transcript,W-44,'7px monospace');
+      ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,220,0.75)';
+      const lines=wrapText(vm.transcript,W-44,'7px Buzzer11, monospace');
       for (let li=0;li<Math.min(lines.length,4);li++) ctx.fillText(lines[li],18,ry+li*11);
     } else {
       ctx.fillStyle='rgba(100,160,255,0.8)'; roundRect(W/2-40,ry,80,22,5); ctx.fill();
-      ctx.font='7px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-      ctx.fillText('▶  Listen',W/2,ry+14);
+      ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+      ctx.fillText('â–¶  Listen',W/2,ry+14);
       ctx.textAlign='left';
     }
   }
 
-  // Call-back section — appears in evening phase if not already called
+  // Call-back section â€” appears in evening phase if not already called
   if (timePhase>=PHASE.EVENING && !flags.has('called_morgan_back')) {
     const cby=H-NAV_H-36;
     ctx.fillStyle='rgba(60,140,74,0.12)'; roundRect(8,cby,W-16,28,6); ctx.fill();
     ctx.strokeStyle='rgba(60,140,74,0.35)'; ctx.lineWidth=1; roundRect(8,cby,W-16,28,6); ctx.stroke();
-    ctx.font='8px monospace'; ctx.textAlign='center'; ctx.fillStyle='#7ed87f';
-    ctx.fillText('📞  Call Morgan back',W/2,cby+17);
+    ctx.font='8px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#7ed87f';
+    ctx.fillText('ðŸ“ž  Call Morgan back',W/2,cby+17);
     ctx.textAlign='left';
   }
 
@@ -1872,7 +1875,7 @@ function drawCalls() {
   if (callBack.active) drawCallOverlay();
 }
 
-// ── Music app ──────────────────────────────────────────────────────
+// â”€â”€ Music app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawMusic() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   if (musicState.view==='player' && musicState.idx>=0) drawMusicPlayer();
@@ -1889,14 +1892,14 @@ function drawMusicList() {
     ctx.fillStyle=t.col+'28'; ctx.fillRect(0,ry,W,38);
     ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(0,ry+37,W,1);
     ctx.fillStyle=t.col; roundRect(10,ry+7,24,24,5); ctx.fill();
-    ctx.font='13px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-    ctx.fillText(musicState.playing?'⏸':'▶',22,ry+25);
+    ctx.font='13px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+    ctx.fillText(musicState.playing?'â¸':'â–¶',22,ry+25);
     ctx.textAlign='left';
-    ctx.font='bold 8px monospace'; ctx.fillStyle='#fff';
-    const titleStr = t.title.length>22 ? t.title.slice(0,21)+'…' : t.title;
+    ctx.font='bold 8px Buzzer11, monospace'; ctx.fillStyle='#fff';
+    const titleStr = t.title.length>22 ? t.title.slice(0,21)+'â€¦' : t.title;
     ctx.fillText(titleStr,42,ry+17);
-    ctx.font='7px monospace'; ctx.fillStyle=t.col;
-    ctx.fillText(musicState.playing?'♫ now playing':'paused',42,ry+30);
+    ctx.font='7px Buzzer11, monospace'; ctx.fillStyle=t.col;
+    ctx.fillText(musicState.playing?'â™« now playing':'paused',42,ry+30);
     ry+=42;
   }
 
@@ -1908,17 +1911,17 @@ function drawMusicList() {
     ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(44,ry+33,W-44,1);
     // Color swatch
     ctx.fillStyle=t.col; roundRect(10,ry+7,20,20,4); ctx.fill();
-    ctx.font='bold 8px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.font='bold 8px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,0.5)';
     ctx.fillText(i+1,20,ry+21);
     ctx.textAlign='left';
-    ctx.font=active?'bold 8px monospace':'8px monospace';
+    ctx.font=active?'bold 8px Buzzer11, monospace':'8px Buzzer11, monospace';
     ctx.fillStyle=active?'#fff':'rgba(255,255,255,0.75)';
-    ctx.fillText(t.title.length>26?t.title.slice(0,25)+'…':t.title,40,ry+22);
+    ctx.fillText(t.title.length>26?t.title.slice(0,25)+'â€¦':t.title,40,ry+22);
     // Playing dots animation
     if (active&&musicState.playing) {
       const d='.'.repeat(Math.floor(totalTime*3)%4);
-      ctx.font='8px monospace'; ctx.textAlign='right'; ctx.fillStyle=t.col;
-      ctx.fillText('♫'+d,W-10,ry+22); ctx.textAlign='left';
+      ctx.font='8px Buzzer11, monospace'; ctx.textAlign='right'; ctx.fillStyle=t.col;
+      ctx.fillText('â™«'+d,W-10,ry+22); ctx.textAlign='left';
     }
     ry+=34;
   }
@@ -1961,10 +1964,10 @@ function drawMusicPlayer() {
 
   // Track info
   const infoY=artY+artS+16;
-  ctx.font='bold 10px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-  const displayTitle = t.title.length>24 ? t.title.slice(0,23)+'…' : t.title;
+  ctx.font='bold 10px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  const displayTitle = t.title.length>24 ? t.title.slice(0,23)+'â€¦' : t.title;
   ctx.fillText(displayTitle,W/2,infoY);
-  ctx.font='6px monospace'; ctx.fillStyle='rgba(255,255,255,0.3)';
+  ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.3)';
   ctx.fillText(`${musicState.idx+1}  /  ${TRACKS.length}`,W/2,infoY+13);
 
   // Progress bar
@@ -1976,23 +1979,23 @@ function drawMusicPlayer() {
   // Scrubber thumb
   ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(progX+Math.round(progW*pct),progY+2,5,0,Math.PI*2); ctx.fill();
   // Times
-  ctx.font='6px monospace'; ctx.fillStyle='rgba(255,255,255,0.28)';
+  ctx.font='6px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.28)';
   ctx.textAlign='left';  ctx.fillText(fmtTime(cur),progX,progY+14);
   ctx.textAlign='right'; ctx.fillText(fmtTime(dur),progX+progW,progY+14);
 
   // Controls
   const ctrlY=progY+28, cx=W/2;
   // Prev
-  ctx.font='20px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.65)';
-  ctx.fillText('⏮',cx-52,ctrlY+16);
+  ctx.font='20px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.65)';
+  ctx.fillText('â®',cx-52,ctrlY+16);
   // Play/Pause button
   ctx.fillStyle=t.col; ctx.beginPath(); ctx.arc(cx,ctrlY+12,20,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(cx,ctrlY+12,20,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='18px monospace';
-  ctx.fillText(musicState.playing?'⏸':'▶',cx+(musicState.playing?0:1),ctrlY+18);
+  ctx.fillStyle='#fff'; ctx.font='18px Buzzer11, monospace';
+  ctx.fillText(musicState.playing?'â¸':'â–¶',cx+(musicState.playing?0:1),ctrlY+18);
   // Next
-  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='20px monospace';
-  ctx.fillText('⏭',cx+52,ctrlY+16);
+  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='20px Buzzer11, monospace';
+  ctx.fillText('â­',cx+52,ctrlY+16);
   ctx.textAlign='left';
 }
 
@@ -2025,7 +2028,7 @@ function onClickMusicPlayer(mx,my) {
   const ctrlY=progY+28, cx=W/2;
   const audio=musicState.audio;
 
-  // Seek — tap on progress bar
+  // Seek â€” tap on progress bar
   if (my>=progY-6&&my<=progY+16&&audio?.duration) {
     const t=Math.max(0,Math.min(1,(mx-progX)/progW));
     audio.currentTime=t*audio.duration; return;
@@ -2038,7 +2041,7 @@ function onClickMusicPlayer(mx,my) {
   if (mx>=cx+32&&mx<=cx+68&&my>=ctrlY&&my<ctrlY+32) { musicSkip(1); return; }
 }
 
-// ── Settings ───────────────────────────────────────────────────────
+// â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawSettings() {
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   appHeader('Settings');
@@ -2046,29 +2049,29 @@ function drawSettings() {
   for (const row of SETTING_ROWS) {
     ctx.fillStyle='rgba(255,255,255,0.02)'; ctx.fillRect(0,ry,W,36);
     ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(0,ry+35,W,1);
-    ctx.font='9px monospace'; ctx.fillStyle='#eee'; ctx.fillText(row.label,14,ry+14);
-    ctx.font='7px monospace'; ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillText(row.sub,14,ry+27);
+    ctx.font='9px Buzzer11, monospace'; ctx.fillStyle='#eee'; ctx.fillText(row.label,14,ry+14);
+    ctx.font='7px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillText(row.sub,14,ry+27);
     const on=settings[row.key], tx=W-46, ty=ry+10;
     ctx.fillStyle=on?'#3c8c4a':'#2a2a3a'; roundRect(tx,ty,32,16,8); ctx.fill();
     ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(on?tx+24:tx+8,ty+8,6,0,Math.PI*2); ctx.fill();
     ry+=38;
   }
   if (flags.has('receipts_off')) {
-    ctx.font='7px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,80,80,0.55)';
+    ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,80,80,0.55)';
     ctx.fillText('Morgan noticed your read receipts are off',W/2,ry+14);
     ctx.textAlign='left';
   }
 }
 
-// ── Call overlay ───────────────────────────────────────────────────
+// â”€â”€ Call overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawCallOverlay() {
   // Full-screen dark overlay
   ctx.fillStyle='rgba(10,8,20,0.96)'; ctx.fillRect(0,0,W,H);
   // Avatar
   ctx.fillStyle=rel.morgan.color; ctx.beginPath(); ctx.arc(W/2,100,28,0,Math.PI*2); ctx.fill();
-  ctx.font='bold 18px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 18px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText('M',W/2,108);
-  ctx.font='bold 11px monospace'; ctx.fillStyle='#fff'; ctx.fillText('Morgan',W/2,148);
+  ctx.font='bold 11px Buzzer11, monospace'; ctx.fillStyle='#fff'; ctx.fillText('Morgan',W/2,148);
 
   if (callBack.state==='calling') {
     // Pulsing ring
@@ -2076,11 +2079,11 @@ function drawCallOverlay() {
     ctx.strokeStyle=`rgba(${rel.morgan.color.slice(1).match(/../g).map(h=>parseInt(h,16)).join(',')},${0.2+0.3*pulse})`;
     ctx.lineWidth=2+pulse*3;
     ctx.beginPath(); ctx.arc(W/2,100,(30+pulse*8),0,Math.PI*2); ctx.stroke();
-    ctx.font='8px monospace'; ctx.fillStyle='rgba(255,255,255,0.45)';
-    ctx.fillText('calling…',W/2,170);
+    ctx.font='8px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.fillText('callingâ€¦',W/2,170);
   } else {
     // Transcript lines
-    ctx.font='8px monospace'; ctx.textAlign='left';
+    ctx.font='8px Buzzer11, monospace'; ctx.textAlign='left';
     let ly=185;
     for (let i=0;i<callBack.lineIdx;i++) {
       const line=callBack.lines[i];
@@ -2091,13 +2094,13 @@ function drawCallOverlay() {
     // Hang up button once all lines shown
     if (callBack.lineIdx>=callBack.lines.length) {
       ctx.fillStyle='rgba(220,60,60,0.85)'; ctx.beginPath(); ctx.arc(W/2,H-NAV_H-30,16,0,Math.PI*2); ctx.fill();
-      ctx.font='13px sans-serif'; ctx.textAlign='center'; ctx.fillText('📵',W/2,H-NAV_H-23);
+      ctx.font='13px sans-serif'; ctx.textAlign='center'; ctx.fillText('ðŸ“µ',W/2,H-NAV_H-23);
     }
   }
   ctx.textAlign='left';
 }
 
-// ── Epilogue screen ────────────────────────────────────────────────
+// â”€â”€ Epilogue screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function drawEnd() {
   const g=ctx.createLinearGradient(0,0,0,H);
   g.addColorStop(0,'#080612'); g.addColorStop(1,'#0e0820');
@@ -2109,11 +2112,11 @@ function drawEnd() {
   ctx.fillStyle=ag; ctx.fillRect(0,0,W,H);
 
   // Title line
-  ctx.font='7px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.2)';
-  ctx.fillText(timePhase>=PHASE.LATE?'end of day  ·  2:47 AM':'end of day',W/2,42);
+  ctx.font='7px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.2)';
+  ctx.fillText(timePhase>=PHASE.LATE?'end of day  Â·  2:47 AM':'end of day',W/2,42);
 
   // Closing line based on final state
-  ctx.font='bold 10px monospace'; ctx.fillStyle='rgba(255,255,255,0.72)';
+  ctx.font='bold 10px Buzzer11, monospace'; ctx.fillStyle='rgba(255,255,255,0.72)';
   ctx.fillText(endingLine(),W/2,72);
 
   // Relationship bars
@@ -2125,13 +2128,13 @@ function drawEnd() {
   ];
   let ry=106;
   for (const {name,r} of rels) {
-    ctx.font='7px monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.font='7px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.35)';
     ctx.fillText(name,14,ry);
     // Trust bar
     const bw=W-90, bx=60, trust=Math.max(0,Math.min(100,r.trust));
     ctx.fillStyle='rgba(255,255,255,0.06)'; roundRect(bx,ry-8,bw,6,3); ctx.fill();
     ctx.fillStyle=r.color||'#666'; roundRect(bx,ry-8,Math.round(bw*trust/100),6,3); ctx.fill();
-    ctx.font='6px monospace'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.22)';
+    ctx.font='6px Buzzer11, monospace'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.22)';
     ctx.fillText(r.tone,W-10,ry);
     ry+=22;
   }
@@ -2140,7 +2143,7 @@ function drawEnd() {
   ry+=8;
   ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(14,ry,W-28,1);
   ry+=12;
-  ctx.font='7px monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.2)';
+  ctx.font='7px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.2)';
   ctx.fillText('how you communicate',14,ry); ry+=14;
   const total=Math.max(1,profile.defensive+profile.trusting+profile.avoidant);
   const bars=[
@@ -2150,7 +2153,7 @@ function drawEnd() {
   ];
   for (const b of bars) {
     const pct=b.val/total, bw2=Math.round((W-70)*pct);
-    ctx.font='7px monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.32)';
+    ctx.font='7px Buzzer11, monospace'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.32)';
     ctx.fillText(b.label,14,ry);
     ctx.fillStyle=b.col+'44'; roundRect(58,ry-8,(W-70),6,3); ctx.fill();
     if (bw2>0) { ctx.fillStyle=b.col; roundRect(58,ry-8,bw2,6,3); ctx.fill(); }
@@ -2158,7 +2161,7 @@ function drawEnd() {
   }
 
   // Restart hint
-  ctx.font='6px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.font='6px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.12)';
   ctx.fillText('tap anywhere to go back',W/2,H-16);
 }
 
@@ -2182,15 +2185,15 @@ function onClickEnd(mx, my) {
   screen = SCR.HOME;
 }
 
-// ── Shared header ──────────────────────────────────────────────────
+// â”€â”€ Shared header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function appHeader(title) {
   ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,32);
   ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,STATUS_H+31,W,1);
-  ctx.font='bold 11px monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.font='bold 11px Buzzer11, monospace'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText(title,W/2,STATUS_H+21); ctx.textAlign='left';
 }
 
-// ── Utilities ──────────────────────────────────────────────────────
+// â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function wrapText(text,maxW,font) {
   ctx.font=font;
   const words=text.split(' '), lines=[]; let line='';
@@ -2220,9 +2223,11 @@ function roundRect(x,y,w,h,r) {
   ctx.closePath();
 }
 
-// ── Game loop ──────────────────────────────────────────────────────
+// â”€â”€ Game loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function loop(ts) {
   const dt=Math.min((ts-lastTs)/1000,0.1); lastTs=ts;
   update(dt); draw(); requestAnimationFrame(loop);
 }
 requestAnimationFrame(ts=>{ lastTs=ts; requestAnimationFrame(loop); });
+
+
