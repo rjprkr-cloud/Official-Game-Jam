@@ -1320,15 +1320,90 @@ function drawNotifToast() {
   ctx.restore();
 }
 
+// ── Wallpaper ──────────────────────────────────────────────────────
+// Pre-baked bokeh dots using a simple xorshift so positions are
+// identical every run (no asset loading required).
+const BOKEH = (function() {
+  let s = 0x9e3779b9;
+  const r = () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/0xffffffff; };
+  const dots = [];
+  for (let i = 0; i < 24; i++) {
+    dots.push({ x:r(), y:r()*0.86, rad:7+r()*22,
+      hue: Math.floor(r()*3),   // 0=blue  1=purple  2=amber
+      a:   0.10+r()*0.18 });
+  }
+  return dots;
+})();
+
+// Skyline silhouette (fixed proportions, drawn dark over wallpaper)
+const SKYLINE = [
+  [0.00,0.15,0.22],[0.13,0.10,0.15],[0.21,0.18,0.28],
+  [0.37,0.12,0.19],[0.47,0.16,0.32],[0.60,0.14,0.23],
+  [0.72,0.15,0.17],[0.85,0.14,0.26],
+];
+
+const BOKEH_COLS = [
+  [[70,110,255],[40,55,180]],    // blue-violet
+  [[150,75,225],[100,35,185]],   // purple
+  [[225,140,65],[175,80,25]],    // amber
+];
+
+function drawWallpaper(dimAmt) {
+  // Phase-keyed base gradient
+  const stops = {
+    [PHASE.NIGHT]:     ['#06080f','#0e0619'],
+    [PHASE.MORNING]:   ['#08101c','#100c22'],
+    [PHASE.AFTERNOON]: ['#0d0c1a','#180e20'],
+    [PHASE.EVENING]:   ['#0a0617','#15081b'],
+    [PHASE.LATE]:      ['#040307','#07040d'],
+  };
+  const [c0,c1] = stops[timePhase] || stops[PHASE.NIGHT];
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,c0); bg.addColorStop(1,c1);
+  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+
+  // Bokeh — alpha scaled by phase brightness
+  const phMult = {[PHASE.NIGHT]:1,[PHASE.MORNING]:0.75,[PHASE.AFTERNOON]:0.65,[PHASE.EVENING]:0.9,[PHASE.LATE]:0.35}[timePhase]??1;
+  for (const d of BOKEH) {
+    const px = d.x*W, py = d.y*H;
+    const [[r1,g1,b1],[r2,g2,b2]] = BOKEH_COLS[d.hue];
+    const a = d.a * phMult;
+    const rg = ctx.createRadialGradient(px,py,0,px,py,d.rad);
+    rg.addColorStop(0,`rgba(${r1},${g1},${b1},${a.toFixed(2)})`);
+    rg.addColorStop(1,`rgba(${r2},${g2},${b2},0)`);
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.arc(px,py,d.rad,0,Math.PI*2); ctx.fill();
+  }
+
+  // Stars (night / late only) — tiny 1px dots above skyline
+  if (timePhase === PHASE.NIGHT || timePhase === PHASE.LATE) {
+    ctx.fillStyle = `rgba(255,255,255,${timePhase===PHASE.LATE?0.25:0.55})`;
+    for (const d of BOKEH) {
+      if (d.y < 0.55) ctx.fillRect(Math.round(d.x*W), Math.round(d.y*H*0.65), 1, 1);
+    }
+  }
+
+  // Skyline silhouette
+  const hY = Math.round(H * 0.78);
+  for (const [fx,fw,fh] of SKYLINE) {
+    const bx=Math.round(fx*W), bw=Math.round(fw*W);
+    const bh=Math.round(fh*H), by=hY-bh;
+    ctx.fillStyle='rgba(4,3,8,0.92)';
+    ctx.fillRect(bx, by, bw, hY-by+1);
+  }
+  ctx.fillStyle='rgba(3,2,7,0.96)';
+  ctx.fillRect(0, hY, W, H-hY);
+
+  // Dark overlay so content stays readable
+  if (dimAmt > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${dimAmt})`;
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
 // ── Lock screen ────────────────────────────────────────────────────
 function drawLock() {
-  const g=ctx.createLinearGradient(0,0,W,H);
-  if (timePhase>=PHASE.LATE) {
-    g.addColorStop(0,'#030206'); g.addColorStop(1,'#08040f');
-  } else {
-    g.addColorStop(0,'#0c1520'); g.addColorStop(1,'#17082a');
-  }
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  drawWallpaper(0.10);   // light dim — wallpaper shows through behind clock
   // Cracked screen overlay — appears in late phase (this isn't your phone)
   if (timePhase>=PHASE.LATE) {
     ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
@@ -1409,19 +1484,7 @@ function drawLockCard(x,y,w,sender,preview) {
 
 // ── Home screen ────────────────────────────────────────────────────
 function drawHome() {
-  const g=ctx.createLinearGradient(0,0,0,H);
-  if (timePhase===PHASE.LATE) {
-    g.addColorStop(0,'#030206'); g.addColorStop(1,'#07040e');
-  } else if (timePhase===PHASE.EVENING) {
-    g.addColorStop(0,'#080410'); g.addColorStop(1,'#10061a');
-  } else if (timePhase===PHASE.AFTERNOON) {
-    g.addColorStop(0,'#1a1020'); g.addColorStop(1,'#2a0f1c');
-  } else if (timePhase===PHASE.MORNING) {
-    g.addColorStop(0,'#0e1828'); g.addColorStop(1,'#180e2a');
-  } else {
-    g.addColorStop(0,'#0c1520'); g.addColorStop(1,'#17082a');
-  }
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  drawWallpaper(0.42);   // heavier dim so app icons stay readable
   // Notch pill
   ctx.fillStyle='rgba(0,0,0,0.45)';
   roundRect(W/2-18,5,36,8,4); ctx.fill();
