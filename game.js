@@ -84,7 +84,7 @@ const SCR = Object.freeze({
   MESSAGES:'messages', THREAD:'thread',
   NOTES:'notes', PHOTOS:'photos',
   CALLS:'calls', SETTINGS:'settings',
-  MUSIC:'music', END:'end',
+  MUSIC:'music', BONDS:'bonds', END:'end',
 });
 let screen = SCR.LOCK;
 
@@ -2237,6 +2237,7 @@ let typingNextNode  = null;
 // Thread scroll state
 let threadScrollY  = 0;    // pixels scrolled up from bottom (0 = most recent visible)
 let msgListScrollY = 0;    // pixels scrolled down in the message list (0 = top)
+let bondsScrollY   = 0;    // pixels scrolled down in the Bonds app
 const threadDrag   = { active:false, startY:0, startScroll:0, totalDelta:0, screen:'' };
 
 function msgListMaxScroll() {
@@ -2317,6 +2318,7 @@ const APP_GRID = (function(){
     { id:'notes',    label:'Notes',    col:'#b8a020', icon:'📝'  },
     { id:'calls',    label:'Calls',    col:'#2878c0', icon:'📞'  },
     { id:'music',    label:'Music',    col:'#8030a0', icon:'🎵'  },
+    { id:'bonds',    label:'Bonds',    col:'#a03070', icon:'🫀'  },
     { id:'settings', label:'Settings', col:'#607080', icon:'⚙️'  },
   ];
   const cols=4, gX=10, gY=22, labelH=14;
@@ -2396,6 +2398,12 @@ canvas.addEventListener('mousedown', e => {
     threadDrag.startY      = my;
     threadDrag.startScroll = msgListScrollY;
     threadDrag.totalDelta  = 0;
+  } else if (screen === SCR.BONDS) {
+    threadDrag.active      = true;
+    threadDrag.screen      = SCR.BONDS;
+    threadDrag.startY      = my;
+    threadDrag.startScroll = bondsScrollY;
+    threadDrag.totalDelta  = 0;
   }
 });
 canvas.addEventListener('touchstart', e => {
@@ -2425,6 +2433,12 @@ canvas.addEventListener('touchstart', e => {
     threadDrag.startY      = my;
     threadDrag.startScroll = msgListScrollY;
     threadDrag.totalDelta  = 0;
+  } else if (screen === SCR.BONDS) {
+    threadDrag.active      = true;
+    threadDrag.screen      = SCR.BONDS;
+    threadDrag.startY      = my;
+    threadDrag.startScroll = bondsScrollY;
+    threadDrag.totalDelta  = 0;
   }
 }, { passive: false });
 
@@ -2442,8 +2456,9 @@ function onSlideMove(mx, my) {
     const dy = threadDrag.startY - my;
     threadDrag.totalDelta = Math.abs(dy);
     if (threadDrag.screen === SCR.MESSAGES) {
-      // Drag up (dy > 0) → scroll list down to see more contacts
       msgListScrollY = Math.max(0, Math.min(msgListMaxScroll(), threadDrag.startScroll + dy));
+    } else if (threadDrag.screen === SCR.BONDS) {
+      bondsScrollY = Math.max(0, Math.min(bondsMaxScroll(), threadDrag.startScroll + dy));
     } else {
       // Thread: drag up → show older messages
       threadScrollY = Math.max(0, threadDrag.startScroll + dy);
@@ -2477,6 +2492,8 @@ canvas.addEventListener('wheel', e => {
     threadScrollY = Math.max(0, threadScrollY - delta * 0.6);
   } else if (screen === SCR.MESSAGES) {
     msgListScrollY = Math.max(0, Math.min(msgListMaxScroll(), msgListScrollY + delta * 0.6));
+  } else if (screen === SCR.BONDS) {
+    bondsScrollY = Math.max(0, Math.min(bondsMaxScroll(), bondsScrollY + delta * 0.6));
   }
 }, { passive: false });
 
@@ -2528,6 +2545,7 @@ function onClickHome(mx,my) {
         case 'photos':   screen=SCR.PHOTOS; photoZoom=false; break;
         case 'calls':    screen=SCR.CALLS; callsVoicemailOpen=false; break;
         case 'music':    screen=SCR.MUSIC; break;
+        case 'bonds':    screen=SCR.BONDS; bondsScrollY=0; break;
         case 'settings': screen=SCR.SETTINGS; break;
       }
       return;
@@ -2668,6 +2686,7 @@ function draw() {
     case SCR.PHOTOS:   drawPhotos();   break;
     case SCR.CALLS:    drawCalls();    break;
     case SCR.MUSIC:    drawMusic();    break;
+    case SCR.BONDS:    drawBonds();    break;
     case SCR.SETTINGS: drawSettings(); break;
     case SCR.END:      drawEnd();      break;
   }
@@ -3613,6 +3632,150 @@ function onClickMusicPlayer(mx,my) {
     musicState.volume=Math.max(0,Math.min(1,(mx-vx)/vw));
     if (musicState.audio) musicState.audio.volume=musicState.volume;
   }
+}
+
+// ── Bonds app ──────────────────────────────────────────────────────
+// Ordered list of contacts to show (unknown only once LATE unlocked)
+function bondsContacts() {
+  const order = ['morgan','casey','riley','alex','jordan','sam','taylor','drew','quinn','unknown'];
+  return order.filter(k => {
+    if (k === 'unknown') return !!threads.unknown && threads.unknown.messages.length > 0;
+    return true;
+  });
+}
+function bondsRowH() { return 64; }
+function bondsMaxScroll() {
+  const topY = STATUS_H + 36 + 44; // header + summary card
+  const rows = bondsContacts().length * bondsRowH();
+  return Math.max(0, rows - (H - topY - NAV_H));
+}
+
+function drawBonds() {
+  ctx.fillStyle = '#0d0d16'; ctx.fillRect(0,0,W,H);
+  appHeader('Bonds');
+
+  const contacts = bondsContacts();
+  const listTop  = STATUS_H + 36;
+
+  // ── Summary card ────────────────────────────────────────────────
+  const cardY = listTop + 6;
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  roundRect(8, cardY, W-16, 38, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
+  roundRect(8, cardY, W-16, 38, 8); ctx.stroke();
+
+  // Average trust
+  const known = contacts.filter(k => k !== 'unknown');
+  const avgTrust = known.length
+    ? Math.round(known.reduce((s,k) => s + (rel[k]?.trust||0), 0) / known.length)
+    : 0;
+  // Count tiers
+  const tierCounts = { '♥':0,'★':0,'◆':0,'●':0,'▲':0,'✕':0 };
+  for (const k of known) tierCounts[relTier(k).sym] = (tierCounts[relTier(k).sym]||0) + 1;
+  const highTier = (tierCounts['♥']||0) + (tierCounts['★']||0) + (tierCounts['◆']||0);
+
+  ctx.save();
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+  ctx.fillText('avg trust', 18, cardY + 12);
+  ctx.font = 'bold 14px Arial Narrow, Arial, sans-serif'; ctx.fillStyle = '#fff';
+  ctx.fillText(avgTrust + '%', 18, cardY + 28);
+
+  // Trust bar spanning card
+  const tbX = 80, tbW = W - 96, tbY = cardY + 22;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; roundRect(tbX, tbY, tbW, 5, 2.5); ctx.fill();
+  const fill = Math.round(tbW * avgTrust / 100);
+  if (fill > 0) {
+    const g = ctx.createLinearGradient(tbX, 0, tbX+tbW, 0);
+    g.addColorStop(0,'#7040c8'); g.addColorStop(0.5,'#c04080'); g.addColorStop(1,'#f07040');
+    ctx.fillStyle = g; roundRect(tbX, tbY, fill, 5, 2.5); ctx.fill();
+  }
+  ctx.font = '6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.textAlign = 'right';
+  ctx.fillText(highTier + ' warm+', W-16, cardY + 14);
+  ctx.fillText(known.length + ' contacts', W-16, cardY + 28);
+  ctx.restore();
+
+  // ── Contact rows ────────────────────────────────────────────────
+  const rowsTop  = cardY + 44;
+  const clipH    = H - rowsTop - NAV_H;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, rowsTop, W, clipH); ctx.clip();
+
+  let ry = rowsTop - bondsScrollY;
+  for (const key of contacts) {
+    drawBondRow(key, ry);
+    ry += bondsRowH();
+  }
+  ctx.restore();
+
+  // Fade at top if scrolled
+  if (bondsScrollY > 0) {
+    const fadeG = ctx.createLinearGradient(0, rowsTop, 0, rowsTop + 22);
+    fadeG.addColorStop(0, 'rgba(13,13,22,0.90)'); fadeG.addColorStop(1, 'rgba(13,13,22,0)');
+    ctx.fillStyle = fadeG; ctx.fillRect(0, rowsTop, W, 22);
+  }
+}
+
+function drawBondRow(key, y) {
+  const r    = rel[key];
+  const tier = relTier(key);
+  const t    = threads[key];
+  const rowH = bondsRowH();
+
+  // Row background
+  ctx.fillStyle = 'rgba(255,255,255,0.02)'; ctx.fillRect(0, y, W, rowH);
+  // Tier accent bar (left edge)
+  ctx.fillStyle = tier.col + 'bb'; ctx.fillRect(0, y+2, 3, rowH-4);
+  // Divider
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(48, y+rowH-1, W-48, 1);
+
+  // Avatar
+  drawContactPhoto(key, 28, y + rowH/2, 16);
+
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+
+  // Name + tier symbol
+  ctx.font = 'bold 9px Arial Narrow, Arial, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#fff';
+  ctx.fillText(r?.name || key, 52, y + 18);
+  ctx.font = '9px Arial'; ctx.fillStyle = tier.col;
+  ctx.fillText(tier.sym, 52 + ctx.measureText((r?.name||key)).width + 4, y + 18);
+
+  // Tier label + tone
+  ctx.font = '6.5px Arial Narrow, Arial, sans-serif'; ctx.fillStyle = tier.col + 'cc';
+  ctx.fillText(tier.label, 52, y + 30);
+  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.fillText(r?.tone || '', W - 10, y + 18);
+  ctx.textAlign = 'left';
+
+  // Trust bar
+  const trust  = Math.max(0, Math.min(100, r?.trust || 0));
+  const bX = 52, bY = y + 38, bW = W - 62 - 34, bH = 3;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; roundRect(bX, bY, bW, bH, 1.5); ctx.fill();
+  const bFill = Math.round(bW * trust / 100);
+  if (bFill > 0) { ctx.fillStyle = tier.col; roundRect(bX, bY, bFill, bH, 1.5); ctx.fill(); }
+
+  // Trust % label
+  ctx.font = '6px Arial Narrow, Arial, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillText(trust + '%', W - 10, y + 42);
+  ctx.textAlign = 'left';
+
+  // Tension indicator (small red pip if tension > 0)
+  if (r?.tension > 0) {
+    const tensW = Math.min(bW, Math.round(bW * Math.min(r.tension, 100) / 100));
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = '#e04040'; roundRect(bX, bY, tensW, bH, 1.5); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Days-known chip (number of messages as a rough proxy)
+  const msgCount = t?.messages?.length || 0;
+  const chipLabel = msgCount > 0 ? msgCount + ' msgs' : 'no msgs';
+  ctx.font = '5.5px Arial Narrow, Arial, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillText(chipLabel, 52, y + 52);
+
+  ctx.restore();
 }
 
 // ── Settings ───────────────────────────────────────────────────────
