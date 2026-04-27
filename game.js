@@ -97,6 +97,12 @@ let eveningTimer   = -1;
 let lateTimer      = -1;
 let phaseStartTime = 0;
 
+// ── Game day (1–7) ────────────────────────────────────────────────
+// Day 1 = Sunday (morning after the party), Day 7 = the following Saturday.
+let gameDay = 1;
+const DAY_NAMES = ['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function dayLabel() { return DAY_NAMES[gameDay] || ('D'+gameDay); }
+
 // ── Interpretation profile ─────────────────────────────────────────
 const profile = { defensive:0, trusting:0, avoidant:0 };
 
@@ -113,6 +119,60 @@ const rel = {
   quinn:   { name:'Quinn',   trust:45, tension:0,  tone:'blunt',    color:'#b07848' },
   unknown: { name:'???',     trust:30, tension:0,  tone:'unknown',  color:'#707080' },
 };
+
+// ── Relationship tier helper ───────────────────────────────────────
+function relTier(key) {
+  const r = rel[key];
+  if (!r) return { sym:'○', label:'???', col:'#555555', score:0 };
+  const score = r.trust - r.tension * 0.5;
+  if (key === 'morgan' && flags.has('morgan_connection') && score >= 55)
+    return { sym:'♥', label:'Connected', col:'#e060c8', score };
+  if (score >= 80) return { sym:'★', label:'Close',    col:'#f0c040', score };
+  if (score >= 60) return { sym:'◆', label:'Warm',     col:'#58d880', score };
+  if (score >= 40) return { sym:'●', label:'Neutral',  col:'#6890d0', score };
+  if (score >= 20) return { sym:'▲', label:'Guarded',  col:'#c89050', score };
+  return               { sym:'✕', label:'Strained', col:'#c04040', score };
+}
+
+// ── Floating heart particles ───────────────────────────────────────
+const floatHearts = [];
+function spawnHearts(cx, cy, col) {
+  for (let i = 0; i < 5; i++) {
+    floatHearts.push({
+      x: cx + (Math.random()-0.5)*22,
+      y: cy,
+      vx: (Math.random()-0.5)*0.7,
+      vy: -(1.1 + Math.random()*1.0),
+      scale: 0.55 + Math.random()*0.65,
+      sym: Math.random() < 0.72 ? '♥' : '✦',
+      col,
+      life: 1.1 + Math.random()*0.7,
+      age: 0,
+    });
+  }
+}
+function tickHearts(dt) {
+  for (let i = floatHearts.length-1; i >= 0; i--) {
+    const h = floatHearts[i];
+    h.age += dt; h.x += h.vx; h.y += h.vy;
+    if (h.age >= h.life) floatHearts.splice(i, 1);
+  }
+}
+function drawHearts() {
+  if (!floatHearts.length) return;
+  ctx.save();
+  ctx.textAlign = 'center';
+  for (const h of floatHearts) {
+    const alpha = Math.max(0, 0.88 * (1 - h.age / h.life));
+    if (alpha <= 0) continue;
+    ctx.globalAlpha = alpha;
+    ctx.font = `${Math.round(9 * h.scale)}px Arial`;
+    ctx.fillStyle = h.col;
+    ctx.fillText(h.sym, h.x, h.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
 
 // ── Settings ───────────────────────────────────────────────────────
 const settings = { readReceipts:true, doNotDisturb:false, locationSharing:true };
@@ -1304,6 +1364,393 @@ const SCRIPT = {
   // ── Morgan — call-back transcript variants (for getCallBackLines) ─
   // (handled separately in getCallBackLines function)
 
+  // ══════════════════════════════════════════════════════════════════
+  //  DAY 2  —  Monday
+  // ══════════════════════════════════════════════════════════════════
+
+  d2_morgan_0: {
+    incoming: { text:'hey. I keep coming back to what we talked about yesterday. in a good way I think.', time:'9:18 AM' },
+    choices: [
+      { text:'me too',                     next:'d2_morgan_1a', fx:()=>{ rel.morgan.trust+=3; } },
+      { text:'what part',                  next:'d2_morgan_1b', fx:()=>{} },
+      { text:'(seen)', silent:true,        next:'d2_morgan_silence', fx:()=>{ rel.morgan.tension+=8; flags.add('d2_morgan_pulled_back'); } },
+    ],
+  },
+  d2_morgan_1a: {
+    incoming: { text:'I don\'t know. all of it. you were actually honest with me. that doesn\'t happen as often as you think it does.', time:'9:19 AM' },
+    choices: [
+      { text:'I\'m trying to get better at it', next:'d2_morgan_2',  fx:()=>{ rel.morgan.trust+=3; flags.add('d2_morgan_real'); } },
+      { text:'I had a weird night',             next:'d2_morgan_2b', fx:()=>{} },
+    ],
+  },
+  d2_morgan_1b: {
+    incoming: { text:'the part where you stopped trying to manage how I was going to react.', time:'9:19 AM' },
+    choices: [
+      { text:'I didn\'t realize I did that', next:'d2_morgan_2', fx:()=>{ rel.morgan.trust+=3; } },
+    ],
+  },
+  d2_morgan_2: {
+    incoming: { text:'I can tell. it suits you.', time:'9:20 AM' },
+    choices: null,
+    onEnd: ()=>{ flags.add('d2_morgan_close'); },
+  },
+  d2_morgan_2b: {
+    incoming: { text:'yeah. I know.', time:'9:20 AM' },
+    choices: null, onEnd: ()=>{},
+  },
+  d2_morgan_silence: {
+    incoming: null, choices: null, onEnd: ()=>{},
+  },
+
+  d2_casey_0: {
+    incoming: { text:'ok important question', time:'10:34 AM' },
+    choices: [
+      { text:'what',     next:'d2_casey_1', fx:()=>{} },
+      { text:'casey no', next:'d2_casey_1', fx:()=>{} },
+    ],
+  },
+  d2_casey_1: {
+    incoming: { text:'do you want to come over and watch something terrible and not talk about any of it', time:'10:35 AM' },
+    choices: [
+      { text:'yes. yes I do.',              next:'d2_casey_2',  fx:()=>{ rel.casey.trust+=5; flags.add('casey_hangout'); } },
+      { text:'I wish I could right now',    next:'d2_casey_2b', fx:()=>{ rel.casey.trust+=2; } },
+    ],
+  },
+  d2_casey_2:  { incoming:{ text:'good. I\'ll make snacks. no talking.', time:'10:36 AM' }, choices:null, onEnd:()=>{} },
+  d2_casey_2b: { incoming:{ text:'ok. whenever you\'re ready.', time:'10:37 AM' }, choices:null, onEnd:()=>{} },
+
+  d2_jordan_0: {
+    incoming: { text:'hey. you good?', time:'2:11 PM' },
+    choices: [
+      { text:'still figuring it out honestly',  next:'d2_jordan_1',       fx:()=>{} },
+      { text:'better than yesterday',           next:'d2_jordan_1b',      fx:()=>{} },
+      { text:'(seen)', silent:true,             next:'d2_jordan_silence',  fx:()=>{ rel.jordan.tension+=8; flags.add('d2_jordan_ignored'); } },
+    ],
+  },
+  d2_jordan_1: {
+    incoming: { text:'yeah. me too.', time:'2:12 PM' },
+    choices: null,
+    onEnd: ()=>{ rel.jordan.tension = Math.max(0, rel.jordan.tension - 3); },
+  },
+  d2_jordan_1b: { incoming:{ text:'good. that\'s good.', time:'2:12 PM' }, choices:null, onEnd:()=>{} },
+  d2_jordan_silence: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  DAY 3  —  Tuesday
+  // ══════════════════════════════════════════════════════════════════
+
+  d3_sam_0: {
+    incoming: { text:'I\'ve been going back and forth about whether to say this.', time:'8:52 AM' },
+    choices: [
+      { text:'say it',              next:'d3_sam_1',  fx:()=>{} },
+      { text:'you don\'t have to', next:'d3_sam_1b', fx:()=>{ rel.sam.trust+=2; } },
+    ],
+  },
+  d3_sam_1: {
+    incoming: { text:'I\'m not mad at you for not picking up. I\'m just glad you\'re ok.', time:'8:53 AM' },
+    choices: [
+      { text:'that means a lot, sam',     next:'d3_sam_2',  fx:()=>{ rel.sam.trust+=6; } },
+      { text:'I should have answered',    next:'d3_sam_2b', fx:()=>{ rel.sam.trust+=4; } },
+    ],
+  },
+  d3_sam_1b: {
+    incoming: { text:'I know. but I needed to. I was trying to look out for you.', time:'8:53 AM' },
+    choices: [
+      { text:'I know you were', next:'d3_sam_2', fx:()=>{ rel.sam.trust+=5; } },
+    ],
+  },
+  d3_sam_2:  { incoming:{ text:'yeah well. just. don\'t make me worry like that again.', time:'8:55 AM' }, choices:null, onEnd:()=>{ flags.add('sam_forgiven'); } },
+  d3_sam_2b: { incoming:{ text:'it\'s ok. you didn\'t know.', time:'8:55 AM' }, choices:null, onEnd:()=>{ flags.add('sam_forgiven'); } },
+
+  d3_morgan_0: {
+    incoming: { text:'random question. what do you actually want. like from any of this.', time:'2:03 PM' },
+    choices: [
+      { text:'I\'m still figuring that out',              next:'d3_morgan_1a', fx:()=>{} },
+      { text:'I want to stop performing all the time',    next:'d3_morgan_1b', fx:()=>{ rel.morgan.trust+=5; flags.add('morgan_vulnerability'); } },
+      { text:'I don\'t think I\'m ready to answer that', next:'d3_morgan_1c', fx:()=>{ rel.morgan.tension+=3; } },
+    ],
+  },
+  d3_morgan_1a: { incoming:{ text:'me too. I think that\'s actually the right answer.', time:'2:04 PM' }, choices:null, onEnd:()=>{} },
+  d3_morgan_1b: {
+    incoming: { text:'yeah. that\'s the most honest thing you\'ve ever said to me.', time:'2:04 PM' },
+    choices: [
+      { text:'don\'t make it a thing',    next:'d3_morgan_2',  fx:()=>{} },
+      { text:'I know. I\'m working on it', next:'d3_morgan_2b', fx:()=>{ rel.morgan.trust+=3; } },
+    ],
+  },
+  d3_morgan_1c: { incoming:{ text:'ok. the door is open when you are.', time:'2:04 PM' }, choices:null, onEnd:()=>{} },
+  d3_morgan_2:  { incoming:{ text:'it IS a thing though.', time:'2:05 PM' }, choices:null, onEnd:()=>{} },
+  d3_morgan_2b: { incoming:{ text:'I know. I can tell.', time:'2:05 PM' }, choices:null, onEnd:()=>{ flags.add('d3_morgan_real'); } },
+
+  d3_riley_0: {
+    incoming: { text:'hey. checking in. how\'s the week going', time:'7:14 PM' },
+    choices: [
+      { text:'honestly, better than expected', next:'d3_riley_1',  fx:()=>{ rel.riley.trust+=2; } },
+      { text:'one day at a time',              next:'d3_riley_1b', fx:()=>{} },
+    ],
+  },
+  d3_riley_1: {
+    incoming: { text:'good. you seem different. steadier.', time:'7:15 PM' },
+    choices: [
+      { text:'I\'m trying',                             next:'d3_riley_end', fx:()=>{ rel.riley.trust+=3; } },
+      { text:'doesn\'t feel that way from the inside', next:'d3_riley_end', fx:()=>{} },
+    ],
+  },
+  d3_riley_1b: { incoming:{ text:'that\'s a good way to do it.', time:'7:15 PM' }, choices:null, onEnd:()=>{} },
+  d3_riley_end: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  DAY 4  —  Wednesday
+  // ══════════════════════════════════════════════════════════════════
+
+  d4_drew_0: {
+    incoming: { text:'hey. I know I said it already but I\'m still glad you\'re ok.', time:'10:01 AM' },
+    choices: [
+      { text:'thanks drew',             next:'d4_drew_1',  fx:()=>{ rel.drew.trust+=2; } },
+      { text:'you keep checking in',    next:'d4_drew_1b', fx:()=>{ rel.drew.trust+=3; } },
+    ],
+  },
+  d4_drew_1:  { incoming:{ text:'some people are worth two check-ins.', time:'10:02 AM' }, choices:null, onEnd:()=>{ rel.drew.trust=Math.min(100,rel.drew.trust+3); } },
+  d4_drew_1b: { incoming:{ text:'yeah. you\'re one of them.', time:'10:02 AM' }, choices:null, onEnd:()=>{ rel.drew.trust=Math.min(100,rel.drew.trust+5); flags.add('drew_close'); } },
+
+  d4_quinn_0: {
+    incoming: { text:'how are you doing with all the jordan stuff', time:'2:45 PM' },
+    choices: [
+      { text:'processing it slowly',            next:'d4_quinn_1',    fx:()=>{} },
+      { text:'honestly still kind of angry',    next:'d4_quinn_1b',   fx:()=>{ flags.add('still_angry_jordan'); } },
+      { text:'I think I\'m past it',            next:'d4_quinn_1c',   fx:()=>{} },
+    ],
+  },
+  d4_quinn_1:  { incoming:{ text:'that\'s the only honest way to do it.', time:'2:46 PM' }, choices:null, onEnd:()=>{ rel.quinn.trust=Math.min(100,rel.quinn.trust+2); } },
+  d4_quinn_1b: { incoming:{ text:'yeah. valid. you\'re allowed to be angry.', time:'2:46 PM' }, choices:null, onEnd:()=>{ rel.quinn.trust=Math.min(100,rel.quinn.trust+3); } },
+  d4_quinn_1c: {
+    incoming: { text:'are you though', time:'2:46 PM' },
+    choices: [
+      { text:'maybe not',  next:'d4_quinn_real',  fx:()=>{ rel.quinn.trust+=3; } },
+      { text:'yeah I am',  next:'d4_quinn_close', fx:()=>{} },
+    ],
+  },
+  d4_quinn_real:  { incoming:{ text:'that\'s probably the realer answer.', time:'2:47 PM' }, choices:null, onEnd:()=>{} },
+  d4_quinn_close: { incoming:{ text:'ok.', time:'2:47 PM' }, choices:null, onEnd:()=>{} },
+
+  d4_morgan_0: {
+    incoming: { text:'hey. I was looking through old photos and I found one of us from like two years ago. we looked so young.', time:'7:48 PM' },
+    choices: [
+      { text:'send it',                      next:'d4_morgan_1',  fx:()=>{ rel.morgan.trust+=2; } },
+      { text:'two years was a long time ago', next:'d4_morgan_1b', fx:()=>{} },
+    ],
+  },
+  d4_morgan_1: {
+    incoming: { text:'[photo: two figures, summer light, both laughing]', time:'7:49 PM' },
+    choices: [
+      { text:'I remember that day',                    next:'d4_morgan_2',  fx:()=>{ rel.morgan.trust+=4; } },
+      { text:'we look like we have no problems',       next:'d4_morgan_2b', fx:()=>{ rel.morgan.trust+=3; } },
+    ],
+  },
+  d4_morgan_1b: { incoming:{ text:'yeah. a lot has happened.', time:'7:49 PM' }, choices:null, onEnd:()=>{} },
+  d4_morgan_2:  { incoming:{ text:'me too. I think I needed to see it.', time:'7:50 PM' }, choices:null, onEnd:()=>{ flags.add('d4_morgan_memory'); } },
+  d4_morgan_2b: { incoming:{ text:'we didn\'t. we just didn\'t know it yet.', time:'7:50 PM' }, choices:null, onEnd:()=>{ flags.add('d4_morgan_memory'); rel.morgan.trust=Math.min(100,rel.morgan.trust+2); } },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  DAY 5  —  Thursday  (catalyst: a photo gets posted)
+  // ══════════════════════════════════════════════════════════════════
+
+  d5_casey_0: {
+    incoming: { text:'ok so someone posted a photo from the party. not sure if you saw it.', time:'8:47 AM' },
+    choices: [
+      { text:'what photo',          next:'d5_casey_1a',     fx:()=>{} },
+      { text:'oh no',               next:'d5_casey_1b',     fx:()=>{} },
+      { text:'(seen)', silent:true, next:'d5_casey_silence', fx:()=>{ rel.casey.tension+=5; flags.add('photo_declined'); } },
+    ],
+  },
+  d5_casey_1a: {
+    incoming: { text:'it\'s you in the middle of the room. the moment with morgan. candid. whoever took it — it\'s actually kind of beautiful.', time:'8:48 AM' },
+    choices: [
+      { text:'can you send it',       next:'d5_casey_photo',   fx:()=>{} },
+      { text:'I don\'t want to see it', next:'d5_casey_noshow', fx:()=>{ flags.add('photo_declined'); } },
+    ],
+  },
+  d5_casey_1b: {
+    incoming: { text:'it\'s not bad. it\'s actually kind of striking. it\'s you in the middle of the room.', time:'8:48 AM' },
+    choices: [
+      { text:'who posted it',  next:'d5_casey_who',   fx:()=>{} },
+      { text:'can you send it', next:'d5_casey_photo', fx:()=>{} },
+    ],
+  },
+  d5_casey_silence: { incoming:null, choices:null, onEnd:()=>{} },
+  d5_casey_who: {
+    incoming: { text:'alex I think. I don\'t think they meant anything by it.', time:'8:49 AM' },
+    choices: [
+      { text:'ok', next:'d5_casey_photo', fx:()=>{} },
+    ],
+  },
+  d5_casey_photo: {
+    incoming: { text:'[photo: warm light, your silhouette center frame, facing someone out of shot]', time:'8:50 AM' },
+    choices: [
+      { text:'that\'s strange to look at',          next:'d5_casey_2',  fx:()=>{ flags.add('photo_seen'); } },
+      { text:'I don\'t look the way I felt',        next:'d5_casey_2b', fx:()=>{ flags.add('photo_seen'); rel.casey.trust+=3; } },
+    ],
+  },
+  d5_casey_noshow: { incoming:{ text:'ok. that\'s ok. just wanted you to know it\'s out there.', time:'8:49 AM' }, choices:null, onEnd:()=>{} },
+  d5_casey_2:  { incoming:{ text:'that might be the point.', time:'8:51 AM' }, choices:null, onEnd:()=>{} },
+  d5_casey_2b: { incoming:{ text:'sometimes other people can see the thing you can\'t.', time:'8:51 AM' }, choices:null, onEnd:()=>{ flags.add('casey_insight'); rel.casey.trust=Math.min(100,rel.casey.trust+2); } },
+
+  d5_jordan_0: {
+    incoming: { text:'hey. did you see what alex posted', time:'1:58 PM' },
+    choices: [
+      { text:'yeah',                 next:'d5_jordan_1a', fx:()=>{} },
+      { text:'just now actually',    next:'d5_jordan_1b', fx:()=>{} },
+      { text:'I didn\'t want to look', next:'d5_jordan_1c', fx:()=>{} },
+    ],
+  },
+  d5_jordan_1a: {
+    incoming: { text:'how do you feel about it', time:'1:59 PM' },
+    choices: [
+      { text:'weird. like watching yourself from outside', next:'d5_jordan_2',  fx:()=>{ rel.jordan.trust+=3; } },
+      { text:'I\'m not sure yet',                          next:'d5_jordan_2b', fx:()=>{} },
+    ],
+  },
+  d5_jordan_1b: {
+    incoming: { text:'it\'s something.', time:'1:59 PM' },
+    choices: [
+      { text:'yeah',    next:'d5_jordan_2',           fx:()=>{ rel.jordan.trust+=2; } },
+    ],
+  },
+  d5_jordan_1c: {
+    incoming: { text:'I get that.', time:'1:59 PM' },
+    choices: [
+      { text:'did you see it', next:'d5_jordan_1d', fx:()=>{} },
+    ],
+  },
+  d5_jordan_1d: { incoming:{ text:'yeah. you look like you had something to say.', time:'2:00 PM' }, choices:[{ text:'I did', next:'d5_jordan_2', fx:()=>{ rel.jordan.trust+=2; } }] },
+  d5_jordan_2: {
+    incoming: { text:'anyway. I\'m sorry. about more than just the shots. I\'ve been sitting with that.', time:'2:01 PM' },
+    choices: [
+      { text:'I know.',                         next:'d5_jordan_end_ok',     fx:()=>{ rel.jordan.trust+=5; flags.add('jordan_full_apology'); } },
+      { text:'that\'s going to take me time',   next:'d5_jordan_end_honest', fx:()=>{ rel.jordan.trust+=2; } },
+      { text:'ok.',                             next:'d5_jordan_end_flat',   fx:()=>{} },
+    ],
+  },
+  d5_jordan_2b: { incoming:{ text:'that\'s fair.', time:'2:01 PM' }, choices:null, onEnd:()=>{} },
+  d5_jordan_end_ok:     { incoming:null, choices:null, onEnd:()=>{ flags.add('jordan_resolved'); } },
+  d5_jordan_end_honest: { incoming:{ text:'yeah. that\'s fair. I\'m not going anywhere.', time:'2:02 PM' }, choices:null, onEnd:()=>{} },
+  d5_jordan_end_flat:   { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  DAY 6  —  Friday
+  // ══════════════════════════════════════════════════════════════════
+
+  d6_morgan_0: {
+    incoming: { text:'hey. I\'ve been trying to say this for a few days. you were actually there for me once. I don\'t think I ever told you that mattered.', time:'9:33 AM' },
+    choices: [
+      { text:'when was this',           next:'d6_morgan_1a', fx:()=>{} },
+      { text:'I remember',              next:'d6_morgan_1b', fx:()=>{ rel.morgan.trust+=5; } },
+      { text:'you don\'t have to say it', next:'d6_morgan_1c', fx:()=>{ rel.morgan.tension+=2; } },
+    ],
+  },
+  d6_morgan_1a: {
+    incoming: { text:'the night everything with your family happened. two years ago. you said one thing and it was exactly right.', time:'9:34 AM' },
+    choices: [
+      { text:'I barely remember what I said', next:'d6_morgan_2', fx:()=>{ rel.morgan.trust+=4; } },
+    ],
+  },
+  d6_morgan_1b: { incoming:{ text:'I know you do. I just needed you to know I do too.', time:'9:34 AM' }, choices:null, onEnd:()=>{ flags.add('morgan_full_circle'); rel.morgan.trust=Math.min(100,rel.morgan.trust+8); } },
+  d6_morgan_1c: { incoming:{ text:'I know. I\'m saying it anyway.', time:'9:34 AM' }, choices:[{ text:'ok. I\'m listening', next:'d6_morgan_1a', fx:()=>{ rel.morgan.trust+=3; } }] },
+  d6_morgan_2:  { incoming:{ text:'sometimes the things that land don\'t feel like much on your end. but they stay.', time:'9:35 AM' }, choices:[{ text:'I\'m glad I was there', next:'d6_morgan_end', fx:()=>{ rel.morgan.trust+=5; flags.add('morgan_full_circle'); } }] },
+  d6_morgan_end: { incoming:null, choices:null, onEnd:()=>{ flags.add('morgan_full_circle'); } },
+
+  d6_riley_0: {
+    incoming: { text:'hey. I\'m having people over tomorrow. nothing intense. you should come.', time:'2:22 PM' },
+    choices: [
+      { text:'yeah. I think I need that.',       next:'d6_riley_1',  fx:()=>{ rel.riley.trust+=5; flags.add('riley_friday_invite'); } },
+      { text:'I\'ll see how I\'m feeling',       next:'d6_riley_1b', fx:()=>{ rel.riley.trust+=2; } },
+      { text:'I don\'t think I\'m ready yet',    next:'d6_riley_1c', fx:()=>{ rel.riley.tension+=3; } },
+    ],
+  },
+  d6_riley_1:  { incoming:{ text:'good. it\'ll be low key. promise.', time:'2:23 PM' }, choices:null, onEnd:()=>{} },
+  d6_riley_1b: { incoming:{ text:'no pressure. the door is open.', time:'2:23 PM' }, choices:null, onEnd:()=>{} },
+  d6_riley_1c: { incoming:{ text:'that\'s ok. next time.', time:'2:23 PM' }, choices:null, onEnd:()=>{} },
+
+  d6_alex_0: {
+    incoming: { text:'hey. I should have asked you before posting that photo. sorry.', time:'7:05 PM' },
+    choices: [
+      { text:'it\'s ok. I\'m glad I saw it',   next:'d6_alex_1',  fx:()=>{ rel.alex.trust+=3; flags.add('photo_ok'); } },
+      { text:'it was a little weird yeah',      next:'d6_alex_1b', fx:()=>{} },
+      { text:'next time ask',                   next:'d6_alex_1c', fx:()=>{ rel.alex.tension+=3; } },
+    ],
+  },
+  d6_alex_1:  { incoming:{ text:'good. you looked like someone worth photographing.', time:'7:06 PM' }, choices:null, onEnd:()=>{} },
+  d6_alex_1b: { incoming:{ text:'I get that. but you looked like yourself. maybe for the first time all night.', time:'7:06 PM' }, choices:[{ text:'I think you might be right', next:'d6_alex_end', fx:()=>{ rel.alex.trust+=3; } }] },
+  d6_alex_1c: { incoming:{ text:'yeah. fair.', time:'7:06 PM' }, choices:null, onEnd:()=>{} },
+  d6_alex_end: { incoming:null, choices:null, onEnd:()=>{} },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  DAY 7  —  Saturday  (one week later)
+  // ══════════════════════════════════════════════════════════════════
+
+  d7_morgan_0: {
+    incoming: { text:'hey. one week. how are you actually doing.', time:'9:08 AM' },
+    choices: [
+      { text:'honestly? better.',         next:'d7_morgan_1a', fx:()=>{ rel.morgan.trust+=4; } },
+      { text:'still figuring it out',      next:'d7_morgan_1b', fx:()=>{ rel.morgan.trust+=2; } },
+      { text:'I\'m not sure',             next:'d7_morgan_1c', fx:()=>{} },
+    ],
+  },
+  d7_morgan_1a: {
+    incoming: { text:'good. I\'m glad. you deserve better than that week deserved to give you.', time:'9:09 AM' },
+    choices: [
+      { text:'we both did',            next:'d7_morgan_2',  fx:()=>{ rel.morgan.trust+=5; flags.add('morgan_true_end'); } },
+      { text:'that means a lot',       next:'d7_morgan_2b', fx:()=>{ rel.morgan.trust+=4; flags.add('morgan_true_end'); } },
+    ],
+  },
+  d7_morgan_1b: { incoming:{ text:'yeah. that\'s honest. there\'s no rush.', time:'9:09 AM' }, choices:[{ text:'thanks for staying in it with me', next:'d7_morgan_2', fx:()=>{ rel.morgan.trust+=6; flags.add('morgan_true_end'); } }] },
+  d7_morgan_1c: { incoming:{ text:'that\'s ok too. you don\'t have to have it figured out.', time:'9:09 AM' }, choices:[{ text:'I know. that helps actually.', next:'d7_morgan_2', fx:()=>{ rel.morgan.trust+=4; } }] },
+  d7_morgan_2:  { incoming:{ text:'I\'m glad we talked. like, all of it. even the hard stuff.', time:'9:10 AM' }, choices:null, onEnd:()=>{ flags.add('morgan_connection_final'); flags.add('morgan_connection'); } },
+  d7_morgan_2b: { incoming:{ text:'always.', time:'9:10 AM' }, choices:null, onEnd:()=>{ flags.add('morgan_true_end'); } },
+
+  d7_casey_0: {
+    incoming: { text:'how are you feeling about everything. like, actually.', time:'10:15 AM' },
+    choices: [
+      { text:'like I\'m starting to figure it out',          next:'d7_casey_1',  fx:()=>{ rel.casey.trust+=4; } },
+      { text:'like I have a long way to go but that\'s ok',  next:'d7_casey_1b', fx:()=>{ rel.casey.trust+=3; } },
+      { text:'still processing',                             next:'d7_casey_1c', fx:()=>{ rel.casey.trust+=2; } },
+    ],
+  },
+  d7_casey_1:  { incoming:{ text:'good. that\'s what I wanted to hear.', time:'10:16 AM' }, choices:null, onEnd:()=>{ flags.add('casey_final_close'); } },
+  d7_casey_1b: { incoming:{ text:'that\'s the right answer honestly.', time:'10:16 AM' }, choices:null, onEnd:()=>{ flags.add('casey_final_close'); rel.casey.trust=Math.min(100,rel.casey.trust+2); } },
+  d7_casey_1c: { incoming:{ text:'take your time. I\'m here.', time:'10:16 AM' }, choices:null, onEnd:()=>{} },
+
+  d7_sam_0: {
+    incoming: { text:'one week later. you\'re still here.', time:'1:44 PM' },
+    choices: [
+      { text:'still here.',  next:'d7_sam_1',  fx:()=>{ rel.sam.trust+=5; } },
+      { text:'barely',       next:'d7_sam_1b', fx:()=>{ rel.sam.trust+=3; } },
+    ],
+  },
+  d7_sam_1:  { incoming:{ text:'good. that\'s enough.', time:'1:45 PM' }, choices:null, onEnd:()=>{ flags.add('sam_final'); } },
+  d7_sam_1b: { incoming:{ text:'barely counts.', time:'1:45 PM' }, choices:null, onEnd:()=>{ flags.add('sam_final'); } },
+
+  d7_jordan_0: {
+    incoming: { text:'hey. I\'m not expecting anything. I just wanted to say this week mattered.', time:'2:38 PM' },
+    choices: [
+      { text:'it did.',                        next:'d7_jordan_1',       fx:()=>{ rel.jordan.trust+=5; flags.add('jordan_final'); } },
+      { text:'I\'m still working through it',  next:'d7_jordan_1b',      fx:()=>{ rel.jordan.trust+=3; } },
+      { text:'(leave on read)', silent:true,   next:'d7_jordan_silence',  fx:()=>{ rel.jordan.tension+=5; } },
+    ],
+  },
+  d7_jordan_1:        { incoming:{ text:'ok. good.', time:'2:39 PM' }, choices:null, onEnd:()=>{} },
+  d7_jordan_1b:       { incoming:{ text:'yeah. me too. take the time.', time:'2:39 PM' }, choices:null, onEnd:()=>{} },
+  d7_jordan_silence:  { incoming:null, choices:null, onEnd:()=>{ flags.add('jordan_final_silence'); } },
+
+  d7_riley_0: {
+    incoming: { text:'hey. tonight was good. you seemed like yourself.', time:'8:22 PM' },
+    choices: [
+      { text:'I felt like myself',    next:'d7_riley_1',  fx:()=>{ rel.riley.trust+=6; flags.add('riley_true_end'); } },
+      { text:'thanks for having me',  next:'d7_riley_1b', fx:()=>{ rel.riley.trust+=4; } },
+    ],
+  },
+  d7_riley_1:  { incoming:{ text:'good. don\'t be a stranger.', time:'8:23 PM' }, choices:null, onEnd:()=>{ flags.add('riley_true_end'); } },
+  d7_riley_1b: { incoming:{ text:'anytime.', time:'8:23 PM' }, choices:null, onEnd:()=>{} },
 
 };
 
@@ -1520,12 +1967,57 @@ const ambientSeeds = [
   { phase:PHASE.EVENING, thread:'sam',    node:'sam_eve1',                  delay:80,  fired:false, cond:()=>flags.has('sam_real_talk_started')&&!flags.has('sam_ghosted') },
   { phase:PHASE.EVENING, thread:'alex',   node:'alex_eve1',                 delay:110, fired:false, cond:()=>!flags.has('alex_ignored') },
   { phase:PHASE.EVENING, thread:'jordan', node:'jordan_eve1',               delay:150, fired:false, cond:()=>!flags.has('jordan_ignored') },
+
+  // ════════════════════════════════════════════════════════════════
+  //  DAY 2  (Monday)
+  // ════════════════════════════════════════════════════════════════
+  { day:2, phase:PHASE.MORNING,   thread:'morgan', node:'d2_morgan_0', delay:10,  fired:false, cond:()=>true },
+  { day:2, phase:PHASE.MORNING,   thread:'casey',  node:'d2_casey_0',  delay:30,  fired:false, cond:()=>true },
+  { day:2, phase:PHASE.AFTERNOON, thread:'jordan', node:'d2_jordan_0', delay:20,  fired:false, cond:()=>!flags.has('jordan_ignored') },
+
+  // ════════════════════════════════════════════════════════════════
+  //  DAY 3  (Tuesday)
+  // ════════════════════════════════════════════════════════════════
+  { day:3, phase:PHASE.MORNING,   thread:'sam',    node:'d3_sam_0',    delay:12,  fired:false, cond:()=>!flags.has('sam_ghosted') },
+  { day:3, phase:PHASE.AFTERNOON, thread:'morgan', node:'d3_morgan_0', delay:20,  fired:false, cond:()=>true },
+  { day:3, phase:PHASE.EVENING,   thread:'riley',  node:'d3_riley_0',  delay:30,  fired:false, cond:()=>rel.riley.trust>=40&&!flags.has('riley_ignored') },
+
+  // ════════════════════════════════════════════════════════════════
+  //  DAY 4  (Wednesday)
+  // ════════════════════════════════════════════════════════════════
+  { day:4, phase:PHASE.MORNING,   thread:'drew',   node:'d4_drew_0',   delay:20,  fired:false, cond:()=>true },
+  { day:4, phase:PHASE.AFTERNOON, thread:'quinn',  node:'d4_quinn_0',  delay:15,  fired:false, cond:()=>!flags.has('quinn_ignored') },
+  { day:4, phase:PHASE.EVENING,   thread:'morgan', node:'d4_morgan_0', delay:18,  fired:false, cond:()=>flags.has('d2_morgan_close')||flags.has('d3_morgan_real')||rel.morgan.trust>=55 },
+
+  // ════════════════════════════════════════════════════════════════
+  //  DAY 5  (Thursday — catalyst: photo surfaces)
+  // ════════════════════════════════════════════════════════════════
+  { day:5, phase:PHASE.MORNING,   thread:'casey',  node:'d5_casey_0',  delay:5,   fired:false, cond:()=>true },
+  { day:5, phase:PHASE.AFTERNOON, thread:'jordan', node:'d5_jordan_0', delay:20,  fired:false, cond:()=>!flags.has('jordan_ignored')&&!flags.has('d2_jordan_ignored') },
+
+  // ════════════════════════════════════════════════════════════════
+  //  DAY 6  (Friday)
+  // ════════════════════════════════════════════════════════════════
+  { day:6, phase:PHASE.MORNING,   thread:'morgan', node:'d6_morgan_0', delay:8,   fired:false, cond:()=>flags.has('d3_morgan_real')||flags.has('d4_morgan_memory')||rel.morgan.trust>=55 },
+  { day:6, phase:PHASE.AFTERNOON, thread:'riley',  node:'d6_riley_0',  delay:22,  fired:false, cond:()=>rel.riley.trust>=42&&!flags.has('riley_ignored') },
+  { day:6, phase:PHASE.EVENING,   thread:'alex',   node:'d6_alex_0',   delay:18,  fired:false, cond:()=>flags.has('photo_seen')||flags.has('photo_declined') },
+
+  // ════════════════════════════════════════════════════════════════
+  //  DAY 7  (Saturday — one week later)
+  // ════════════════════════════════════════════════════════════════
+  { day:7, phase:PHASE.MORNING,   thread:'morgan', node:'d7_morgan_0', delay:8,   fired:false, cond:()=>true },
+  { day:7, phase:PHASE.MORNING,   thread:'casey',  node:'d7_casey_0',  delay:25,  fired:false, cond:()=>flags.has('casey_hangout')||flags.has('casey_insight')||flags.has('casey_connection') },
+  { day:7, phase:PHASE.AFTERNOON, thread:'sam',    node:'d7_sam_0',    delay:10,  fired:false, cond:()=>flags.has('sam_forgiven')||flags.has('sam_real_talk_started') },
+  { day:7, phase:PHASE.AFTERNOON, thread:'jordan', node:'d7_jordan_0', delay:30,  fired:false, cond:()=>flags.has('jordan_accountable')||flags.has('jordan_full_apology')||flags.has('jordan_resolved') },
+  { day:7, phase:PHASE.EVENING,   thread:'riley',  node:'d7_riley_0',  delay:20,  fired:false, cond:()=>flags.has('riley_friday_invite') },
 ];
 
 function tickAmbientSeeds() {
   const elapsed = totalTime - phaseStartTime;
   for (const seed of ambientSeeds) {
     if (seed.fired) continue;
+    // Seeds with no day tag belong to day 1; day-tagged seeds fire only on their day
+    if (seed.day !== undefined ? seed.day !== gameDay : gameDay !== 1) continue;
     if (seed.phase !== timePhase) continue;
     if (elapsed < seed.delay) continue;
     if (seed.cond && !seed.cond()) { seed.fired = true; continue; } // condition failed — skip
@@ -1670,6 +2162,35 @@ function eveningNoteBody() {
   return "the phone's quiet now. probably for the best.";
 }
 
+// ── Day advance ────────────────────────────────────────────────────
+function advanceDay() {
+  if (gameDay >= 7) { flags.add('game_complete'); return; }
+  gameDay++;
+  timePhase = PHASE.MORNING;
+  phaseStartTime = totalTime;
+  phaseTimer = -1; afternoonTimer = -1; eveningTimer = -1; lateTimer = -1;
+  // Insert a date-separator chip into every thread that has messages
+  const sep = DAY_NAMES[gameDay] || ('Day '+gameDay);
+  for (const t of Object.values(threads)) {
+    if (t.messages && t.messages.length > 0) {
+      t.messages.push({ from:'date', text:sep });
+    }
+  }
+  notes.push({ time:'8:' + String(25 + gameDay).padStart(2,'0') + ' AM', body:dayStartNote() });
+}
+
+function dayStartNote() {
+  switch(gameDay) {
+    case 2: return "second day. things feel quieter. not sure if that's good or not.";
+    case 3: return "back at it. the normal world keeps moving whether you're ready or not.";
+    case 4: return "middle of the week. the party feels far away and close at the same time.";
+    case 5: return "something's been sitting with me. can't name it yet.";
+    case 6: return "tomorrow is the one-week mark. strange how fast and slow this all went.";
+    case 7: return "one week.";
+    default: return "";
+  }
+}
+
 function getCallBackLines() {
   if (flags.has('morgan_connection') || flags.has('morgan_told_the_truth')) {
     return [
@@ -1742,8 +2263,14 @@ function submitChoice(choice) {
   if (choiceMade || !activeThreadKey) return;
   choiceMade = true;
   const t = threads[activeThreadKey];
+  const r = rel[activeThreadKey];
+  const oldTrust = r ? r.trust : 0;
   if (!choice.silent) t.messages.push({ from:'me', text:choice.text, time:clockStr(), read:false });
   if (choice.fx) choice.fx();
+  // Spawn hearts when trust meaningfully increases
+  if (r && r.trust >= oldTrust + 2) {
+    spawnHearts(W/2, STATUS_H + 28, r.color);
+  }
   refreshTone(activeThreadKey);
   if (choice.next) {
     const next = SCRIPT[choice.next];
@@ -2089,6 +2616,10 @@ function update(dt) {
   if (afternoonTimer>=0) { afternoonTimer-=dt;  if (afternoonTimer<=0) { afternoonTimer=-1; seedAfternoon(); } }
   if (eveningTimer>=0)   { eveningTimer-=dt;    if (eveningTimer<=0)   { eveningTimer=-1;   seedEvening();   } }
   if (lateTimer>=0)      { lateTimer-=dt;       if (lateTimer<=0)      { lateTimer=-1;      seedLate();      } }
+  // Auto-queue afternoon once all morning threads go quiet
+  if (timePhase===PHASE.MORNING && afternoonTimer<0) {
+    if (Object.values(threads).every(t=>!t.scriptNode)) queueAfternoon();
+  }
   // Auto-queue evening once all afternoon threads go quiet
   if (timePhase===PHASE.AFTERNOON && eveningTimer<0) {
     if (Object.values(threads).every(t=>!t.scriptNode)) queueEvening();
@@ -2097,6 +2628,7 @@ function update(dt) {
   if (screen===SCR.THREAD&&!choiceMade&&!typingActive) choiceAnim=Math.min(1,choiceAnim+dt*2.8);
   if (typingActive) { typingTimer-=dt; if (typingTimer<=0) deliverPending(); }
   if (notifToast)   { notifToast.timer-=dt; if (notifToast.timer<=0) notifToast=null; }
+  tickHearts(dt);
   // Slide snap-back
   if (lockSlide.snapBack) {
     lockSlide.progress = Math.max(0, lockSlide.progress - dt * 5);
@@ -2144,6 +2676,7 @@ function draw() {
     drawBottomNav();
     if (notifToast&&screen===SCR.HOME) drawNotifToast();
   }
+  drawHearts();
   drawPowerButton();
 }
 
@@ -2168,6 +2701,8 @@ function drawStatusBar() {
   ctx.fillStyle='rgba(5,5,12,0.78)'; ctx.fillRect(0,0,W,STATUS_H);
   ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#ddd';
   ctx.fillText(clockStr(),8,13);
+  ctx.font='5.5px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.30)';
+  ctx.fillText(dayLabel(),8,8);
   ctx.textAlign='right'; ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#aaa';
   let rx=W-6; ctx.fillText('▮▮▮▯',rx,13); rx-=34;
   if (settings.doNotDisturb) ctx.fillText('🌙',rx,13);
@@ -2438,12 +2973,17 @@ function drawHome() {
   ctx.fillStyle='rgba(0,0,0,0.45)';
   roundRect(W/2-18,5,36,8,4); ctx.fill();
   for (const app of APP_GRID) drawAppIcon(app);
-  // Evening: show quiet-phone / epilogue prompt
+  // Evening: show quiet-phone / end-of-day prompt
   if (timePhase>=PHASE.EVENING && Object.values(threads).every(t=>!t.scriptNode)) {
     const qy=H-NAV_H-30;
     ctx.fillStyle='rgba(255,255,255,0.05)'; roundRect(8,qy,W-16,22,6); ctx.fill();
     ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.28)';
-    ctx.fillText('the phone goes quiet  ·  tap to reflect',W/2,qy+14);
+    const promptLabel = gameDay >= 7
+      ? 'one week  ·  tap to close'
+      : gameDay === 1 && timePhase < PHASE.LATE
+        ? 'the phone goes quiet  ·  tap to reflect'
+        : `end of ${DAY_NAMES[gameDay]||'day'}  ·  tap to sleep`;
+    ctx.fillText(promptLabel, W/2, qy+14);
     ctx.textAlign='left';
   }
 }
@@ -2526,8 +3066,12 @@ function drawMsgList() {
 
 function drawThreadRow(key,t,y) {
   const r=rel[key], last=t.messages[t.messages.length-1];
+  const tier=relTier(key);
   ctx.fillStyle=t.unread>0?'rgba(60,140,74,0.07)':'rgba(255,255,255,0.02)';
   ctx.fillRect(0,y,W,55);
+  // Left accent bar — tier colour
+  ctx.fillStyle=tier.col+'99';
+  ctx.fillRect(0,y,3,55);
   ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(52,y+54,W-52,1);
   drawContactPhoto(key, 28, y+27, 18);
   ctx.textAlign='left';
@@ -2551,11 +3095,24 @@ function drawThread() {
   const node=t.scriptNode?SCRIPT[t.scriptNode]:null;
   ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,34);
-  ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(0,STATUS_H+33,W,1);
+  // Tier-coloured bottom border on thread header
+  const tier=relTier(activeThreadKey);
+  ctx.fillStyle=tier.col+'55'; ctx.fillRect(0,STATUS_H+33,W,1);
   ctx.font='11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('‹',8,STATUS_H+22);
   drawContactPhoto(activeThreadKey, W/2, STATUS_H+11, 9);
   ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
   ctx.fillText(r?.name||activeThreadKey,W/2,STATUS_H+30);
+  // Tier symbol + affinity bar on right side of header
+  ctx.save();
+  ctx.textAlign='right';
+  ctx.font='8px Arial'; ctx.fillStyle=tier.col;
+  ctx.fillText(tier.sym, W-10, STATUS_H+14);
+  const barW=28, barH=3, barX=W-10-barW, barY=STATUS_H+20;
+  ctx.fillStyle='rgba(255,255,255,0.10)';
+  roundRect(barX,barY,barW,barH,1.5); ctx.fill();
+  const fillPx=Math.round(barW*Math.max(0,Math.min(100,r?.trust||0))/100);
+  if (fillPx>0) { ctx.fillStyle=tier.col; roundRect(barX,barY,fillPx,barH,1.5); ctx.fill(); }
+  ctx.restore();
   ctx.textAlign='left';
   const hasChoices=node?.choices&&!choiceMade&&!typingActive;
   const choiceH=hasChoices?node.choices.length*26+10:0;
@@ -3126,9 +3683,27 @@ function drawEnd() {
   ag.addColorStop(0,'rgba(80,50,120,0.12)'); ag.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=ag; ctx.fillRect(0,0,W,H);
 
+  // ── Day 1-6: brief day-end screen ──────────────────────────────
+  if (!flags.has('game_complete') && gameDay < 7) {
+    const sleepLabel = `day ${gameDay} of 7  ·  ${DAY_NAMES[gameDay]||''}`;
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.18)';
+    ctx.fillText(sleepLabel, W/2, 42);
+    ctx.font='bold 10px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.65)';
+    ctx.fillText(endingLine(), W/2, 72);
+    // Sleep / continue button
+    const nextLabel = gameDay < 7 ? `sleep  →  ${DAY_NAMES[gameDay+1]||'day '+(gameDay+1)}` : 'one week later';
+    ctx.fillStyle='rgba(255,255,255,0.06)'; roundRect(W/2-55,H-70,110,22,6); ctx.fill();
+    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillText(nextLabel, W/2, H-56);
+    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.12)';
+    ctx.fillText('tap to continue', W/2, H-16);
+    ctx.textAlign='left'; return;
+  }
+
+  // ── Day 7 / game_complete: full epilogue ─────────────────────────
   // Title line
   ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.2)';
-  ctx.fillText(timePhase>=PHASE.LATE?'end of day  ·  2:47 AM':'end of day',W/2,42);
+  ctx.fillText('one week later  ·  saturday', W/2, 42);
 
   // Closing line based on final state
   ctx.font='bold 10px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.72)';
@@ -3187,16 +3762,26 @@ function drawEnd() {
 }
 
 function endingLine() {
+  // Day 7 endings take priority
+  if (flags.has('morgan_connection_final'))     return "you let someone all the way in.";
+  if (flags.has('riley_true_end'))              return "you showed up. that's not nothing.";
+  if (flags.has('sam_final') && flags.has('sam_forgiven')) return "you stayed. sam noticed.";
+  if (flags.has('jordan_final'))                return "jordan said it mattered. you believed them.";
+  if (flags.has('casey_final_close'))           return "casey knew you'd figure it out.";
+  // Day 1–6 endings
   if (flags.has('morgan_connection'))           return "you let someone in.";
   if (flags.has('unknown_connection'))          return "a stranger saw you clearly.";
   if (flags.has('casey_connection'))            return "someone who knew you told you who you were.";
   if (flags.has('morgan_told_the_truth'))       return "you said the true thing.";
   if (flags.has('called_morgan_back'))          return "you called.";
   if (flags.has('riley_sees_you'))              return "someone saw you. you let them.";
+  if (flags.has('sam_forgiven'))                return "sam forgave you. now forgive yourself.";
   if (flags.has('sam_real_talk_started'))       return "you left a door open with Sam.";
+  if (flags.has('jordan_full_apology'))         return "jordan said sorry. really said it.";
   if (flags.has('jordan_accountable'))          return "you got an answer. maybe not the one you wanted.";
   if (flags.has('morgan_connection_started'))   return "maybe that was enough.";
   if (flags.has('riley_connection'))            return "you made something right.";
+  if (flags.has('d2_morgan_close'))             return "the second day was steadier.";
   if (flags.has('sam_ghosted') && flags.has('casey_pushed_away')) return "you went quiet on everyone. it's a choice.";
   if (flags.has('eve_silence') || flags.has('morgan_aft_ignored')) return "you said nothing. again.";
   if (flags.has('admitted_blackout'))           return "at least you were honest about it.";
@@ -3204,8 +3789,16 @@ function endingLine() {
 }
 
 function onClickEnd(mx, my) {
-  if (timePhase >= PHASE.EVENING) queueLate();
-  screen = SCR.HOME;
+  if (gameDay === 1 && timePhase < PHASE.LATE) {
+    // Day 1: first tap triggers LATE (unknown number / closing acts)
+    queueLate(); screen = SCR.HOME; return;
+  }
+  if (gameDay >= 7) {
+    // Day 7: true finale — stay on END or go home
+    flags.add('game_complete'); screen = SCR.HOME; return;
+  }
+  // Days 1 (post-LATE) through 6: sleep and advance to next day
+  advanceDay(); screen = SCR.HOME;
 }
 
 // ── Shared header ──────────────────────────────────────────────────
