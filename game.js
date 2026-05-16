@@ -2717,17 +2717,56 @@ function drawPowerButton() {
 
 // ── Status bar ─────────────────────────────────────────────────────
 function drawStatusBar() {
-  ctx.fillStyle='rgba(5,5,12,0.78)'; ctx.fillRect(0,0,W,STATUS_H);
-  ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#ddd';
-  ctx.fillText(clockStr(),8,13);
-  ctx.font='5.5px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.30)';
-  ctx.fillText(dayLabel(),8,8);
-  ctx.textAlign='right'; ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#aaa';
-  let rx=W-6; ctx.fillText('▮▮▮▯',rx,13); rx-=34;
-  if (settings.doNotDisturb) ctx.fillText('🌙',rx,13);
-  // Missed call indicator
+  // Frosted glass background with subtle gradient
+  const sbG = ctx.createLinearGradient(0,0,0,STATUS_H);
+  sbG.addColorStop(0,'rgba(8,6,18,0.88)'); sbG.addColorStop(1,'rgba(5,4,12,0.75)');
+  ctx.fillStyle = sbG; ctx.fillRect(0,0,W,STATUS_H);
+  // Bottom separator
+  ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(0,STATUS_H-1,W,1);
+
+  // Day label (tiny, above clock)
+  ctx.font='5px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left';
+  ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillText(dayLabel(), 8, 7);
+  // Clock
+  ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.92)';
+  ctx.fillText(clockStr(), 8, 16);
+
+  // Right-side icons
+  let rx = W - 7;
+
+  // Battery outline + fill (drawn, not emoji)
+  const bw=18, bh=8, by=Math.round((STATUS_H-bh)/2);
+  ctx.strokeStyle='rgba(255,255,255,0.40)'; ctx.lineWidth=0.8;
+  roundRect(rx-bw, by, bw, bh, 2); ctx.stroke();
+  // battery nub
+  ctx.fillStyle='rgba(255,255,255,0.40)';
+  ctx.fillRect(rx, by+2, 2, bh-4);
+  // fill (75%)
+  const bFill = Math.round((bw-3)*0.75);
+  ctx.fillStyle='rgba(120,220,100,0.80)';
+  roundRect(rx-bw+1.5, by+1.5, bFill, bh-3, 1.2); ctx.fill();
+  rx -= bw + 5;
+
+  // Signal bars (4 bars, 3 filled)
+  const barW=3, barGap=2, bars=4, barMaxH=7;
+  for (let i=0; i<bars; i++) {
+    const bh2 = Math.round(barMaxH*(i+1)/bars);
+    const bx2 = rx - (bars-1-i)*(barW+barGap);
+    const by2 = Math.round((STATUS_H-bh2)/2);
+    ctx.fillStyle = i < 3 ? 'rgba(255,255,255,0.80)' : 'rgba(255,255,255,0.20)';
+    roundRect(bx2, by2, barW, bh2, 0.8); ctx.fill();
+  }
+  rx -= bars*(barW+barGap) + 4;
+
+  // DND moon
+  if (settings.doNotDisturb) {
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.textAlign='right';
+    ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fillText('🌙', rx, 14); rx -= 14;
+  }
+  // Missed call pip
   if (timePhase>=PHASE.AFTERNOON && !voicemails[0].listened) {
-    rx-=20; ctx.fillStyle='#e53935'; ctx.fillText('📵',rx,13);
+    ctx.fillStyle='#e53935'; ctx.beginPath(); ctx.arc(rx-3, STATUS_H/2, 3, 0, Math.PI*2); ctx.fill();
+    rx -= 10;
   }
   ctx.textAlign='left';
 }
@@ -2735,14 +2774,24 @@ function drawStatusBar() {
 // ── Bottom nav ─────────────────────────────────────────────────────
 function drawBottomNav() {
   const y=H-NAV_H;
-  ctx.fillStyle='rgba(8,8,16,0.93)'; ctx.fillRect(0,y,W,NAV_H);
-  ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,y,W,1);
+  // Frosted glass gradient
+  const nbG=ctx.createLinearGradient(0,y,0,H);
+  nbG.addColorStop(0,'rgba(10,10,20,0.97)'); nbG.addColorStop(1,'rgba(6,6,14,1.0)');
+  ctx.fillStyle=nbG; ctx.fillRect(0,y,W,NAV_H);
+  // Top separator
+  ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(0,y,W,1);
   if (screen!==SCR.HOME) {
-    ctx.font='10px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left';
-    ctx.fillStyle='#6aacff'; ctx.fillText('‹  back',12,y+17);
+    // Back button with pill background
+    ctx.fillStyle='rgba(106,172,255,0.12)';
+    roundRect(6,y+5,52,20,10); ctx.fill();
+    ctx.font='bold 11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left';
+    ctx.fillStyle='#6aacff'; ctx.fillText('‹',13,y+19);
+    ctx.font='8px Arial Narrow, Arial, sans-serif';
+    ctx.fillText('back',24,y+19);
   }
-  ctx.fillStyle='rgba(255,255,255,0.3)';
-  roundRect(W/2-22,y+8,44,5,3); ctx.fill();
+  // Home indicator pill — thicker, rounder, iOS-style
+  ctx.fillStyle='rgba(255,255,255,0.35)';
+  roundRect(W/2-20,y+10,40,4,2.5); ctx.fill();
 }
 
 // ── Notification toast ─────────────────────────────────────────────
@@ -3073,7 +3122,7 @@ function drawAppIcon(app) {
 
 // ── Messages list ──────────────────────────────────────────────────
 function drawMsgList() {
-  ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#080810'; ctx.fillRect(0,0,W,H);
   appHeader('Messages');
   const listTop = STATUS_H+36, listBot = H - NAV_H;
   ctx.save();
@@ -3086,25 +3135,41 @@ function drawMsgList() {
 function drawThreadRow(key,t,y) {
   const r=rel[key], last=t.messages[t.messages.length-1];
   const tier=relTier(key);
-  ctx.fillStyle=t.unread>0?'rgba(60,140,74,0.07)':'rgba(255,255,255,0.02)';
+  // Row background
+  if (t.unread>0) {
+    const rG=ctx.createLinearGradient(0,y,W,y);
+    rG.addColorStop(0,'rgba(46,120,60,0.11)'); rG.addColorStop(1,'rgba(46,120,60,0.03)');
+    ctx.fillStyle=rG;
+  } else {
+    ctx.fillStyle='rgba(255,255,255,0.015)';
+  }
   ctx.fillRect(0,y,W,55);
-  // Left accent bar — tier colour
-  ctx.fillStyle=tier.col+'99';
-  ctx.fillRect(0,y,3,55);
-  ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(52,y+54,W-52,1);
-  drawContactPhoto(key, 28, y+27, 18);
+  // Left accent bar — tier colour, slightly wider
+  ctx.fillStyle=tier.col+'aa';
+  ctx.fillRect(0,y,4,55);
+  // Bottom divider (skip left accent zone)
+  ctx.fillStyle='rgba(255,255,255,0.055)'; ctx.fillRect(56,y+54,W-56,1);
+  drawContactPhoto(key, 29, y+28, 19);
   ctx.textAlign='left';
-  ctx.font=t.unread>0?'bold 9px Arial Narrow, Arial, sans-serif':'9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
-  ctx.fillText(r?.name||key,54,y+22);
-  ctx.font='8px Arial Narrow, Arial, sans-serif';
-  ctx.fillStyle=t.unread>0?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.38)';
+  ctx.font=t.unread>0?'bold 9px Arial Narrow, Arial, sans-serif':'9px Arial Narrow, Arial, sans-serif';
+  ctx.fillStyle=t.unread>0?'#ffffff':'rgba(255,255,255,0.88)';
+  ctx.fillText(r?.name||key,57,y+23);
+  ctx.font='7.5px Arial Narrow, Arial, sans-serif';
+  ctx.fillStyle=t.unread>0?'rgba(255,255,255,0.78)':'rgba(255,255,255,0.36)';
   const prev=last?(last.from==='me'?'You: '+last.text:last.text):'';
-  ctx.fillText(prev.length>26?prev.slice(0,25)+'…':prev,54,y+37);
+  ctx.fillText(prev.length>26?prev.slice(0,25)+'…':prev,57,y+37);
   if (last) {
     ctx.textAlign='right'; ctx.font='6px Arial Narrow, Arial, sans-serif';
-    ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillText(last.time,W-10,y+22); ctx.textAlign='left';
+    ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.fillText(last.time,W-10,y+23); ctx.textAlign='left';
   }
-  if (t.unread>0) { ctx.fillStyle='#3c8c4a'; ctx.beginPath(); ctx.arc(W-13,y+33,5,0,Math.PI*2); ctx.fill(); }
+  if (t.unread>0) {
+    // Unread badge — pill instead of circle for counts > 1
+    const badgeStr=String(t.unread);
+    ctx.font='bold 6px Arial Narrow, Arial, sans-serif';
+    const bw=Math.max(10,ctx.measureText(badgeStr).width+6);
+    ctx.fillStyle='#2e8c44'; roundRect(W-10-bw,y+30,bw,11,5.5); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(badgeStr,W-10-bw/2,y+39); ctx.textAlign='left';
+  }
 }
 
 // ── Thread view ────────────────────────────────────────────────────
@@ -3112,14 +3177,24 @@ function drawThread() {
   if (!activeThreadKey) return;
   const t=threads[activeThreadKey], r=rel[activeThreadKey];
   const node=t.scriptNode?SCRIPT[t.scriptNode]:null;
-  ctx.fillStyle='#0d0d16'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,34);
+  ctx.fillStyle='#080810'; ctx.fillRect(0,0,W,H);
+  // Subtle vignette on chat bg
+  const tvG=ctx.createRadialGradient(W/2,H/2,60,W/2,H/2,200);
+  tvG.addColorStop(0,'rgba(0,0,0,0)'); tvG.addColorStop(1,'rgba(0,0,0,0.18)');
+  ctx.fillStyle=tvG; ctx.fillRect(0,0,W,H);
+  // Thread header — frosted glass gradient
+  const thG = ctx.createLinearGradient(0,STATUS_H,0,STATUS_H+34);
+  thG.addColorStop(0,'rgba(14,14,26,0.99)'); thG.addColorStop(1,'rgba(10,10,20,0.96)');
+  ctx.fillStyle=thG; ctx.fillRect(0,STATUS_H,W,34);
   // Tier-coloured bottom border on thread header
   const tier=relTier(activeThreadKey);
-  ctx.fillStyle=tier.col+'55'; ctx.fillRect(0,STATUS_H+33,W,1);
-  ctx.font='11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#6aacff'; ctx.fillText('‹',8,STATUS_H+22);
-  drawContactPhoto(activeThreadKey, W/2, STATUS_H+11, 9);
-  ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#fff';
+  ctx.fillStyle=tier.col+'66'; ctx.fillRect(0,STATUS_H+33,W,1);
+  // Back chevron
+  ctx.font='bold 13px Arial Narrow, Arial, sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#6aacff';
+  ctx.fillText('‹',8,STATUS_H+23);
+  // Centered avatar (radius 11) + centered name below
+  drawContactPhoto(activeThreadKey, W/2, STATUS_H+12, 11);
+  ctx.font='bold 9px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
   ctx.fillText(r?.name||activeThreadKey,W/2,STATUS_H+30);
   // Tier symbol + affinity bar on right side of header
   ctx.save();
@@ -3134,7 +3209,7 @@ function drawThread() {
   ctx.restore();
   ctx.textAlign='left';
   const hasChoices=node?.choices&&!choiceMade&&!typingActive;
-  const choiceH=hasChoices?node.choices.length*26+10:0;
+  const choiceH=hasChoices?node.choices.length*28+10:0;
   const typingH=typingActive?28:0;
   const bubbleBot=H-NAV_H-choiceH-typingH-4;
   const bubbleTop=STATUS_H+36;
@@ -3187,13 +3262,21 @@ function drawBubbles(t,top,bottom) {
     y-=bH+7;
     if (y+bH<top) break;
     const bX=isMe?W-bW-10:10;
-    ctx.fillStyle=isMe?'#1d5fa8':'#252535';
+    // Sent: deep blue gradient  /  Received: dark purple-slate
+    const bubbleCol = isMe ? '#1a58a8' : '#1e1e30';
+    ctx.fillStyle=bubbleCol;
     ctx.beginPath();
     if (isMe) { ctx.moveTo(bX+bW,y+bH-10); ctx.lineTo(bX+bW+6,y+bH-4); ctx.lineTo(bX+bW-4,y+bH-4); }
     else       { ctx.moveTo(bX,y+bH-10);    ctx.lineTo(bX-6,y+bH-4);    ctx.lineTo(bX+4,y+bH-4);    }
     ctx.fill();
-    ctx.fillStyle=isMe?'#1d5fa8':'#252535'; roundRect(bX,y,bW,bH,10); ctx.fill();
-    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='#f0f0f0'; ctx.textAlign='left';
+    roundRect(bX,y,bW,bH,11); ctx.fill();
+    if (isMe) {
+      // Gradient overlay on sent bubble
+      const bG=ctx.createLinearGradient(bX,y,bX,y+bH);
+      bG.addColorStop(0,'rgba(255,255,255,0.12)'); bG.addColorStop(1,'rgba(0,0,0,0.08)');
+      ctx.fillStyle=bG; roundRect(bX,y,bW,bH,11); ctx.fill();
+    }
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle=isMe?'#eef4ff':'#dde0f0'; ctx.textAlign='left';
     for (let li=0;li<lines.length;li++) ctx.fillText(lines[li],bX+padX,y+padY+10+li*12);
     if (isMe&&i===t.messages.length-1) {
       ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.textAlign='right';
@@ -3208,26 +3291,43 @@ function drawBubbles(t,top,bottom) {
 }
 
 function drawTyping(y) {
-  const phase=(totalTime*2.8)%3;
-  ctx.fillStyle='#252535'; roundRect(12,y+2,46,20,10); ctx.fill();
+  ctx.fillStyle='#1e1e30'; roundRect(12,y+2,52,22,11); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1; roundRect(12,y+2,52,22,11); ctx.stroke();
   for (let d=0;d<3;d++) {
-    ctx.fillStyle=`rgba(200,200,210,${Math.floor(phase)===d?1:0.25})`;
-    ctx.beginPath(); ctx.arc(24+d*11,y+12,3,0,Math.PI*2); ctx.fill();
+    // Wave: each dot bobs on a sin wave offset by 0.6 rad
+    const wave=Math.sin(totalTime*5 + d*1.2);
+    const dotY=y+13 - wave*2;
+    const a=0.35+0.65*((wave+1)/2);
+    ctx.fillStyle=`rgba(180,188,220,${a.toFixed(2)})`;
+    ctx.beginPath(); ctx.arc(25+d*12,dotY,2.5,0,Math.PI*2); ctx.fill();
   }
 }
 
 function drawChoices(choices,startY) {
-  const bH=22,gap=4;
+  const bH=24,gap=4;
   ctx.globalAlpha=choiceAnim;
   let by=startY+4;
   for (const c of choices) {
     const silent=!!c.silent;
-    ctx.fillStyle='rgba(0,0,0,0.35)'; roundRect(9,by+2,W-18,bH,6); ctx.fill();
-    ctx.fillStyle=silent?'rgba(45,45,55,0.92)':'rgba(22,70,140,0.92)'; roundRect(8,by,W-16,bH,6); ctx.fill();
-    ctx.strokeStyle=silent?'rgba(130,130,150,0.3)':'rgba(80,140,255,0.4)'; ctx.lineWidth=1;
-    roundRect(8,by,W-16,bH,6); ctx.stroke();
-    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle=silent?'rgba(255,255,255,0.45)':'#fff';
+    // Drop shadow
+    ctx.fillStyle='rgba(0,0,0,0.45)'; roundRect(9,by+2,W-18,bH,7); ctx.fill();
+    // Base fill
+    ctx.fillStyle=silent?'rgba(38,38,52,0.94)':'rgba(18,64,138,0.96)'; roundRect(8,by,W-16,bH,7); ctx.fill();
+    // Gradient sheen on top half
+    if (!silent) {
+      const cG=ctx.createLinearGradient(8,by,8,by+bH/2);
+      cG.addColorStop(0,'rgba(255,255,255,0.14)'); cG.addColorStop(1,'rgba(255,255,255,0.00)');
+      ctx.fillStyle=cG; roundRect(8,by,W-16,bH/2,7); ctx.fill();
+    }
+    // Border
+    ctx.strokeStyle=silent?'rgba(140,140,165,0.28)':'rgba(88,148,255,0.50)'; ctx.lineWidth=1;
+    roundRect(8,by,W-16,bH,7); ctx.stroke();
+    // Choice text
+    ctx.font='8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle=silent?'rgba(255,255,255,0.42)':'#fff';
     ctx.textAlign='left'; ctx.fillText(c.text,16,by+bH/2+3);
+    // Chevron
+    ctx.textAlign='right'; ctx.fillStyle=silent?'rgba(255,255,255,0.20)':'rgba(140,190,255,0.70)';
+    ctx.fillText('›',W-12,by+bH/2+3);
     by+=bH+gap;
   }
   ctx.globalAlpha=1; ctx.textAlign='left';
@@ -3853,12 +3953,16 @@ function drawEnd() {
     ctx.fillText(sleepLabel, W/2, 42);
     ctx.font='bold 10px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.65)';
     ctx.fillText(endingLine(), W/2, 72);
-    // Sleep / continue button
+    // Sleep / continue button — glassy pill
     const nextLabel = gameDay < 7 ? `sleep  →  ${DAY_NAMES[gameDay+1]||'day '+(gameDay+1)}` : 'one week later';
-    ctx.fillStyle='rgba(255,255,255,0.06)'; roundRect(W/2-55,H-70,110,22,6); ctx.fill();
-    ctx.font='7px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
-    ctx.fillText(nextLabel, W/2, H-56);
-    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.12)';
+    ctx.fillStyle='rgba(255,255,255,0.07)'; roundRect(W/2-58,H-76,116,26,8); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1; roundRect(W/2-58,H-76,116,26,8); ctx.stroke();
+    const slG=ctx.createLinearGradient(W/2-58,H-76,W/2-58,H-50);
+    slG.addColorStop(0,'rgba(255,255,255,0.06)'); slG.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=slG; roundRect(W/2-58,H-76,116,13,8); ctx.fill();
+    ctx.font='bold 8px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.55)';
+    ctx.fillText(nextLabel, W/2, H-60);
+    ctx.font='6px Arial Narrow, Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,0.14)';
     ctx.fillText('tap to continue', W/2, H-16);
     ctx.textAlign='left'; return;
   }
@@ -3966,9 +4070,18 @@ function onClickEnd(mx, my) {
 
 // ── Shared header ──────────────────────────────────────────────────
 function appHeader(title) {
-  ctx.fillStyle='rgba(12,12,22,0.97)'; ctx.fillRect(0,STATUS_H,W,32);
-  ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,STATUS_H+31,W,1);
-  ctx.font='bold 11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  // Frosted glass gradient header
+  const ahG=ctx.createLinearGradient(0,STATUS_H,0,STATUS_H+32);
+  ahG.addColorStop(0,'rgba(16,14,28,0.99)'); ahG.addColorStop(1,'rgba(10,10,20,0.96)');
+  ctx.fillStyle=ahG; ctx.fillRect(0,STATUS_H,W,32);
+  // Bottom edge glow-line
+  const sepG=ctx.createLinearGradient(0,0,W,0);
+  sepG.addColorStop(0,'rgba(255,255,255,0.0)');
+  sepG.addColorStop(0.3,'rgba(255,255,255,0.10)');
+  sepG.addColorStop(0.7,'rgba(255,255,255,0.10)');
+  sepG.addColorStop(1,'rgba(255,255,255,0.0)');
+  ctx.fillStyle=sepG; ctx.fillRect(0,STATUS_H+31,W,1);
+  ctx.font='bold 11px Arial Narrow, Arial, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.95)';
   ctx.fillText(title,W/2,STATUS_H+21); ctx.textAlign='left';
 }
 
